@@ -56,18 +56,11 @@ def imageCutter(img, width=256, height=256):
     imgWidth, imgHeight = img.size
     for ih in range(0, imgHeight, height):
         for iw in range(0, imgWidth, width):
-            box = (iw, ih, imageCutWidth, imageCutHeight)
-
-            '''
-            if iw + width > imgwidth : 
-                boxL = (imgwidth - width, imgwidth)
+            box = (iw, ih, iw + width, ih + height)
+            if iw + width > imgwidth:
+                box = (imgwidth - iw, ih, imgWidth, imageCutHeight)
             if ih + height > imgheight : 
-                box = (box[0], box[1], imgheight-height, imgheight)
-            if iw + width > imgwidth : 
-                boxL = (imgwidth - width, imgwidth, box[1], box[2])
-            if ih + height > imgheight : 
-                box = (box[0], imgheight-height, box[2], imgheight)
-            '''
+                box = (box[0], imgheight-ih, box[2], imgheight)
             cutimg = img.crop(box)
             cutimgWidth, cutimgHeight = cutimg.size
             images.append(cutimg)

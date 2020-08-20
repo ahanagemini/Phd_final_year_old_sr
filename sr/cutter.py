@@ -33,20 +33,22 @@ def process(ifile, ofile):
     ifile: input file path for matrix
     ofile: use this to chop input into pieces and write out
     """
-    print("Processing: ", ifile)
+    print("Processing: ", ifile, "...", end="")
     imatrix = np.load(ifile)
     imatrix = imatrix.f.arr_0  # Load data from inside file.
     stats = computestats(imatrix)
     if stats["upper_quartile"] - stats["lower_quartile"] < 0.01:
-        continue
+        print("Skipping because file is constant")
+        return
     prefix = ofile.stem
     odir = ofile.parent
     os.makedirs(odir)
     with open(odir / "stats.json", "w") as outfile:
         json.dump(stats, outfile)
+
     # mlist = matrixcutter(m)
     # Fill this direcory up with prefix_xx_xx.npz files.
-
+    print("Done")
 
 def scan_idir(ipath, opath):
     """
