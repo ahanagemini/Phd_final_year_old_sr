@@ -12,7 +12,9 @@ from pathlib import Path
 import numpy as np
 
 def computestats(m):
-    return (np.mean(m), np.std(m))
+    upper_quartile = np.percentile(m, 90)
+    lower_quartile = np.percentile(m, 10)
+    return (np.mean(m), np.std(m), upper_quartile, lower_quartile)
 
 def process(ifile, ofile):
     print("Processing: ", ifile)
