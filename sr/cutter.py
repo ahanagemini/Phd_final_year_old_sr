@@ -9,9 +9,15 @@ Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata
 """
 from docopt import docopt
 from pathlib import Path
+import numpy as np
 
 def process(ifile, ofile):
     print("Processing: ", ifile)
+    m = np.load(ifile)
+    m = m.f.arr_0  # Load data from inside file.
+    #stats = computestats(m)
+    #mlist = matrixcutter(m)
+    # Write this out to ofile path
 
 def scan_idir(ipath, opath):
     return [ (x, opath / str(x)[len(str(ipath))+1:]) for x in sorted(ipath.rglob("*.npz"))]
