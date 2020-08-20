@@ -11,11 +11,14 @@ from docopt import docopt
 from pathlib import Path
 import numpy as np
 
+def computestats(m):
+    return (np.mean(m), np.std(m))
+
 def process(ifile, ofile):
     print("Processing: ", ifile)
     m = np.load(ifile)
     m = m.f.arr_0  # Load data from inside file.
-    #stats = computestats(m)
+    stats = computestats(m)
     #mlist = matrixcutter(m)
     # Write this out to ofile path
 
