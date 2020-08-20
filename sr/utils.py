@@ -2,99 +2,76 @@
 """
 Created on Wed Aug 19 22:41:51 2020
 
-@author: sumu1
+@author: sumanth
 """
 from PIL import Image
 import numpy as np
+import os
 
 
-def Loader(file):
+def Loader(filePath):
     '''
-
-
     Parameters
     ----------
-    file : TYPE
+    filePath : image File path
         DESCRIPTION.
 
     Returns
     -------
-    imageArray : TYPE
+    image : PillowImage
         DESCRIPTION.
 
     '''
 
     ImagePaths = [".jpg", ".png", ".jpeg", ".gif"]
     ImageArrayPaths = [".npy", ".npz"]
-    fileExt = os.path.splitext(file.name)[1].lower()
+    fileExt = os.path.splitext(filePath)[1].lower()
     if fileExt in ImagePaths:
-        image = Image.open(file)
+        image = Image.open(filePath)
     elif fileExt in ImageArrayPaths:
-        image = Image.fromarray(np.uint8(np.load(file)))
+        image = Image.fromarray(np.uint8(np.load(filePath)))
     return image
 
 
-def imageCutter(img, width=256, height=256):
+def matrixcutter(imgPath, height=256, width=256):
     '''
 
 
     Parameters
     ----------
-    image : TYPE
-        DESCRIPTION.
-    height : TYPE, optional
-        DESCRIPTION. The default is 256.
-    width : TYPE, optional
-        DESCRIPTION. The default is 256.
+    imgPath : String
+        image file.
+    height : int
+        height of the cut image.
+    width : int
+        width of the cut image.
 
     Returns
     -------
-    None.
+    images: List
+    Contains list of pillow images cut in 256 width and 256 height.
 
     '''
+    img = Loader(imgPath)
     images = []
     imgWidth, imgHeight = img.size
-    for ih in range(0, imgHeight, height):
-        for iw in range(0, imgWidth, width):
-            box = (iw, ih, iw + width, ih + height)
-            if iw + width > imgwidth:
-                box = (imgwidth - iw, ih, imgWidth, imageCutHeight)
-            if ih + height > imgheight : 
-                box = (box[0], imgheight-ih, box[2], imgheight)
+    for y in range(0, imgHeight, height):
+        for x in range(0, imgWidth, width):
+            xPrime = x + width
+            yPrime = y + height
+            box = (x, y, xPrime, yPrime)
+            if xPrime > imgWidth:
+                # exceededWidth is the difference between xPrime and original Image width
+                exceededWidth = xPrime - imgWidth
+                box = (x - exceededWidth, y, xPrime - exceededWidth, yPrime)
+            if yPrime > imgHeight:
+                # exceededHeight is the difference between yPrime and original Image height
+                exceededHeight = yPrime - imgHeight
+                box = (x, y - exceededHeight, xPrime, yPrime - exceededHeight)
             cutimg = img.crop(box)
-            cutimgWidth, cutimgHeight = cutimg.size
             images.append(cutimg)
     return images
 
-
-def matrixcutter(imgPath):
-    '''
-
-
-    Parameters
-    ----------
-    imgPath : TYPE
-        DESCRIPTION.
-    height : TYPE
-        DESCRIPTION.
-    width : TYPE
-        DESCRIPTION.
-
-    Returns
-    -------
-    None.
-
-    '''
-    for file in os.scandir(path):
-        if file.is_dir():
-            subFolders.append(file.path)
-        if file.is_file():
-            img = Loader(file)
-            images = imageCutter(img, 256, 256)
-    for dir in list(subFolders):
-        subF = matrixcutter(dir)
-        subFolders.extend(subF)
-    return subFolders
 
 
 
