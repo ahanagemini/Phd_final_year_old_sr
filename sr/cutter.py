@@ -7,10 +7,19 @@ cutter.py --input-directory=IDIR --output-directory=ODIR
 
 """
 from docopt import docopt
+from pathlib import Path
+
+
+
+def scan_idir(ipath):
+    return sorted(ipath.rglob("*.npz"))
 
 def main():
     arguments = docopt(__doc__, version='Matrix cutter system')
-    print(arguments)
+    idir = Path(arguments['--input-directory'])
+    odir = Path(arguments['--output-directory'])
+    L = scan_idir(idir)
+    print(len(L))
 
 if __name__ == '__main__':
     main()
