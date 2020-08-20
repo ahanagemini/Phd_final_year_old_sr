@@ -65,21 +65,21 @@ def imageCutter(img, width=256, height=256):
     """
     images = []
     imgHeight, imgWidth = img.shape
-    #print("Input size = ", img.shape)
+    # print("Input size = ", img.shape)
     for i, ih in enumerate(range(0, imgHeight, height)):
         for j, iw in enumerate(range(0, imgWidth, width)):
             posx = iw
             posy = ih
             if posx + width > imgWidth:
-                posx = imgWidth-width
+                posx = imgWidth - width
             if posy + height > imgHeight:
                 posy = imgHeight - height
-        
-            cutimg = img[posy:posy+height, posx:posx+width]
-            #print("Pos: ", posy, posx)
+
+            cutimg = img[posy : posy + height, posx : posx + width]
+            # print("Pos: ", posy, posx)
             # cutimg = img.crop(box)
-            #print("Cropped image shape = ", cutimg.shape)
-            #cutimgWidth, cutimgHeight = cutimg.shape
+            # print("Cropped image shape = ", cutimg.shape)
+            # cutimgWidth, cutimgHeight = cutimg.shape
             assert cutimg.shape[0] == height and cutimg.shape[1] == width
             images.append((i, j, cutimg))
     return images
@@ -106,8 +106,8 @@ def process(ifile, ofile):
     """
     print("Processing: ", ifile, "...", end="")
     imatrix = Loader(ifile)
-    #imatrix = np.load(ifile)
-    #imatrix = imatrix.f.arr_0  # Load data from inside file.
+    # imatrix = np.load(ifile)
+    # imatrix = imatrix.f.arr_0  # Load data from inside file.
     stats = computestats(imatrix)
     if (
         (stats["upper_quartile"] - stats["lower_quartile"] < 0.01)
