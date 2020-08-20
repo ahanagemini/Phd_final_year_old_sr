@@ -2,7 +2,7 @@
 name = "sr"
 version = "0.1.0"
 description = ""
-authors = ["Piyush Kumar <piyush@compgeom.com>"]
+authors = ["Piyush Kumar <piyush@acm.org>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
