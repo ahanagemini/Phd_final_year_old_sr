@@ -9,9 +9,80 @@ Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata
 """
 import os
 import json
+from PIL import Image
+import numpy as np
 from docopt import docopt
 from pathlib import Path
 import numpy as np
+
+
+def Loader(ifile):
+    """
+
+
+    Parameters
+    ----------
+    file : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    imageArray : TYPE
+        DESCRIPTION.
+
+    """
+
+    ImagePaths = [".jpg", ".png", ".jpeg", ".gif"]
+    ImageArrayPaths = [".npy", ".npz"]
+    fileExt = os.path.splitext(ifile.name)[1].lower()
+    if fileExt in ImagePaths:
+        image = Image.open(ifile)
+    if fileExt == ".npz":
+        image = np.load(ifile)
+        image = image.f.arr_0  # Load data from inside file.
+    elif fileExt in ImageArrayPaths:
+        image = Image.fromarray(np.uint8(np.load(ifile)))
+    return image
+
+
+def imageCutter(img, width=256, height=256):
+    """
+
+
+    Parameters
+    ----------
+    image : TYPE
+        DESCRIPTION.
+    height : TYPE, optional
+        DESCRIPTION. The default is 256.
+    width : TYPE, optional
+        DESCRIPTION. The default is 256.
+
+    Returns
+    -------
+    None.
+
+    """
+    images = []
+    imgHeight, imgWidth = img.shape
+    #print("Input size = ", img.shape)
+    for i, ih in enumerate(range(0, imgHeight, height)):
+        for j, iw in enumerate(range(0, imgWidth, width)):
+            posx = iw
+            posy = ih
+            if posx + width > imgWidth:
+                posx = imgWidth-width
+            if posy + height > imgHeight:
+                posy = imgHeight - height
+        
+            cutimg = img[posy:posy+height, posx:posx+width]
+            #print("Pos: ", posy, posx)
+            # cutimg = img.crop(box)
+            #print("Cropped image shape = ", cutimg.shape)
+            #cutimgWidth, cutimgHeight = cutimg.shape
+            assert cutimg.shape[0] == height and cutimg.shape[1] == width
+            images.append((i, j, cutimg))
+    return images
 
 
 def computestats(imatrix):
@@ -24,7 +95,7 @@ def computestats(imatrix):
         "mean": np.mean(imatrix),
         "std": np.std(imatrix),
         "upper_quartile": upper_quartile,
-        "lower_quartile": lower_quartile
+        "lower_quartile": lower_quartile,
     }
 
 
@@ -34,11 +105,16 @@ def process(ifile, ofile):
     ofile: use this to chop input into pieces and write out
     """
     print("Processing: ", ifile, "...", end="")
-    imatrix = np.load(ifile)
-    imatrix = imatrix.f.arr_0  # Load data from inside file.
+    imatrix = Loader(ifile)
+    #imatrix = np.load(ifile)
+    #imatrix = imatrix.f.arr_0  # Load data from inside file.
     stats = computestats(imatrix)
-    if stats["upper_quartile"] - stats["lower_quartile"] < 0.01:
-        print("Skipping because file is constant")
+    if (
+        (stats["upper_quartile"] - stats["lower_quartile"] < 0.01)
+        or imatrix.shape[0] < 256
+        or imatrix.shape[1] < 256
+    ):
+        print("Skipping because file is constant or size is too small.")
         return
     prefix = ofile.stem
     odir = ofile.parent
@@ -46,9 +122,14 @@ def process(ifile, ofile):
     with open(odir / "stats.json", "w") as outfile:
         json.dump(stats, outfile)
 
-    # mlist = matrixcutter(m)
+    mlist = imageCutter(imatrix)
+    for i, j, mat in mlist:
+        fname = str(prefix) + "_" + str(i) + "_" + str(j)
+        np.savez_compressed(odir / fname, mat)
+
     # Fill this direcory up with prefix_xx_xx.npz files.
     print("Done")
+
 
 def scan_idir(ipath, opath):
     """
