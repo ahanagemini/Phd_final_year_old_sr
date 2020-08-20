@@ -5,21 +5,24 @@ cutter.py --input-directory=IDIR --output-directory=ODIR
 --input-directory=IDIR  Some directory [default: ./data]
 --output-directory=ODIR  Some directory [default: ./mdata]
 
+Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata
 """
 from docopt import docopt
 from pathlib import Path
 
+def process(ifile, ofile):
+    print("Processing: ", ifile)
 
-
-def scan_idir(ipath):
-    return sorted(ipath.rglob("*.npz"))
+def scan_idir(ipath, opath):
+    return [ (x, opath / str(x)[len(str(ipath))+1:]) for x in sorted(ipath.rglob("*.npz"))]
 
 def main():
     arguments = docopt(__doc__, version='Matrix cutter system')
     idir = Path(arguments['--input-directory'])
     odir = Path(arguments['--output-directory'])
-    L = scan_idir(idir)
-    print(len(L))
-
+    L = scan_idir(idir, odir)
+    for inpfile, outfile in L:
+        process(inpfile, outfile)
+    
 if __name__ == '__main__':
     main()
