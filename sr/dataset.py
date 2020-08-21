@@ -4,6 +4,7 @@ from matplotlib import pyplot as plt
 import torch
 from torch.utils.data import Dataset
 import scipy.ndimage
+import numpy as np
 
 from cutter import loader
 
@@ -35,6 +36,17 @@ class SrDataset(Dataset):
         img_name = Path(self.datalist[idx])
         stats = self.statlist[idx]
         hr = loader(img_name)
+        s = np.sign(hr)
+        hr = s * np.log(np.abs(hr) + 1.0) 
+        # upper_quartile = stats['upper_quartile']
+        # lower_quartile = stats['lower_quartile']
+        # hr[hr > upper_quartile] = upper_quartile
+        # hr[hr < lower_quartile] = lower_quartile
+        # interval_length = upper_quartile - lower_quartile
+        # hr -= lower_quartile
+        # hr /= abs(interval_length)
+        # hr = (hr - 0.5)*2.0
+
         lr = scipy.ndimage.zoom(scipy.ndimage.zoom(hr, 0.5), 2.0)
         sample = {'hr': hr, 'lr': lr, 'stats': stats}
 
