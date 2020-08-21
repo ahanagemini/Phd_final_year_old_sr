@@ -41,7 +41,7 @@ def Loader(ifile):
         image = np.load(ifile)
         image = image.f.arr_0  # Load data from inside file.
     elif fileExt in ImageArrayPaths:
-        image = Image.fromarray(np.uint8(np.load(ifile)))
+        image = Image.np.load(ifile)
     return image
 
 
