@@ -1,8 +1,13 @@
 from pathlib import Path
+import json
+from matplotlib import pyplot as plt
+import torch
 from torch.utils.data import Dataset
 
+from cutter import Loader
+
 class SrDataset(Dataset):
-	def __init__(self,root_dir, transform=None):
+    def __init__(self,root_dir, transform=None):
         """
         Args:
             root_dir (string): Directory with all the images.
@@ -10,30 +15,48 @@ class SrDataset(Dataset):
                 on a sample.
         """
         self.root_dir = Path(root_dir)
-        self.datalist = self.root_dir.rglob('*.npz')
+        self.datalist = list(self.root_dir.rglob('*.npz'))
         self.statlist = []
         for fname in self.datalist:
-        	p = Path(fname)
-        	d = json.load(p.parent // "stats.json")
-        	self.statlist.append(d)
+            p = Path(fname)
+            d = json.load(open(str(p.parent / "stats.json")))
+            self.statlist.append(d)
         self.transform = transform
 
-	def __len__(self):
+    def __len__(self):
         return len(self.datalist)
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
             idx = idx.tolist()
 
-        img_name = os.path.join(self.root_dir,
-                                self.landmarks_frame.iloc[idx, 0])
-        image = io.imread(img_name)
-        landmarks = self.landmarks_frame.iloc[idx, 1:]
-        landmarks = np.array([landmarks])
-        landmarks = landmarks.astype('float').reshape(-1, 2)
-        sample = {'image': image, 'landmarks': landmarks}
+        img_name = Path(self.datalist[idx])
+        stats = self.statlist[idx]
+        image = Loader(img_name)
+
+        sample = {'image': image, 'stats': stats}
 
         if self.transform:
             sample = self.transform(sample)
 
         return sample
+
+if __name__ == "__main__":
+    face_dataset = SrDataset(root_dir='../data')
+
+    fig = plt.figure()
+
+    for i in range(len(face_dataset)):
+        sample = face_dataset[i]
+
+        print(i, sample['image'].shape, sample['stats'])
+
+        ax = plt.subplot(1, 4, i + 1)
+        plt.tight_layout()
+        ax.set_title('Sample #{}'.format(i))
+        ax.axis('off')
+        plt.imshow(sample['image'])
+
+        if i == 3:
+            plt.show()
+            break
