@@ -3,8 +3,9 @@ import json
 from matplotlib import pyplot as plt
 import torch
 from torch.utils.data import Dataset
+import scipy.ndimage
 
-from cutter import Loader
+from cutter import loader
 
 class SrDataset(Dataset):
     def __init__(self,root_dir, transform=None):
@@ -33,8 +34,8 @@ class SrDataset(Dataset):
 
         img_name = Path(self.datalist[idx])
         stats = self.statlist[idx]
-        hr = Loader(img_name)
-
+        hr = loader(img_name)
+        lr = scipy.ndimage.zoom(scipy.ndimage.zoom(hr, 0.5), 2.0)
         sample = {'hr': hr, 'lr': lr, 'stats': stats}
 
         if self.transform:
@@ -50,13 +51,14 @@ if __name__ == "__main__":
     for i in range(len(face_dataset)):
         sample = face_dataset[i]
 
-        print(i, sample['image'].shape, sample['stats'])
+        print(i, sample['hr'].shape, sample['stats'])
 
         ax = plt.subplot(1, 4, i + 1)
         plt.tight_layout()
         ax.set_title('Sample #{}'.format(i))
         ax.axis('off')
-        plt.imshow(sample['image'])
+        plt.imshow(sample['lr'])
+
 
         if i == 3:
             plt.show()
