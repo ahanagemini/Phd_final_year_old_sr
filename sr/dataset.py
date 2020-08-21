@@ -21,6 +21,7 @@ class SrDataset(Dataset):
             p = Path(fname)
             d = json.load(open(str(p.parent / "stats.json")))
             self.statlist.append(d)
+        print("Total number of data elements found = ", len(self.datalist))
         self.transform = transform
 
     def __len__(self):
@@ -32,9 +33,9 @@ class SrDataset(Dataset):
 
         img_name = Path(self.datalist[idx])
         stats = self.statlist[idx]
-        image = Loader(img_name)
+        hr = Loader(img_name)
 
-        sample = {'image': image, 'stats': stats}
+        sample = {'hr': hr, 'lr': lr, 'stats': stats}
 
         if self.transform:
             sample = self.transform(sample)

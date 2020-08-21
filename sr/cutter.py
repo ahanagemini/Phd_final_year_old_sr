@@ -16,7 +16,7 @@ from pathlib import Path
 import numpy as np
 
 
-def Loader(ifile):
+def loader(ifile):
     """
 
 
@@ -45,7 +45,7 @@ def Loader(ifile):
     return image
 
 
-def imageCutter(img, width=256, height=256):
+def matrix_cutter(img, width=256, height=256):
     """
 
 
@@ -65,7 +65,6 @@ def imageCutter(img, width=256, height=256):
     """
     images = []
     imgHeight, imgWidth = img.shape
-    # print("Input size = ", img.shape)
     for i, ih in enumerate(range(0, imgHeight, height)):
         for j, iw in enumerate(range(0, imgWidth, width)):
             posx = iw
@@ -76,10 +75,6 @@ def imageCutter(img, width=256, height=256):
                 posy = imgHeight - height
 
             cutimg = img[posy : posy + height, posx : posx + width]
-            # print("Pos: ", posy, posx)
-            # cutimg = img.crop(box)
-            # print("Cropped image shape = ", cutimg.shape)
-            # cutimgWidth, cutimgHeight = cutimg.shape
             assert cutimg.shape[0] == height and cutimg.shape[1] == width
             images.append((i, j, cutimg))
     return images
@@ -105,7 +100,7 @@ def process(ifile, ofile):
     ofile: use this to chop input into pieces and write out
     """
     print("Processing: ", ifile, "...", end="")
-    imatrix = Loader(ifile)
+    imatrix = loader(ifile)
     # imatrix = np.load(ifile)
     # imatrix = imatrix.f.arr_0  # Load data from inside file.
     stats = computestats(imatrix)
@@ -122,7 +117,7 @@ def process(ifile, ofile):
     with open(odir / "stats.json", "w") as outfile:
         json.dump(stats, outfile)
 
-    mlist = imageCutter(imatrix)
+    mlist = matrix_cutter(imatrix)
     for i, j, mat in mlist:
         fname = str(prefix) + "_" + str(i) + "_" + str(j)
         np.savez_compressed(odir / fname, mat)
