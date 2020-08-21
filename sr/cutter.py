@@ -36,7 +36,7 @@ def Loader(ifile):
     ImageArrayPaths = [".npy", ".npz"]
     fileExt = os.path.splitext(ifile.name)[1].lower()
     if fileExt in ImagePaths:
-        image = Image.open(ifile)
+        image = np.array(Image.open(ifile))
     if fileExt == ".npz":
         image = np.load(ifile)
         image = image.f.arr_0  # Load data from inside file.
