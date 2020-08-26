@@ -10,7 +10,6 @@ Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata
 import os
 import json
 from PIL import Image
-import numpy as np
 from docopt import docopt
 from pathlib import Path
 import numpy as np
@@ -64,18 +63,19 @@ def matrix_cutter(img, width=256, height=256):
 
     """
     images = []
-    imgHeight, imgWidth = img.shape
-    for i, ih in enumerate(range(0, imgHeight, height)):
-        for j, iw in enumerate(range(0, imgWidth, width)):
+    img_height, img_width, img_channels= img.shape
+    for i, ih in enumerate(range(0, img_height, height)):
+        for j, iw in enumerate(range(0, img_width, width)):
             posx = iw
             posy = ih
-            if posx + width > imgWidth:
-                posx = imgWidth - width
-            if posy + height > imgHeight:
-                posy = imgHeight - height
+            if posx + width > img_width:
+                posx = img_width - width
+            if posy + height > img_height:
+                posy = img_height - height
 
-            cutimg = img[posy : posy + height, posx : posx + width]
-            assert cutimg.shape[0] == height and cutimg.shape[1] == width
+            cutimg = img[posy : posy + height, posx : posx + width, :]
+            cutimg_height, cutimg_width, cutimg_channels = cutimg.shape
+            assert cutimg_height == height and cutimg_width == width and cutimg_channels == img_channels
             images.append((i, j, cutimg))
     return images
 
@@ -112,7 +112,7 @@ def process(ifile, ofile):
         print("Skipping because file is constant or size is too small.")
         return
     prefix = ofile.stem
-    odir = ofile.parent
+    odir = ofile
     os.makedirs(odir)
     with open(odir / "stats.json", "w") as outfile:
         json.dump(stats, outfile)
