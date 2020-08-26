@@ -130,9 +130,21 @@ def scan_idir(ipath, opath):
     """
     Returns (x,y) pairs so that x can be processed to create y
     """
-    return [
-        (x, opath / str(x)[len(str(ipath)) + 1 :]) for x in sorted(ipath.rglob("*.npz"))
-    ]
+    extensions = ["*.npy", "*.npz", "*.png", "*.jpg", "*.gif", "*.jpeg"]
+    filesList = []
+
+    [filesList.extend(sorted(ipath.rglob(x))) for x in extensions]
+
+    L = []
+    paths = ["Training", "Validation", "Testing"]
+    for i, x in enumerate(filesList):
+        if i < 0.9 * len(filesList):
+            L.append((x, opath / paths[0] / "HR" / str(x)[len(str(ipath)) + 1:]))
+        elif i >= 0.9 * len(filesList) and i < 0.95 * len(filesList):
+            L.append((x, opath / paths[1] / "HR" / str(x)[len(str(ipath)) + 1:]))
+        else:
+            L.append((x, opath / paths[2] / "HR" / str(x)[len(str(ipath)) + 1:]))
+    return L
 
 
 def main():

@@ -46,7 +46,6 @@ class SrDataset(Dataset):
         # hr -= lower_quartile
         # hr /= abs(interval_length)
         # hr = (hr - 0.5)*2.0
-
         lr = scipy.ndimage.zoom(scipy.ndimage.zoom(hr, 0.5), 2.0)
         sample = {'hr': hr, 'lr': lr, 'stats': stats}
 

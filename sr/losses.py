@@ -10,26 +10,26 @@ def binarize(y, threshold):
 
 
 class L1loss(nn.Module):
+    '''L1 Loss'''
     def __init__(self):
         super(L1loss, self).__init__()
 
-    def forward(self, y_pred, y_true, dim=1, threshold=None):
+    def forward(self, y_pred, y_true):
         '''
 
         Parameters
         ----------
         y_pred
         y_true
-        dim
-        threshold
 
         Returns
         -------
-
+        l1 loss
         '''
-        return torch.mean(y_pred - y_true)
+        return torch.mean(y_pred-y_true)
 class SSIM(nn.Module):
     '''
+    SSIM Loss
     Modified from https://github.com/huster-wgm/Pytorch-metrics/blob/master/metrics.py
     '''
     def __init__(self):
@@ -39,13 +39,13 @@ class SSIM(nn.Module):
         guass = torch.Tensor([math.exp(-(x - w_size//2)**2/float(2*sigma**2)) for x in range(w_size)])
         return guass/guass.sum()
 
-    def createWindow(self, w_size, channel = 1):
+    def createWindow(self, w_size, channel=1):
         _1D_window = self.gaussian(w_size, 1.5).unsqueeze(1)
         _2D_window = _1D_window.mm(_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
         window = _2D_window.expand(channel, 1, w_size, w_size).contiguous()
         return window
 
-    def forward(self, y_pred, y_true, w_size=11, size_average=True, full = False):
+    def forward(self, y_pred, y_true, w_size=11, size_average=True, full=False):
         """
                args:
                    y_true : 4-d ndarray in [batch_size, channels, img_rows, img_cols]
@@ -100,9 +100,25 @@ class SSIM(nn.Module):
             return ret, cs
         return ret
 class PSNR(nn.Module):
+    '''PSNR Loss'''
     def __init__(self):
         super(PSNR, self).__init__()
 
     def forward(self, y_pred, y_true):
-        mae = L1loss(y_pred = y_pred, y_true = y_true)
+        '''
+
+        Parameters
+        ----------
+        y_pred: Tensor
+        predicted values
+
+        y_true: Tensor
+        ground truth values
+
+        Returns
+        -------
+
+        '''
+        l1 = L1loss()
+        mae = l1(y_pred=y_pred, y_true=y_true)
         return 10*torch.log10(1/mae)
