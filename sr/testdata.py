@@ -5,20 +5,23 @@ import os
 
 
 def fileChecker(file_path):
-    file_extensions = [".npy", ".npz", ".png", ".jpg", ".gif", ".jpeg"]
+    file_extensions = [".npy", ".npz", ".png", ".jpg", ".gif", ".jpeg", ".json"]
     for image_file in file_path.rglob("*.*"):
         if image_file.is_file():
             image_file_ext = os.path.splitext(image_file.name)[1].lower()
+            print("Image file = ", image_file, image_file_ext)
             if image_file_ext not in file_extensions:
                 assert False
 
 
 def directoryChecker(directory_path):
     assert directory_path.is_dir()
-    directory_names = ["train", "test", "validate"]
-    for folder in directory_path.rglob("*"):
+    directory_names = {"train", "test", "validate"}
+    assert directory_names == {folder.name for folder in directory_path.glob("*")}
+    for folder in directory_path.glob("*"):
         print("Folder:", folder.absolute())
         if folder.is_dir():
+            print("Folder name ", folder.name)
             if folder.name not in directory_names:
                 assert False
             else:
