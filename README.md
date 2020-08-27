@@ -5,6 +5,12 @@ Super Resolution
 cutter
 ======
 
+Input for cutter is a directory which has subdirectories, perhaps for different patients. Lets call the input directory, idir. Then:
+
+idir has subdirectories patient1, patient2, ... , patientn
+
+such that each of these subdirectories has matrices of different sizes.
+
 testdata
 ========
 
