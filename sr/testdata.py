@@ -14,7 +14,7 @@ def fileChecker(file_path):
 
 
 def directoryChecker(directory_path):
-    directory_names = ["Training", "Testing", "Validation"]
+    directory_names = ["train", "test", "validate"]
     for folder in os.scandir(directory_path):
         if folder.is_dir():
             if folder.name not in directory_names:
