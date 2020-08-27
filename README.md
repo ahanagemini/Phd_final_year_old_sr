@@ -2,6 +2,12 @@
 Super Resolution
 
 
+cutter
+======
+
+testdata
+========
+
 # Data directory structure.
 
 A test directory consists of the following structure:
