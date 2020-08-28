@@ -5,7 +5,7 @@ import os
 
 
 def fileChecker(file_path):
-    file_extensions = [".npy", ".npz", ".png", ".jpg", ".gif", ".jpeg", ".json"]
+    file_extensions = [".npy", ".npz", ".png", ".jpg", ".gif", ".jpeg", ".json", ".json"]
     for image_file in file_path.rglob("*.*"):
         if image_file.is_file():
             image_file_ext = os.path.splitext(image_file.name)[1].lower()

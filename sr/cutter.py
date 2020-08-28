@@ -13,6 +13,7 @@ from PIL import Image
 from docopt import docopt
 from pathlib import Path
 import numpy as np
+import random
 
 
 def loader(ifile):
@@ -31,16 +32,17 @@ def loader(ifile):
 
     """
 
-    ImagePaths = [".jpg", ".png", ".jpeg", ".gif"]
+    ImagePaths = [".jpg", ".png", ".jpeg", ".gif", ".tif"]
     ImageArrayPaths = [".npy", ".npz"]
     fileExt = os.path.splitext(ifile.name)[1].lower()
     if fileExt in ImagePaths:
-        image = np.array(Image.open(ifile))
+        image = Image.open(ifile)
+        image = np.array(image.convert(mode = 'L'))
     if fileExt == ".npz":
         image = np.load(ifile)
         image = image.f.arr_0  # Load data from inside file.
     elif fileExt in ImageArrayPaths:
-        image = Image.np.load(ifile)
+        image = np.load(ifile)
     return image
 
 
@@ -63,7 +65,7 @@ def matrix_cutter(img, width=256, height=256):
 
     """
     images = []
-    img_height, img_width, img_channels= img.shape
+    img_height, img_width = img.shape
     for i, ih in enumerate(range(0, img_height, height)):
         for j, iw in enumerate(range(0, img_width, width)):
             posx = iw
@@ -73,9 +75,9 @@ def matrix_cutter(img, width=256, height=256):
             if posy + height > img_height:
                 posy = img_height - height
 
-            cutimg = img[posy : posy + height, posx : posx + width, :]
-            cutimg_height, cutimg_width, cutimg_channels = cutimg.shape
-            assert cutimg_height == height and cutimg_width == width and cutimg_channels == img_channels
+            cutimg = img[posy : posy + height, posx : posx + width]
+            cutimg_height, cutimg_width = cutimg.shape
+            assert cutimg_height == height and cutimg_width == width
             images.append((i, j, cutimg))
     return images
 
@@ -104,6 +106,12 @@ def process(ifile, ofile):
     # imatrix = np.load(ifile)
     # imatrix = imatrix.f.arr_0  # Load data from inside file.
     stats = computestats(imatrix)
+    prefix = ofile.stem
+    odir = ofile
+    os.makedirs(odir)
+    with open(odir / "stats.json", "w") as outfile:
+        json.dump(stats, outfile)
+
     if (
         (stats["upper_quartile"] - stats["lower_quartile"] < 0.01)
         or imatrix.shape[0] < 256
@@ -111,11 +119,6 @@ def process(ifile, ofile):
     ):
         print("Skipping because file is constant or size is too small.")
         return
-    prefix = ofile.stem
-    odir = ofile
-    os.makedirs(odir)
-    with open(odir / "stats.json", "w") as outfile:
-        json.dump(stats, outfile)
 
     mlist = matrix_cutter(imatrix)
     for i, j, mat in mlist:
@@ -125,25 +128,34 @@ def process(ifile, ofile):
     # Fill this direcory up with prefix_xx_xx.npz files.
     print("Done")
 
-
 def scan_idir(ipath, opath):
     """
     Returns (x,y) pairs so that x can be processed to create y
     """
-    extensions = ["*.npy", "*.npz", "*.png", "*.jpg", "*.gif", "*.jpeg"]
-    filesList = []
+    extensions = [".npy", ".npz", ".png", ".jpg", ".gif", ".tif", ".jpeg"]
+    folders_list = []
+    folder_file_map = {}
 
-    [filesList.extend(sorted(ipath.rglob(x))) for x in extensions]
+    for patient_folder in os.scandir(ipath):
+        if patient_folder.is_dir():
+            folders_list.append(patient_folder.name)
+            new_path = ipath/patient_folder.name
+            for file_path in new_path.rglob('*.*'):
+                file_ext = os.path.splitext(file_path.name)[1].lower()
+                if file_ext in extensions:
+                    folder_file_map[patient_folder.name] = file_path
+
+    random.shuffle(folders_list)
 
     L = []
-    paths = ["Training", "Validation", "Testing"]
-    for i, x in enumerate(filesList):
-        if i < 0.9 * len(filesList):
-            L.append((x, opath / paths[0] / "HR" / str(x)[len(str(ipath)) + 1:]))
-        elif i >= 0.9 * len(filesList) and i < 0.95 * len(filesList):
-            L.append((x, opath / paths[1] / "HR" / str(x)[len(str(ipath)) + 1:]))
+    paths = ["train", "test", "valid"]
+    for i, x in enumerate(folders_list):
+        if i < int(0.9 * len(folders_list)):
+            L.append((folder_file_map[x], opath / paths[0] / "HR"/ x))
+        elif i >= int(0.9 * len(folders_list)) and i < int(0.95 * len(folders_list)):
+            L.append((folder_file_map[x], opath / paths[1] / "HR"/ x))
         else:
-            L.append((x, opath / paths[2] / "HR" / str(x)[len(str(ipath)) + 1:]))
+            L.append((folder_file_map[x], opath / paths[2] /"HR"/ x))
     return L
 
 

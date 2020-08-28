@@ -241,15 +241,11 @@ class UNET(nn.Module):
         self.enc1 = Downsampler(in_channels=inchannels, out_channels=init_features)
         self.enc2 = Downsampler(in_channels=init_features, out_channels=init_features*2)
         self.enc3 = Downsampler(in_channels=init_features*2, out_channels=init_features*4)
-        self.enc4 = Downsampler(in_channels=init_features*4, out_channels=init_features*8)
-        self.enc5 = Downsampler(in_channels=init_features*8, out_channels=init_features*16)
 
         #Base
-        self.ubase = UnetBase(in_channels=init_features*16, out_channels=init_features*32)
+        self.ubase = UnetBase(in_channels=init_features*4, out_channels=init_features*8)
 
         #Upsampler
-        self.dec5 = Upsampling(in_channels=init_features*32, out_channels=init_features*16)
-        self.dec4 = Upsampling(in_channels=init_features*16, out_channels=init_features*8)
         self.dec3 = Upsampling(in_channels=init_features*8, out_channels=init_features*4)
         self.dec2 = Upsampling(in_channels=init_features*4, out_channels=init_features*2)
         self.dec1 = Upsampling(in_channels=init_features*2, out_channels=init_features)
@@ -274,15 +270,11 @@ class UNET(nn.Module):
         skip1, x = self.enc1(x)
         skip2, x = self.enc2(x)
         skip3, x = self.enc3(x)
-        skip4, x = self.enc4(x)
-        skip5, x = self.enc5(x)
 
         # base
         x = self.ubase(x)
 
         # upsample
-        x = self.dec5(x, skip5)
-        x = self.dec4(x, skip4)
         x = self.dec3(x, skip3)
         x = self.dec2(x, skip2)
         x = self.dec1(x, skip1)
