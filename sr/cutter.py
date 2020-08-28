@@ -151,11 +151,11 @@ def scan_idir(ipath, opath):
     paths = ["train", "test", "valid"]
     for i, x in enumerate(folders_list):
         if i < int(0.9 * len(folders_list)):
-            L.append((folder_file_map[x], opath / paths[0] / "HR"/ x))
+            L.append((folder_file_map[x], opath / paths[0] /x))
         elif i >= int(0.9 * len(folders_list)) and i < int(0.95 * len(folders_list)):
-            L.append((folder_file_map[x], opath / paths[1] / "HR"/ x))
+            L.append((folder_file_map[x], opath / paths[1] /x))
         else:
-            L.append((folder_file_map[x], opath / paths[2] /"HR"/ x))
+            L.append((folder_file_map[x], opath / paths[2] /x))
     return L
 
 
