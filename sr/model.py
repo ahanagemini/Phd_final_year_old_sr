@@ -112,6 +112,7 @@ def process(train_path, valid_path, log_dir):
     ----------
     train_path: contains the path of training values
     valid_path: contains the path of validation values
+    log_dir: contains the path where log summary is stored
 
     Returns
     -------
