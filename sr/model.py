@@ -10,17 +10,17 @@ from docopt import docopt
 
 import numpy as np
 from unet import UNET
-from losses import PSNR
 from losses import SSIM
 from Logger import Logger
 
 """Usage: model.py
 model.py --Training_X=X_Train --Training_Y=Y_Train --Valid_X=X_Valid --Valid_Y=Y_Valid
 
---Training_X=X_Train path  Some directory [default: ./idata]
---Valid_X=X_Valid path  Some directory [default: ./mdata]
+--Training-X=X_Train path  Some directory [default: ./idata]
+--Valid-X=X_Valid path  Some directory [default: ./mdata]
+--Log-dir=log_dir path Some directory [default: ./kdata]
 
-Example: python3.8 sr/cutter.py --Training_X=idata --Valid_X=mdata
+Example: python3.8 sr/cutter.py --Training_X=idata --Valid_X=mdata --Log_dir=kdata
 """
 def normalize_denormalize(norm_denorm_option, tensor_variable, mean, sigma):
     if norm_denorm_option=="norm":
@@ -117,7 +117,7 @@ def process(train_path, valid_path, log_dir):
     -------
 
     '''
-    parameters = {'batch_size': 16,
+    parameters = {'batch_size': 8,
                   'shuffle': True,
                   'num_workers': 6}
 
@@ -137,9 +137,9 @@ def process(train_path, valid_path, log_dir):
 
 def main():
     arguments = docopt(__doc__, version="Div2k_test")
-    train_path = Path(arguments["--Training_X"])
-    valid_path = Path(["--Valid_X"])
-    log_dir = Path(["--Log"])
+    train_path = Path(arguments["--Training-X"])
+    valid_path = Path(["--Valid-X"])
+    log_dir = Path(["--Log-dir"])
 
     process(train_path, valid_path, log_dir)
 
