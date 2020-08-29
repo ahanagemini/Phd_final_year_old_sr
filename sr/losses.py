@@ -40,7 +40,7 @@ class SSIM(nn.Module):
         return guass/guass.sum()
 
     def createWindow(self, w_size, channel=1):
-        _1D_window = self.gaussian(w_size, 1.5).unsqueeze(1)
+        _1D_window = self.guassian(w_size, 1.5).unsqueeze(1)
         _2D_window = _1D_window.mm(_1D_window.t()).float().unsqueeze(0).unsqueeze(0)
         window = _2D_window.expand(channel, 1, w_size, w_size).contiguous()
         return window

@@ -44,7 +44,7 @@ class Conv(nn.Module):
         Output
         '''
         x = self.batch_norm(self.conv_2d(x))
-        x = F.elu(x)
+        x = F.leaky_relu(x, inplace=False)
         return x
 
 class ConvTranspose(nn.Module):
@@ -105,12 +105,15 @@ class Downsampler(nn.Module):
         the size of the window to take pool over
         '''
         super(Downsampler, self).__init__()
-        self.num_conv_blocks = 4
+        self.num_conv_blocks = 2
         if pool_type == "MAX":
             self.pool = nn.MaxPool2d(kernel_size=pool_size, stride=pool_stride)
         else:
             self.pool = nn.AvgPool2d(kernel_size=pool_size, stride=pool_stride)
-        self.conv = Conv(in_channels=in_channels, out_channels=out_channels)
+
+        self.conv1 = Conv(in_channels=in_channels, out_channels=out_channels)
+        self.conv2 = Conv(in_channels=out_channels, out_channels=out_channels)
+
 
     def forward(self, x):
         '''
@@ -124,8 +127,9 @@ class Downsampler(nn.Module):
         -------
 
         '''
-        for i in range(len(self.num_conv_blocks)):
-            x = self.conv(x)
+        x = self.conv1(x)
+        for i in range(self.num_conv_blocks):
+            x = self.conv2(x)
         return x, self.pool(x)
 
 
@@ -149,16 +153,18 @@ class UnetBase(nn.Module):
         the size of the window to take pool over
         '''
         super(UnetBase, self).__init__()
-        self.num_conv_blocks = 3
+        self.num_conv_blocks = 2
         if pool_type == "MAX":
             self.pool = nn.MaxPool2d(kernel_size=pool_size, stride=pool_stride)
         else:
             self.pool = nn.AvgPool2d(kernel_size=pool_size, stride=pool_stride)
-        self.conv = Conv(in_channels=in_channels, out_channels=out_channels)
+        self.conv1 = Conv(in_channels=in_channels, out_channels=out_channels)
+        self.conv2 = Conv(in_channels=out_channels, out_channels=out_channels)
 
     def forward(self, x):
+        x = self.conv1(x)
         for i in range(self.num_conv_blocks):
-            x = self.conv(x)
+            x = self.conv2(x)
         return x
 
 
@@ -176,10 +182,10 @@ class Upsampling(nn.Module):
         filters
         '''
         super(Upsampling, self).__init__()
-        self.num_conv_blocks = 2
+        self.num_conv_blocks = 1
         self.conv_transpose = ConvTranspose(in_channels=in_channels, out_channels=in_channels//2)
-        self.conv = Conv(in_channels=in_channels, out_channels=out_channels)
-
+        self.conv1 = Conv(in_channels=in_channels, out_channels=out_channels)
+        self.conv2 = Conv(in_channels=out_channels, out_channels=out_channels)
     def forward(self, x_1, x_2):
         '''
 
@@ -197,8 +203,9 @@ class Upsampling(nn.Module):
         '''
         x_1 = self.conv_transpose(x_1)
         x = torch.cat((x_1, x_2), dim=1)
-        for i in range(len(self.num_conv_blocks)):
-            x = self.conv(x)
+        x = self.conv1(x)
+        for i in range(self.num_conv_blocks):
+            x = self.conv2(x)
         return x
 
 class OutConv(nn.Module):

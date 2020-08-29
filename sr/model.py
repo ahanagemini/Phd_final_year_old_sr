@@ -5,25 +5,36 @@ import torch
 from torchsummary import summary
 import torch.optim as optim
 
+from dataset import SrDataset
 from docopt import docopt
 
+import numpy as np
 from unet import UNET
-from dataloader import DataSet
 from losses import PSNR
+from losses import SSIM
+from Logger import Logger
 
 """Usage: model.py
 model.py --Training_X=X_Train --Training_Y=Y_Train --Valid_X=X_Valid --Valid_Y=Y_Valid
 
---Training_X=X_Train path  Some directory [default: ./x_tdata]
---Training_Y=Y_Train path  Some directory [default: ./y_tdata]
---Valid_X=X_Valid path  Some directory [default: ./x_vdata]
---Valid_Y=Y_Valid path  Some directory [default: ./y_vdata]
+--Training_X=X_Train path  Some directory [default: ./idata]
+--Valid_X=X_Valid path  Some directory [default: ./mdata]
 
-Example: python3.8 sr/cutter.py --Training_X=x_tdata --Training_Y=y_tdata --Valid_X=x_vdata --Valid_Y=y_vdata
+Example: python3.8 sr/cutter.py --Training_X=idata --Valid_X=mdata
 """
+def normalize_denormalize(norm_denorm_option, tensor_variable, mean, sigma):
+    if norm_denorm_option=="norm":
+        for i in range(len(tensor_variable)):
+            tensor_variable[i] = (tensor_variable[i] - mean[i])/sigma[i]
+    else:
+        for i in range(len(tensor_variable)):
+            tensor_variable[i] = (tensor_variable[i]*sigma[i])+mean[i]
+    return tensor_variable
 
-lossTrain = []
-def training(training_generator, validation_generator, device):
+def log_loss_summary(logger, loss, step, prefix=""):
+    logger.scalar_summary(prefix + "loss", np.mean(loss), step)
+
+def training(training_generator, validation_generator, device, log_dir):
     '''
 
     Parameters
@@ -37,84 +48,100 @@ def training(training_generator, validation_generator, device):
 
     '''
     # parameters
-    unet = UNET(inchannels=3, outchannels=3)
+    unet = UNET(inchannels=1, outchannels=1)
     unet.to(device)
-    summary(unet.cuda(), (3, 256, 256))
-    max_epochs = 100
+    summary(unet, (1, 256, 256), batch_size=-1, device='cuda')
+    max_epochs = 50
+    criterion = SSIM()
+    logger = Logger(str(log_dir))
+    step = 0
     for epoch in range(max_epochs):
         unet.train()
-        for x_train, y_train in training_generator:
-            x_train, y_train = x_train.to(device), y_train.to(device)
-            criterion = PSNR()
+        loss_train_list = []
+        step += 1
+        for i, data in enumerate(training_generator):
+            x_train = data['lr']
+            y_train = data['hr']
+            stat = data['stats']
+            mean, sigma = stat['mean'], stat['std']
+            x_train, y_train, mean, sigma = x_train.to(device), y_train.to(device), mean.to(device), sigma.to(device)
+            x_train = normalize_denormalize("norm", x_train, mean, sigma)
             optimizer = optim.Adam(unet.parameters(), lr=0.0005)
             optimizer.zero_grad()
-            with torch.set_grad_enabled(phase='train'):
-                y_pred = unet(x_train)
+            with torch.autograd.set_detect_anomaly(True):
+                with torch.set_grad_enabled(True):
+                    y_pred = unet(x_train)
+                    y_pred = normalize_denormalize("denorm", y_pred, mean, sigma)
+                    loss_train = criterion(y_pred, y_train)
+                    loss_train_list.append(loss_train.item())
+                    print("the training loss is {} in epoch {}".format(loss_train.item(), epoch))
+                    loss_train.backward()
+                    optimizer.step()
 
-                loss = criterion(y_pred, y_train)
-                print("the training loss is {} in epoch {}".format(loss.item(), epoch))
-                loss.backward()
-                optimizer.step()
-        for x_valid, y_valid in validation_generator:
+            #training log summary after every 10 epochs
+            if step%10 == 0:
+                log_loss_summary(logger, loss_train_list, step, prefix="train_")
+                loss_train_list = []
+
+        del x_train, y_train, mean, sigma, loss_train_list
+        loss_valid_list = []
+        for i, data in enumerate(validation_generator):
             unet.eval()
+            x_valid = data['lr']
+            y_valid = data['hr']
+
             x_valid, y_valid = x_valid.to(device), y_valid.to(device)
             y_pred = unet(x_valid)
+            loss_valid = criterion(y_pred, y_valid)
+            loss_valid_list.append(loss_valid)
+            print("the validation loss is {} in epoch {}".format(loss_valid.item(), epoch))
 
-            loss = criterion(y_pred, y_valid)
-            print("the validation loss is {} in epoch {}".format(loss.item(), epoch))
-    torch.save(unet.state_dict(), os.getcwd())
+            #valid log summary after every 10 epochs
+            if step % 10 == 0:
+                log_loss_summary(logger, loss_valid_list, step, prefix="val_")
+                loss_valid_list = []
 
-def process(x_train, y_train, x_valid, y_valid):
+        del x_valid, y_valid, mean, sigma, loss_valid_list
+    torch.save(unet.state_dict(), os.getcwd()+"unet_model.pt")
+
+
+def process(train_path, valid_path, log_dir):
     '''
 
     Parameters
     ----------
-    X_train: contains training values
-    Y_train: contains training label values
-    X_valid: contains validation values
-    Y_valid: contains validation label values
+    train_path: contains the path of training values
+    valid_path: contains the path of validation values
 
     Returns
     -------
 
     '''
+    parameters = {'batch_size': 16,
+                  'shuffle': True,
+                  'num_workers': 6}
+
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
-    parameters = {'batch_size': 64,
-                  'shuffle': True,
-                  'num_workers': 6}
-    training_set = DataSet(x_train, y_train)
+
+    training_set = SrDataset(train_path)
     training_generator = torch.utils.data.DataLoader(training_set, **parameters)
 
-    validation_set = DataSet(x_valid, y_valid)
+    validation_set = SrDataset(valid_path)
     validation_generator = torch.utils.data.DataLoader(validation_set)
-    training(training_generator, validation_generator, device)
+    training(training_generator, validation_generator, device, log_dir)
 
-def scan_idir(ipath):
-    """
-    Returns (x,y) pairs so that x can be processed to create y
-    """
-    extensions = ["*.npy", "*.npz", "*.png", "*.jpg", "*.gif", "*.jpeg"]
-    files_list = []
-    [files_list.extend(sorted(ipath.rglob(x))) for x in extensions]
-    return files_list
+
 
 
 def main():
     arguments = docopt(__doc__, version="Div2k_test")
     train_path = Path(arguments["--Training_X"])
-    train_label_path = Path(arguments["--Training_Y"])
-
     valid_path = Path(["--Valid_X"])
-    valid_label_path = Path(["--Valid_y"])
+    log_dir = Path(["--Log"])
 
-    x_train = scan_idir(train_path)
-    y_train = scan_idir(train_label_path)
-    x_valid = scan_idir(valid_path)
-    y_valid = scan_idir(valid_label_path)
-
-    process(x_train, y_train, x_valid, y_valid)
+    process(train_path, valid_path, log_dir)
 
 
 

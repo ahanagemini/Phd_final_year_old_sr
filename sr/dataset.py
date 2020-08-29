@@ -47,7 +47,12 @@ class SrDataset(Dataset):
         # hr /= abs(interval_length)
         # hr = (hr - 0.5)*2.0
         lr = scipy.ndimage.zoom(scipy.ndimage.zoom(hr, 0.5), 2.0)
-        sample = {'hr': hr, 'lr': lr, 'stats': stats}
+        hr = np.reshape(hr, (1, 256, 256))
+        lr = np.reshape(lr, (1, 256, 256))
+
+        hr = torch.tensor(hr, dtype=torch.float32)
+        lr = torch.tensor(lr, dtype=torch.float32)
+        sample = {'lr': lr, 'hr': hr, 'stats': stats}
 
         if self.transform:
             sample = self.transform(sample)
