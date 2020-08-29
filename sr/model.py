@@ -11,7 +11,7 @@ from docopt import docopt
 import numpy as np
 from unet import UNET
 from losses import SSIM
-from Logger import Logger
+from logger import Logger
 
 """Usage: model.py
 model.py --Training_X=X_Train --Training_Y=Y_Train --Valid_X=X_Valid --Valid_Y=Y_Valid
@@ -139,8 +139,8 @@ def process(train_path, valid_path, log_dir):
 def main():
     arguments = docopt(__doc__, version="Div2k_test")
     train_path = Path(arguments["--Training-X"])
-    valid_path = Path(["--Valid-X"])
-    log_dir = Path(["--Log-dir"])
+    valid_path = Path(arguments["--Valid-X"])
+    log_dir = Path(arguments["--Log-dir"])
 
     process(train_path, valid_path, log_dir)
 
