@@ -44,7 +44,9 @@ class Conv(nn.Module):
         Output
         '''
         x = self.batch_norm(self.conv_2d(x))
-        x = F.leaky_relu(x, inplace=False)
+        #x = F.leaky_relu(x, inplace=True)
+        #print(dir(F))
+        x = F.relu6(x) # relu , prelu, relu6
         return x
 
 class ConvTranspose(nn.Module):

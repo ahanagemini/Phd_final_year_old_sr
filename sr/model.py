@@ -1,5 +1,6 @@
 from pathlib import Path
 import os
+import sys
 
 import torch
 from torchsummary import summary
@@ -32,7 +33,8 @@ def normalize_denormalize(norm_denorm_option, tensor_variable, mean, sigma):
     return tensor_variable
 
 def log_loss_summary(logger, loss, step, prefix=""):
-    logger.scalar_summary(prefix + "loss", np.mean(loss), step)
+    #logger.scalar_summary(prefix + "loss", np.mean(loss), step)
+    pass
 
 def training(training_generator, validation_generator, device, log_dir):
     '''
@@ -48,7 +50,7 @@ def training(training_generator, validation_generator, device, log_dir):
 
     '''
     # parameters
-    unet = UNET(inchannels=1, outchannels=1)
+    unet = UNET(inchannels=1, outchannels=1, init_features=1)
     unet.to(device)
     summary(unet, (1, 256, 256), batch_size=-1, device='cuda')
     max_epochs = 50
@@ -101,7 +103,7 @@ def training(training_generator, validation_generator, device, log_dir):
                 log_loss_summary(logger, loss_valid_list, step, prefix="val_")
                 loss_valid_list = []
 
-        del x_valid, y_valid, mean, sigma, loss_valid_list
+        del x_valid, y_valid, loss_valid_list
     torch.save(unet.state_dict(), os.getcwd()+"unet_model.pt")
 
 
