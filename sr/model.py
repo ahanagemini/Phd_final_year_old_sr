@@ -11,8 +11,9 @@ from docopt import docopt
 
 import numpy as np
 from unet import UNET
-from losses import SSIM
+from losses import SSIM, L1loss
 from logger import Logger
+from tqdm import tqdm
 
 """Usage: model.py
 model.py --Training_X=X_Train --Training_Y=Y_Train --Valid_X=X_Valid --Valid_Y=Y_Valid
@@ -23,21 +24,25 @@ model.py --Training_X=X_Train --Training_Y=Y_Train --Valid_X=X_Valid --Valid_Y=Y
 
 Example: python3.8 sr/cutter.py --Training_X=idata --Valid_X=mdata --Log_dir=kdata
 """
+
+
 def normalize_denormalize(norm_denorm_option, tensor_variable, mean, sigma):
-    if norm_denorm_option=="norm":
+    if norm_denorm_option == "norm":
         for i in range(len(tensor_variable)):
-            tensor_variable[i] = (tensor_variable[i] - mean[i])/sigma[i]
+            tensor_variable[i] = (tensor_variable[i] - mean[i]) / sigma[i]
     else:
         for i in range(len(tensor_variable)):
-            tensor_variable[i] = (tensor_variable[i]*sigma[i])+mean[i]
+            tensor_variable[i] = (tensor_variable[i] * sigma[i]) + mean[i]
     return tensor_variable
 
+
 def log_loss_summary(logger, loss, step, prefix=""):
-    #logger.scalar_summary(prefix + "loss", np.mean(loss), step)
+    # logger.scalar_summary(prefix + "loss", np.mean(loss), step)
     pass
 
+
 def training(training_generator, validation_generator, device, log_dir):
-    '''
+    """
 
     Parameters
     ----------
@@ -48,67 +53,81 @@ def training(training_generator, validation_generator, device, log_dir):
     Returns
     -------
 
-    '''
+    """
     # parameters
     unet = UNET(inchannels=1, outchannels=1, init_features=1)
     unet.to(device)
-    summary(unet, (1, 256, 256), batch_size=-1, device='cuda')
-    max_epochs = 50
-    criterion = SSIM()
+    summary(unet, (1, 256, 256), batch_size=-1, device="cuda")
+    max_epochs = 200
+    # criterion = SSIM()
+    criterion = L1loss()
+
     logger = Logger(str(log_dir))
     step = 0
     for epoch in range(max_epochs):
         unet.train()
         loss_train_list = []
         step += 1
-        for i, data in enumerate(training_generator):
-            x_train = data['lr']
-            y_train = data['hr']
-            stat = data['stats']
-            mean, sigma = stat['mean'], stat['std']
-            x_train, y_train, mean, sigma = x_train.to(device), y_train.to(device), mean.to(device), sigma.to(device)
+        avloss = 0.0
+        for i, data in tqdm(enumerate(training_generator)):
+            x_train = data["lr"]
+            y_train = data["hr"]
+            stat = data["stats"]
+            mean, sigma = stat["mean"], stat["std"]
+            x_train, y_train, mean, sigma = (
+                x_train.to(device),
+                y_train.to(device),
+                mean.to(device),
+                sigma.to(device),
+            )
             x_train = normalize_denormalize("norm", x_train, mean, sigma)
             optimizer = optim.Adam(unet.parameters(), lr=0.0005)
             optimizer.zero_grad()
+
             with torch.autograd.set_detect_anomaly(True):
                 with torch.set_grad_enabled(True):
                     y_pred = unet(x_train)
                     y_pred = normalize_denormalize("denorm", y_pred, mean, sigma)
                     loss_train = criterion(y_pred, y_train)
                     loss_train_list.append(loss_train.item())
-                    print("the training loss is {} in epoch {}".format(loss_train.item(), epoch))
+                    avloss += loss_train.item()
                     loss_train.backward()
                     optimizer.step()
 
-            #training log summary after every 10 epochs
-            if step%10 == 0:
+            # training log summary after every 10 epochs
+            if step % 10 == 0:
                 log_loss_summary(logger, loss_train_list, step, prefix="train_")
                 loss_train_list = []
 
         del x_train, y_train, mean, sigma, loss_train_list
-        loss_valid_list = []
-        for i, data in enumerate(validation_generator):
-            unet.eval()
-            x_valid = data['lr']
-            y_valid = data['hr']
+        print("the training loss is {} in epoch {}".format(avloss / max_epochs, epoch))
+        if step % 10 == 0:
+            loss_valid_list = []
+            for i, data in enumerate(validation_generator):
+                unet.eval()
+                x_valid = data["lr"]
+                y_valid = data["hr"]
 
-            x_valid, y_valid = x_valid.to(device), y_valid.to(device)
-            y_pred = unet(x_valid)
-            loss_valid = criterion(y_pred, y_valid)
-            loss_valid_list.append(loss_valid)
-            print("the validation loss is {} in epoch {}".format(loss_valid.item(), epoch))
+                x_valid, y_valid = x_valid.to(device), y_valid.to(device)
+                y_pred = unet(x_valid)
+                loss_valid = criterion(y_pred, y_valid)
+                loss_valid_list.append(loss_valid)
+                print(
+                    "the validation loss is {} in epoch {}".format(
+                        loss_valid.item(), epoch
+                    )
+                )
 
-            #valid log summary after every 10 epochs
-            if step % 10 == 0:
+                # valid log summary after every 10 epochs
                 log_loss_summary(logger, loss_valid_list, step, prefix="val_")
                 loss_valid_list = []
 
-        del x_valid, y_valid, loss_valid_list
-    torch.save(unet.state_dict(), os.getcwd()+"unet_model.pt")
+            del x_valid, y_valid, loss_valid_list
+    torch.save(unet.state_dict(), os.getcwd() + "unet_model.pt")
 
 
 def process(train_path, valid_path, log_dir):
-    '''
+    """
 
     Parameters
     ----------
@@ -119,10 +138,8 @@ def process(train_path, valid_path, log_dir):
     Returns
     -------
 
-    '''
-    parameters = {'batch_size': 8,
-                  'shuffle': True,
-                  'num_workers': 6}
+    """
+    parameters = {"batch_size": 8, "shuffle": True, "num_workers": 6}
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
@@ -136,8 +153,6 @@ def process(train_path, valid_path, log_dir):
     training(training_generator, validation_generator, device, log_dir)
 
 
-
-
 def main():
     arguments = docopt(__doc__, version="Div2k_test")
     train_path = Path(arguments["--Training-X"])
@@ -145,9 +160,3 @@ def main():
     log_dir = Path(arguments["--Log-dir"])
 
     process(train_path, valid_path, log_dir)
-
-
-
-
-
-

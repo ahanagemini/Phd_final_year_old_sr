@@ -3,19 +3,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 def binarize(y, threshold):
-    y[y<threshold] = 0.0
-    y[y>=threshold] = 1.0
+    y[y < threshold] = 0.0
+    y[y >= threshold] = 1.0
     return y
 
 
 class L1loss(nn.Module):
-    '''L1 Loss'''
+    """L1 Loss"""
+
     def __init__(self):
         super(L1loss, self).__init__()
 
     def forward(self, y_pred, y_true):
-        '''
+        """
 
         Parameters
         ----------
@@ -25,19 +27,27 @@ class L1loss(nn.Module):
         Returns
         -------
         l1 loss
-        '''
-        return torch.mean(y_pred-y_true)
+        """
+        return torch.mean(y_pred - y_true)
+
+
 class SSIM(nn.Module):
-    '''
+    """
     SSIM Loss
     Modified from https://github.com/huster-wgm/Pytorch-metrics/blob/master/metrics.py
-    '''
+    """
+
     def __init__(self):
         super(SSIM, self).__init__()
 
     def guassian(self, w_size, sigma):
-        guass = torch.Tensor([math.exp(-(x - w_size//2)**2/float(2*sigma**2)) for x in range(w_size)])
-        return guass/guass.sum()
+        guass = torch.Tensor(
+            [
+                math.exp(-((x - w_size // 2) ** 2) / float(2 * sigma ** 2))
+                for x in range(w_size)
+            ]
+        )
+        return guass / guass.sum()
 
     def createWindow(self, w_size, channel=1):
         _1D_window = self.guassian(w_size, 1.5).unsqueeze(1)
@@ -78,9 +88,15 @@ class SSIM(nn.Module):
         mu2_sq = mu2.pow(2)
         mu1_mu2 = mu1 * mu2
 
-        sigma1_sq = F.conv2d(y_pred * y_pred, window, padding=padd, groups=channel) - mu1_sq
-        sigma2_sq = F.conv2d(y_true * y_true, window, padding=padd, groups=channel) - mu2_sq
-        sigma12 = F.conv2d(y_pred * y_true, window, padding=padd, groups=channel) - mu1_mu2
+        sigma1_sq = (
+            F.conv2d(y_pred * y_pred, window, padding=padd, groups=channel) - mu1_sq
+        )
+        sigma2_sq = (
+            F.conv2d(y_true * y_true, window, padding=padd, groups=channel) - mu2_sq
+        )
+        sigma12 = (
+            F.conv2d(y_pred * y_true, window, padding=padd, groups=channel) - mu1_mu2
+        )
 
         C1 = (0.01 * L) ** 2
         C2 = (0.03 * L) ** 2
@@ -99,13 +115,16 @@ class SSIM(nn.Module):
         if full:
             return ret, cs
         return ret
+
+
 class PSNR(nn.Module):
-    '''PSNR Loss'''
+    """PSNR Loss"""
+
     def __init__(self):
         super(PSNR, self).__init__()
 
     def forward(self, y_pred, y_true):
-        '''
+        """
 
         Parameters
         ----------
@@ -118,7 +137,7 @@ class PSNR(nn.Module):
         Returns
         -------
 
-        '''
+        """
         l1 = L1loss()
         mae = l1(y_pred=y_pred, y_true=y_true)
-        return 10*torch.log10(1/mae)
+        return 10 * torch.log10(1 / mae)
