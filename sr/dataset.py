@@ -1,15 +1,22 @@
+"""
+Dataset file
+"""
 from pathlib import Path
 import json
-from matplotlib import pyplot as plt
+
+# from matplotlib import pyplot as plt
 import torch
 from torch.utils.data import Dataset
+from torchvision.transforms import Compose
 import scipy.ndimage
 import numpy as np
-
 from cutter import loader
 
+
 class SrDataset(Dataset):
-    def __init__(self,root_dir, transform=None):
+    """Dataset class for loading large amount of image arrays data"""
+
+    def __init__(self, root_dir):
         """
         Args:
             root_dir (string): Directory with all the images.
@@ -17,48 +24,44 @@ class SrDataset(Dataset):
                 on a sample.
         """
         self.root_dir = Path(root_dir)
-        self.datalist = list(self.root_dir.rglob('*.npz'))
+        self.datalist = list(self.root_dir.rglob("*.npz"))
         self.statlist = []
         for fname in self.datalist:
-            p = Path(fname)
-            d = json.load(open(str(p.parent / "stats.json")))
-            self.statlist.append(d)
+            file_path = Path(fname)
+            stat_file = json.load(open(str(file_path.parent / "stats.json")))
+            self.statlist.append(stat_file)
         print("Total number of data elements found = ", len(self.datalist))
-        self.transform = transform
 
     def __len__(self):
         return len(self.datalist)
 
     def __getitem__(self, idx):
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
+        idx = idx.tolist()
 
         img_name = Path(self.datalist[idx])
         stats = self.statlist[idx]
-        hr = loader(img_name)
-        s = np.sign(hr)
-        hr = s * np.log(np.abs(hr) + 1.0) 
+        hr_image = loader(img_name)
+        image_sign = np.sign(hr_image)
+        hr_image = image_sign * np.log(np.abs(hr_image) + 1.0)
         # upper_quartile = stats['upper_quartile']
         # lower_quartile = stats['lower_quartile']
-        # hr[hr > upper_quartile] = upper_quartile
-        # hr[hr < lower_quartile] = lower_quartile
+        # hr_image[hr_image > upper_quartile] = upper_quartile
+        # hr_image[hr_image < lower_quartile] = lower_quartile
         # interval_length = upper_quartile - lower_quartile
-        # hr -= lower_quartile
-        # hr /= abs(interval_length)
-        # hr = (hr - 0.5)*2.0
-        lr = scipy.ndimage.zoom(scipy.ndimage.zoom(hr, 0.5), 2.0)
-        hr = np.reshape(hr, (1, 256, 256))
-        lr = np.reshape(lr, (1, 256, 256))
-
-        hr = torch.tensor(hr, dtype=torch.float32)
-        lr = torch.tensor(lr, dtype=torch.float32)
-        sample = {'lr': lr, 'hr': hr, 'stats': stats}
-
-        if self.transform:
-            sample = self.transform(sample)
-
+        # hr_image -= lower_quartile
+        # hr_image /= abs(interval_length)
+        # hr_image = (hr_image - 0.5)*2.0
+        lr_image = scipy.ndimage.zoom(scipy.ndimage.zoom(hr_image, 0.5), 2.0)
+        hr_image = np.reshape(hr_image, (1, 256, 256))
+        lr_image = np.reshape(lr_image, (1, 256, 256))
+        sample = {"lr": lr_image, "hr": hr_image, "stats": stats}
+        transforms = Compose([Rotate, Transpose, Pertube(1.00e-6)], ToFloatTensor)
+        for i, trans in enumerate(transforms):
+            sample = trans(sample)
         return sample
 
+
+"""
 if __name__ == "__main__":
     face_dataset = SrDataset(root_dir='../data')
 
@@ -75,7 +78,101 @@ if __name__ == "__main__":
         ax.axis('off')
         plt.imshow(sample['lr'])
 
-
         if i == 3:
             plt.show()
             break
+"""
+
+
+class Rotate:
+    """Rotate class rotates image array"""
+
+    def __call__(self, sample):
+        """
+
+        Parameters
+        ----------
+        sample: dictionary containing lr, hr and stats
+
+        Returns
+        -------
+        sample: dictionary containing transformed lr and transformed hr
+        """
+        image_hr = sample["hr"]
+        image_lr = sample["lr"]
+
+        return {"lr": np.rot90(image_lr), "hr": np.rot90(image_hr)}
+
+
+class ToFloatTensor:
+    """This class is for converting the image array to Float Tensor"""
+
+    def __call__(self, sample):
+        """
+        Parameters
+        ----------
+        sample: dictionary containing lr, hr and stats
+
+        Returns
+        -------
+        sample: dictionary containing transformed lr and transformed hr
+        """
+        image_hr = sample["hr"]
+        image_lr = sample["lr"]
+
+        return {
+            "lr": torch.tensor(image_lr, dytpe=torch.float32),
+            "hr": torch.tensor(image_hr, dtype=torch.float32),
+        }
+
+
+class Transpose:
+    """Transpose class calculates the transpose of the matrix"""
+
+    def __call__(self, sample):
+        """
+
+        Parameters
+        ----------
+        sample: dictionary containing lr, hr and stats
+
+        Returns
+        -------
+        sample: dictionary containing transformed lr and transformed hr
+        """
+        image_hr = sample["hr"]
+        image_lr = sample["lr"]
+
+        return {"lr": np.transpose(image_lr), "hr": np.transpose(image_hr)}
+
+
+class Pertube:
+    """ Pertube class transforms image array by adding very small values to the array """
+
+    def __init__(self, episilon=1.00e-10):
+        """
+
+        Parameters
+        ----------
+        episilon: a very small float value
+        """
+        self.episilon = episilon
+
+    def __call__(self, sample):
+        """
+        Parameters
+        ----------
+        sample: dictionary containing lr, hr and stats
+
+        Returns
+        -------
+        sample: dictionary containing transformed lr and transformed hr
+        """
+        image_hr = sample["hr"]
+        image_lr = sample["lr"]
+        data = sample["stats"]
+        std = data["std"]
+
+        image_lr = image_lr + (std / 100 + self.episilon)
+        image_hr = image_hr + (std / 100 + self.episilon)
+        return {"lr": image_lr, "hr": image_hr}
