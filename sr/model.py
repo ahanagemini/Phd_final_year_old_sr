@@ -55,12 +55,12 @@ def training(training_generator, validation_generator, device, log_dir):
 
     """
     # parameters
-    unet = UNET(in_channels=3, out_channels=3, init_features=32)
+    unet = UNET(in_channels=1, out_channels=1, init_features=32)
     unet.to(device)
-    summary(unet, (3, 256, 256), batch_size=-1, device="cuda")
+    summary(unet, (1, 256, 256), batch_size=-1, device="cuda")
     max_epochs = 200
-    # criterion = SSIM()
-    criterion = L1loss()
+    criterion = SSIM()
+    #criterion = L1loss()
 
     logger = Logger(str(log_dir))
     step = 0
@@ -139,7 +139,7 @@ def process(train_path, valid_path, log_dir):
     -------
 
     """
-    parameters = {"batch_size": 8, "shuffle": True, "num_workers": 6}
+    parameters = {"batch_size": 32, "shuffle": True, "num_workers": 6}
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
@@ -149,7 +149,7 @@ def process(train_path, valid_path, log_dir):
     training_generator = torch.utils.data.DataLoader(training_set, **parameters)
 
     validation_set = SrDataset(valid_path)
-    validation_generator = torch.utils.data.DataLoader(validation_set)
+    validation_generator = torch.utils.data.DataLoader(validation_set, **parameters)
     training(training_generator, validation_generator, device, log_dir)
 
 

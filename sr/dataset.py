@@ -36,8 +36,6 @@ class SrDataset(Dataset):
         return len(self.datalist)
 
     def __getitem__(self, idx):
-        idx = idx.tolist()
-
         img_name = Path(self.datalist[idx])
         stats = self.statlist[idx]
         hr_image = loader(img_name)
@@ -55,8 +53,8 @@ class SrDataset(Dataset):
         hr_image = np.reshape(hr_image, (1, 256, 256))
         lr_image = np.reshape(lr_image, (1, 256, 256))
         sample = {"lr": lr_image, "hr": hr_image, "stats": stats}
-        transforms = Compose([Rotate, Transpose, Pertube(1.00e-6)], ToFloatTensor)
-        for i, trans in enumerate(transforms):
+        transforms = Compose([Rotate(), Transpose(), Pertube(1.00e-6), Reshape(), ToFloatTensor()])
+        for i, trans in enumerate([transforms]):
             sample = trans(sample)
         return sample
 
@@ -84,7 +82,7 @@ if __name__ == "__main__":
 """
 
 
-class Rotate:
+class Rotate(object):
     """Rotate class rotates image array"""
 
     def __call__(self, sample):
@@ -98,13 +96,13 @@ class Rotate:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
-        image_hr = sample["hr"]
-        image_lr = sample["lr"]
+        sample["hr"] = np.rot90(sample["hr"])
+        sample["lr"] = np.rot90(sample["lr"])
 
-        return {"lr": np.rot90(image_lr), "hr": np.rot90(image_hr)}
+        return sample
 
 
-class ToFloatTensor:
+class ToFloatTensor(object):
     """This class is for converting the image array to Float Tensor"""
 
     def __call__(self, sample):
@@ -117,16 +115,13 @@ class ToFloatTensor:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
-        image_hr = sample["hr"]
-        image_lr = sample["lr"]
+        sample["hr"] = torch.tensor(sample["hr"], dtype=torch.float32)
+        sample["lr"] = torch.tensor(sample["lr"], dtype=torch.float32)
 
-        return {
-            "lr": torch.tensor(image_lr, dytpe=torch.float32),
-            "hr": torch.tensor(image_hr, dtype=torch.float32),
-        }
+        return sample
 
 
-class Transpose:
+class Transpose(object):
     """Transpose class calculates the transpose of the matrix"""
 
     def __call__(self, sample):
@@ -140,13 +135,13 @@ class Transpose:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
-        image_hr = sample["hr"]
-        image_lr = sample["lr"]
+        sample["hr"] = np.transpose(sample["hr"])
+        sample["lr"] = np.transpose(sample["lr"])
 
-        return {"lr": np.transpose(image_lr), "hr": np.transpose(image_hr)}
+        return sample
 
 
-class Pertube:
+class Pertube(object):
     """ Pertube class transforms image array by adding very small values to the array """
 
     def __init__(self, episilon=1.00e-10):
@@ -168,11 +163,27 @@ class Pertube:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
-        image_hr = sample["hr"]
-        image_lr = sample["lr"]
-        data = sample["stats"]
-        std = data["std"]
 
-        image_lr = image_lr + (std / 100 + self.episilon)
-        image_hr = image_hr + (std / 100 + self.episilon)
-        return {"lr": image_lr, "hr": image_hr}
+        data = sample["stats"]
+        sample["hr"] = sample["hr"] + (data["std"] / 100 + self.episilon)
+        sample["lr"] = sample["lr"] + (data["std"] / 100 + self.episilon)
+        return sample
+
+class Reshape(object):
+    '''Reshaping tensors'''
+
+    def __call__(self, sample):
+        '''
+
+        Parameters
+        ----------
+        sample: dictionary containing lr, hr and stats
+
+        Returns
+        -------
+        sample: dictionary containing reshaped lr and reshaped hr
+        '''
+
+        sample["hr"] = np.reshape(sample["hr"], (1, 256, 256))
+        sample["lr"] = np.reshape(sample["lr"], (1, 256, 256))
+        return sample
