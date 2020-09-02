@@ -55,9 +55,9 @@ def training(training_generator, validation_generator, device, log_dir):
 
     """
     # parameters
-    unet = UNET(inchannels=1, outchannels=1, init_features=1)
+    unet = UNET(in_channels=3, out_channels=3, init_features=32)
     unet.to(device)
-    summary(unet, (1, 256, 256), batch_size=-1, device="cuda")
+    summary(unet, (3, 256, 256), batch_size=-1, device="cuda")
     max_epochs = 200
     # criterion = SSIM()
     criterion = L1loss()
