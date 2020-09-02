@@ -53,7 +53,9 @@ class SrDataset(Dataset):
         hr_image = np.reshape(hr_image, (1, 256, 256))
         lr_image = np.reshape(lr_image, (1, 256, 256))
         sample = {"lr": lr_image, "hr": hr_image, "stats": stats}
-        transforms = Compose([Rotate(), Transpose(), Pertube(1.00e-6), Reshape(), ToFloatTensor()])
+        transforms = Compose(
+            [Rotate(), Transpose(), Pertube(1.00e-6), Reshape(), ToFloatTensor()]
+        )
         for i, trans in enumerate([transforms]):
             sample = trans(sample)
         return sample
@@ -82,7 +84,7 @@ if __name__ == "__main__":
 """
 
 
-class Rotate(object):
+class Rotate:
     """Rotate class rotates image array"""
 
     def __call__(self, sample):
@@ -102,7 +104,7 @@ class Rotate(object):
         return sample
 
 
-class ToFloatTensor(object):
+class ToFloatTensor:
     """This class is for converting the image array to Float Tensor"""
 
     def __call__(self, sample):
@@ -121,7 +123,7 @@ class ToFloatTensor(object):
         return sample
 
 
-class Transpose(object):
+class Transpose:
     """Transpose class calculates the transpose of the matrix"""
 
     def __call__(self, sample):
@@ -141,7 +143,7 @@ class Transpose(object):
         return sample
 
 
-class Pertube(object):
+class Pertube:
     """ Pertube class transforms image array by adding very small values to the array """
 
     def __init__(self, episilon=1.00e-10):
@@ -169,11 +171,12 @@ class Pertube(object):
         sample["lr"] = sample["lr"] + (data["std"] / 100 + self.episilon)
         return sample
 
-class Reshape(object):
-    '''Reshaping tensors'''
+
+class Reshape:
+    """Reshaping tensors"""
 
     def __call__(self, sample):
-        '''
+        """
 
         Parameters
         ----------
@@ -182,7 +185,7 @@ class Reshape(object):
         Returns
         -------
         sample: dictionary containing reshaped lr and reshaped hr
-        '''
+        """
 
         sample["hr"] = np.reshape(sample["hr"], (1, 256, 256))
         sample["lr"] = np.reshape(sample["lr"], (1, 256, 256))
