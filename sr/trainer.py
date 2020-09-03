@@ -2,6 +2,7 @@
 from pathlib import Path
 import os
 import sys
+from time import time
 
 import torch
 from torchsummary import summary
@@ -58,6 +59,7 @@ def training(training_generator, validation_generator, device, log_dir):
     logger = Logger(str(log_dir))
     step = 0
     for epoch in range(max_epochs):
+        start_time = time()
         train_loss = valid_loss = 0.0
         unet.train()
         loss_train_list = []
@@ -118,8 +120,8 @@ def training(training_generator, validation_generator, device, log_dir):
 
         del x_valid, y_valid, loss_valid_list
         print(
-            "\nEpoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f}".format(
-                epoch, train_loss, valid_loss
+            "\nEpoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f} in {:.1f} seconds.".format(
+                epoch, train_loss, valid_loss, time() - start_time
             )
         )
 
