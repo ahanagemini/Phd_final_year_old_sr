@@ -98,7 +98,7 @@ class Rotate:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
-        for i in range(random.randint(0,3)):
+        for i in range(random.randint(0, 3)):
             sample["hr"] = np.rot90(sample["hr"])
             sample["lr"] = np.rot90(sample["lr"])
 
@@ -168,8 +168,10 @@ class Pertube:
         """
 
         data = sample["stats"]
-        #sample["hr"] = sample["hr"] + (data["std"] / 100 + self.episilon)
-        sample["lr"] = sample["lr"] + (data["std"] / 100 + self.episilon)
+        sample["hr"] = sample["hr"] + (data["std"] / 100.0)
+        sample["lr"] = sample["lr"] + (
+            data["std"] / 100.0 + self.episilon * np.random.rand(*(sample["lr"].shape))
+        )
         return sample
 
 
@@ -191,9 +193,11 @@ class Reshape:
         sample["hr"] = np.reshape(sample["hr"], (1, 256, 256))
         sample["lr"] = np.reshape(sample["lr"], (1, 256, 256))
         return sample
-        
+
+
 class Normalize:
     """Normalizing the high resolution image using mean and standard deviation"""
+
     def __call__(self, hr_image, stats):
         """
 
@@ -206,4 +210,4 @@ class Normalize:
         -------
         hr_image: returns normalized hr image
         """
-        return (hr_image - stats["mean"])/stats["std"]
+        return (hr_image - stats["mean"]) / stats["std"]
