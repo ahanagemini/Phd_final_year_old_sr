@@ -36,3 +36,5 @@ pip install tensorflow
 run tensorboard using 
 tensorboard --logdir=path
 where path is the place where tensorboard will recursively look for .tfevents file
+
+Go to the URL it provides OR to http://localhost:6006/ to look for output.
