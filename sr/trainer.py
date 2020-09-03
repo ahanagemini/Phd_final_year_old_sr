@@ -2,6 +2,7 @@
 from pathlib import Path
 import os
 import sys
+import math
 
 import torch
 from torchsummary import summary
@@ -54,7 +55,7 @@ def training(training_generator, validation_generator, device, log_dir):
     #criterion = PSNR()
     criterion = L1loss()
     optimizer = optim.Adam(unet.parameters(), lr=0.0005)
-
+    best_valid_loss = float('inf')
     logger = Logger(str(log_dir))
     step = 0
     for epoch in range(max_epochs):
@@ -122,8 +123,15 @@ def training(training_generator, validation_generator, device, log_dir):
                 epoch, train_loss, valid_loss
             )
         )
+        # Save best validation epoch model
+        if valid_loss < best_valid_loss:
+            best_valid_loss = valid_loss
+            torch.save(unet.state_dict(), os.getcwd() + "/unet_best_model.pt")
 
-        torch.save(unet.state_dict(), os.getcwd() + "unet_model.pt")
+        if step % 10 == 0:
+            print(f"{os.getcwd()}/unet_model_{step}.pt")
+            torch.save(unet.state_dict(), f"{os.getcwd()}/unet_model_{step}.pt")
+        torch.save(unet.state_dict(), os.getcwd() + "/unet_model.pt")
         torch.cuda.empty_cache()
 
 
