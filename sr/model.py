@@ -50,8 +50,8 @@ def training(training_generator, validation_generator, device, log_dir):
     unet.to(device)
     summary(unet, (1, 256, 256), batch_size=-1, device="cuda")
     max_epochs = 200
-    #criterion = SSIM()
-    criterion = L1loss()
+    criterion = SSIM()
+    #criterion = L1loss()
 
     logger = Logger(str(log_dir))
     step = 0
