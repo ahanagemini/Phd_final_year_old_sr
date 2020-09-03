@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from model import process
+from trainer import process
 
 input_path_train = Path("/home/venkat/Documents/PiyushKumarProject/sr/tests/CutterOutput/train")
 input_path_valid = Path("/home/venkat/Documents/PiyushKumarProject/sr/tests/CutterOutput/valid")
