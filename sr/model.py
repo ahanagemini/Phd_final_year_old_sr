@@ -50,7 +50,7 @@ def training(training_generator, validation_generator, device, log_dir):
     unet.to(device)
     summary(unet, (1, 256, 256), batch_size=-1, device="cuda")
     max_epochs = 200
-    #criterion = SSIM()
+    # criterion = SSIM()
     criterion = L1loss()
 
     logger = Logger(str(log_dir))
@@ -110,8 +110,13 @@ def training(training_generator, validation_generator, device, log_dir):
         # valid log summary after every 10 epochs
         log_loss_summary(logger, loss_valid_list, step, prefix="val_")
         loss_valid_list = []
+
         del x_valid, y_valid, loss_valid_list
-        print("the training loss is {:3.5f} and validation loss is {:3.5f} in epoch {}".format(tavloss / imax, vavloss / imax, epoch))
+        print(
+            "the training loss is {:3.5f} and validation loss is {:3.5f} in epoch {}".format(
+                tavloss / imax, vavloss / imax, epoch
+            )
+        )
 
         torch.save(unet.state_dict(), os.getcwd() + "unet_model.pt")
         torch.cuda.empty_cache()
