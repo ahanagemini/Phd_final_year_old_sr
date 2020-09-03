@@ -41,6 +41,7 @@ class SrDataset(Dataset):
         hr_image = loader(img_name)
         image_sign = np.sign(hr_image)
         hr_image = image_sign * np.log(np.abs(hr_image) + 1.0)
+        hr_image = Normalize()(hr_image, stats)
         # upper_quartile = stats['upper_quartile']
         # lower_quartile = stats['lower_quartile']
         # hr_image[hr_image > upper_quartile] = upper_quartile
@@ -50,8 +51,6 @@ class SrDataset(Dataset):
         # hr_image /= abs(interval_length)
         # hr_image = (hr_image - 0.5)*2.0
         lr_image = scipy.ndimage.zoom(scipy.ndimage.zoom(hr_image, 0.5), 2.0)
-        hr_image = np.reshape(hr_image, (1, 256, 256))
-        lr_image = np.reshape(lr_image, (1, 256, 256))
         sample = {"lr": lr_image, "hr": hr_image, "stats": stats}
         transforms = Compose(
             [Rotate(), Transpose(), Pertube(1.00e-6), Reshape(), ToFloatTensor()]
@@ -190,3 +189,18 @@ class Reshape:
         sample["hr"] = np.reshape(sample["hr"], (1, 256, 256))
         sample["lr"] = np.reshape(sample["lr"], (1, 256, 256))
         return sample
+class Normalize:
+    """Normalizing the high resolution image using mean and standard deviation"""
+    def __call__(self, hr_image, stats):
+        """
+
+        Parameters
+        ----------
+        hr_image: high resolution image
+        stats: containing mean and standard deviation
+
+        Returns
+        -------
+        hr_image: returns normalized hr image
+        """
+        return (hr_image - stats["mean"])/stats["std"]
