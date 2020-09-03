@@ -166,7 +166,7 @@ class Pertube:
         """
 
         data = sample["stats"]
-        sample["hr"] = sample["hr"] + (data["std"] / 100 + self.episilon)
+        #sample["hr"] = sample["hr"] + (data["std"] / 100 + self.episilon)
         sample["lr"] = sample["lr"] + (data["std"] / 100 + self.episilon)
         return sample
 
