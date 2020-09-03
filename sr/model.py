@@ -12,7 +12,7 @@ from docopt import docopt
 
 import numpy as np
 from unet import UNET
-from losses import SSIM, L1loss
+from losses import SSIM, L1loss, PSNR
 from logger import Logger
 from tqdm import tqdm
 
@@ -50,8 +50,8 @@ def training(training_generator, validation_generator, device, log_dir):
     unet.to(device)
     summary(unet, (1, 256, 256), batch_size=-1, device="cuda")
     max_epochs = 200
-    # criterion = SSIM()
-    criterion = L1loss()
+    criterion = SSIM()
+    #criterion = PSNR()
     optimizer = optim.Adam(unet.parameters(), lr=0.0005)
 
     logger = Logger(str(log_dir))
