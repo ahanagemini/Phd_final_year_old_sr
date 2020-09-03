@@ -24,3 +24,15 @@ Each of these directories must have subdirectories for each type of data. For ex
 These directories must be disjoint for test/train/validate. So if patient1 is in test, it cant be in train or validate.
 
 In these directories there must exist a .json file and multiple .npz files containing 256 x 256 x float data.
+
+tensorboard
+========
+
+# running tensor board.
+
+install tensorboard using 
+pip install tensorflow
+
+run tensorboard using 
+tensorboard --logdir=path
+where path is the place where tensorboard will recursively look for .tfevents file

@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+
+"""Usage: 	tester (hr|lr) --input <input> --output <output> --model <model>
+			tester --help | -help | -h
+
+Process input to create super resolution using the model input and plot it.
+Arguments:
+  input       a npz or jpg or a supported format
+  output      a npz or jpg output based on filename output
+  model       a .pt file to use for the model
+Options:
+  -h --help -h
+"""
+from docopt import docopt
+if __name__ == '__main__':
+    args = docopt(__doc__)
+    print(args)
+    """ An example:
+     ./tester hr --input input.npz --output output.npz --model srunet.pt
+	{'--help': False,
+	 '--input': True,
+	 '--model': True,
+	 '--output': True,
+	 '-e': False,
+	 '-l': False,
+	 '-p': False,
+	 '<input>': 'input.npz',
+	 '<model>': 'srunet.pt',
+	 '<output>': 'output.npz',
+	 'hr': True,
+	 'lr': False}
+	"""
