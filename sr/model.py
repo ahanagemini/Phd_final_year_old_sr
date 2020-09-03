@@ -61,7 +61,7 @@ def training(training_generator, validation_generator, device, log_dir):
         unet.train()
         loss_train_list = []
         step += 1
-        
+
         for batch_idx, data in tqdm(enumerate(training_generator)):
             unet.train(True)
             x_train = data["lr"]
@@ -74,14 +74,16 @@ def training(training_generator, validation_generator, device, log_dir):
                 mean.to(device),
                 sigma.to(device),
             )
-            
+
             optimizer.zero_grad()
 
             with torch.autograd.set_detect_anomaly(True):
                 with torch.set_grad_enabled(True):
                     y_pred = unet(x_train)
                     loss_train = criterion(y_pred, y_train)
-                    train_loss = train_loss + ((1 / (batch_idx + 1)) * (loss_train.data - train_loss))
+                    train_loss = train_loss + (
+                        (1 / (batch_idx + 1)) * (loss_train.data - train_loss)
+                    )
                     loss_train_list.append(loss_train.item())
                     loss_train.backward()
                     optimizer.step()
@@ -105,18 +107,20 @@ def training(training_generator, validation_generator, device, log_dir):
                 y_pred = unet(x_valid)
                 loss_valid = criterion(y_pred, y_valid)
                 loss_valid_list.append(loss_valid.item())
-                valid_loss = valid_loss + ((1 / (batch_idx + 1)) * (loss_valid.data - valid_loss))
+                valid_loss = valid_loss + (
+                    (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
+                )
 
         # valid log summary after every 10 epochs
         log_loss_summary(logger, loss_valid_list, step, prefix="val_")
         loss_valid_list = []
 
         del x_valid, y_valid, loss_valid_list
-        print('Epoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f}'.format(
-            epoch, 
-            train_loss,
-            valid_loss
-        ))
+        print(
+            "\nEpoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f}".format(
+                epoch, train_loss, valid_loss
+            )
+        )
 
         torch.save(unet.state_dict(), os.getcwd() + "unet_model.pt")
         torch.cuda.empty_cache()
