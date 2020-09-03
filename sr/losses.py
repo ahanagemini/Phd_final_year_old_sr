@@ -66,15 +66,8 @@ class SSIM(nn.Module):
                return ssim, larger the better
                """
         # Value range can be different from 255. Other common ranges are 1 (sigmoid) and 2 (tanh).
-        if torch.max(y_pred) > 128:
-            max_val = 255
-        else:
-            max_val = 1
-
-        if torch.min(y_pred) < -0.5:
-            min_val = -1
-        else:
-            min_val = 0
+        max_val = torch.max(y_pred)
+        min_val = torch.min(y_pred)
         L = max_val - min_val
 
         padd = 0
@@ -113,8 +106,8 @@ class SSIM(nn.Module):
             ret = ssim_map.mean(1).mean(1).mean(1)
 
         if full:
-            return ret, cs
-        return ret
+            return -ret, cs
+        return -ret
 
 
 class PSNR(nn.Module):
