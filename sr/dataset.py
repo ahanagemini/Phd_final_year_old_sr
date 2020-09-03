@@ -3,6 +3,7 @@ Dataset file
 """
 from pathlib import Path
 import json
+import random
 
 # from matplotlib import pyplot as plt
 import torch
@@ -97,8 +98,9 @@ class Rotate:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
-        sample["hr"] = np.rot90(sample["hr"])
-        sample["lr"] = np.rot90(sample["lr"])
+        for i in range(random.randint(0,3)):
+            sample["hr"] = np.rot90(sample["hr"])
+            sample["lr"] = np.rot90(sample["lr"])
 
         return sample
 
