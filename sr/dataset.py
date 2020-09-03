@@ -189,6 +189,7 @@ class Reshape:
         sample["hr"] = np.reshape(sample["hr"], (1, 256, 256))
         sample["lr"] = np.reshape(sample["lr"], (1, 256, 256))
         return sample
+        
 class Normalize:
     """Normalizing the high resolution image using mean and standard deviation"""
     def __call__(self, hr_image, stats):
