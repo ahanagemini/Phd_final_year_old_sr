@@ -28,7 +28,7 @@ class L1loss(nn.Module):
         -------
         l1 loss
         """
-        return torch.mean(y_pred - y_true)
+        return torch.mean(torch.abs(y_pred - y_true))
 
 
 class SSIM(nn.Module):
