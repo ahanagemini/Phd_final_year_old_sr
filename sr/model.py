@@ -84,15 +84,15 @@ def training(training_generator, validation_generator, device, log_dir):
                     loss_train.backward()
                     optimizer.step()
 
-            # training log summary after every 10 epochs
+        # training log summary after every 10 epochs
+        log_loss_summary(logger, loss_train_list, step, prefix="train_")
+        loss_train_list = []
 
-            log_loss_summary(logger, loss_train_list, step, prefix="train_")
-            loss_train_list = []
-
+        print("the training loss is {} in epoch {}".format(avloss / max_epochs, epoch))
         del x_train, y_train, mean, sigma, avloss, loss_train_list
         torch.cuda.empty_cache()
 
-        print("the training loss is {} in epoch {}".format(avloss / max_epochs, epoch))
+
 
         avloss = 0.0
         with torch.no_grad():
@@ -114,9 +114,9 @@ def training(training_generator, validation_generator, device, log_dir):
                     )
                 )
 
-                # valid log summary after every 10 epochs
-                log_loss_summary(logger, loss_valid_list, step, prefix="val_")
-                loss_valid_list = []
+            # valid log summary after every 10 epochs
+            log_loss_summary(logger, loss_valid_list, step, prefix="val_")
+            loss_valid_list = []
 
             del x_valid, y_valid, loss_valid_list, avloss
         torch.save(unet.state_dict(), os.getcwd() + "unet_model.pt")
