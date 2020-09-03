@@ -1,3 +1,4 @@
+# sudo nvidia-smi --gpu-reset -i 0
 from pathlib import Path
 import os
 import sys
@@ -70,6 +71,7 @@ def training(training_generator, validation_generator, device, log_dir):
         step += 1
         avloss = 0.0
         for i, data in tqdm(enumerate(training_generator)):
+            unet.train(True)
             x_train = data["lr"]
             y_train = data["hr"]
             stat = data["stats"]
@@ -102,25 +104,27 @@ def training(training_generator, validation_generator, device, log_dir):
         del x_train, y_train, mean, sigma, loss_train_list
         print("the training loss is {} in epoch {}".format(avloss / max_epochs, epoch))
         if step % 10 == 0:
-            loss_valid_list = []
-            for i, data in enumerate(validation_generator):
-                unet.eval()
-                x_valid = data["lr"]
-                y_valid = data["hr"]
-
-                x_valid, y_valid = x_valid.to(device), y_valid.to(device)
-                y_pred = unet(x_valid)
-                loss_valid = criterion(y_pred, y_valid)
-                loss_valid_list.append(loss_valid)
-                print(
-                    "the validation loss is {} in epoch {}".format(
-                        loss_valid.item(), epoch
-                    )
-                )
-
-                # valid log summary after every 10 epochs
-                log_loss_summary(logger, loss_valid_list, step, prefix="val_")
+            with torch.no_grad():
                 loss_valid_list = []
+                for i, data in enumerate(validation_generator):
+                    #unet.eval()
+                    unet.train(False)
+                    x_valid = data["lr"]
+                    y_valid = data["hr"]
+
+                    x_valid, y_valid = x_valid.to(device), y_valid.to(device)
+                    y_pred = unet(x_valid)
+                    loss_valid = criterion(y_pred, y_valid)
+                    loss_valid_list.append(loss_valid)
+                    print(
+                        "the validation loss is {} in epoch {}".format(
+                            loss_valid.item(), epoch
+                        )
+                    )
+
+                    # valid log summary after every 10 epochs
+                    log_loss_summary(logger, loss_valid_list, step, prefix="val_")
+                    loss_valid_list = []
 
             del x_valid, y_valid, loss_valid_list
     torch.save(unet.state_dict(), os.getcwd() + "unet_model.pt")
