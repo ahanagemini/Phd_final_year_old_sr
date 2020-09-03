@@ -196,10 +196,8 @@ class Pertube:
         """
 
         data = sample["stats"]
-        sample["hr"] = sample["hr"] + (data["std"] / 100.0)
-        sample["lr"] = sample["lr"] + (
-            data["std"] / 100.0 + self.episilon * np.random.rand(*(sample["lr"].shape))
-        )
+        sample["hr"] = sample["hr"] + 0.0
+        sample["lr"] = sample["lr"] + (data["std"] / 100.0) * np.random.rand(*(sample["lr"].shape))
         return sample
 
 
