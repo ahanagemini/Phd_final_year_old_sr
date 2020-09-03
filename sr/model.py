@@ -52,15 +52,17 @@ def training(training_generator, validation_generator, device, log_dir):
     max_epochs = 200
     # criterion = SSIM()
     criterion = L1loss()
+    optimizer = optim.Adam(unet.parameters(), lr=0.0005)
 
     logger = Logger(str(log_dir))
     step = 0
     for epoch in range(max_epochs):
+        train_loss = valid_loss = 0.0
         unet.train()
         loss_train_list = []
         step += 1
-        tavloss = 0.0
-        for i, data in tqdm(enumerate(training_generator)):
+        
+        for batch_idx, data in tqdm(enumerate(training_generator)):
             unet.train(True)
             x_train = data["lr"]
             y_train = data["hr"]
@@ -72,15 +74,15 @@ def training(training_generator, validation_generator, device, log_dir):
                 mean.to(device),
                 sigma.to(device),
             )
-            optimizer = optim.Adam(unet.parameters(), lr=0.0005)
+            
             optimizer.zero_grad()
 
             with torch.autograd.set_detect_anomaly(True):
                 with torch.set_grad_enabled(True):
                     y_pred = unet(x_train)
                     loss_train = criterion(y_pred, y_train)
+                    train_loss = train_loss + ((1 / (batch_idx + 1)) * (loss_train.data - train_loss))
                     loss_train_list.append(loss_train.item())
-                    tavloss += loss_train.item()
                     loss_train.backward()
                     optimizer.step()
 
@@ -88,14 +90,12 @@ def training(training_generator, validation_generator, device, log_dir):
         log_loss_summary(logger, loss_train_list, step, prefix="train_")
         loss_train_list = []
 
-        imax = i
         del x_train, y_train, mean, sigma, loss_train_list
         torch.cuda.empty_cache()
 
-        vavloss = 0.0
         with torch.no_grad():
             loss_valid_list = []
-            for i, data in enumerate(validation_generator):
+            for batch_idx, data in enumerate(validation_generator):
                 # unet.eval()
                 unet.train(False)
                 x_valid = data["lr"]
@@ -105,18 +105,18 @@ def training(training_generator, validation_generator, device, log_dir):
                 y_pred = unet(x_valid)
                 loss_valid = criterion(y_pred, y_valid)
                 loss_valid_list.append(loss_valid.item())
-                vavloss += loss_valid.item()
+                valid_loss = valid_loss + ((1 / (batch_idx + 1)) * (loss_valid.data - valid_loss))
 
         # valid log summary after every 10 epochs
         log_loss_summary(logger, loss_valid_list, step, prefix="val_")
         loss_valid_list = []
 
         del x_valid, y_valid, loss_valid_list
-        print(
-            "the training loss is {:3.5f} and validation loss is {:3.5f} in epoch {}".format(
-                tavloss / imax, vavloss / imax, epoch
-            )
-        )
+        print('Epoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f}'.format(
+            epoch, 
+            train_loss,
+            valid_loss
+        ))
 
         torch.save(unet.state_dict(), os.getcwd() + "unet_model.pt")
         torch.cuda.empty_cache()
