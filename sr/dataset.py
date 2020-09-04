@@ -53,6 +53,8 @@ class SrDataset(Dataset):
             stats = {}
             stats["mean"] = np.mean(hr_image)
             stats["std"] = np.std(hr_image)
+            if stats["std"] <= 0.001:
+                stats["std"] = 1
             hr_image = Normalize()(hr_image, stats)
         # upper_quartile = stats['upper_quartile']
         # lower_quartile = stats['lower_quartile']
@@ -80,6 +82,8 @@ class SrDataset(Dataset):
             lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
             stats["mean"] = np.mean(lr_image)
             stats["std"] = np.std(lr_image)
+            if stats["std"] <= 0.001:
+                stats["std"] = 1
             lr_image = Normalize()(lr_image, stats)
             sample = {"lr": lr_image, "hr": hr_image, "stats": stats}
             transforms = Compose(
