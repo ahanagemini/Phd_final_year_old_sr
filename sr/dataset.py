@@ -77,7 +77,7 @@ class SrDataset(Dataset):
             for i, trans in enumerate([transforms]):
                 sample = trans(sample)
         else:
-            stat = {}
+            stats = {}
             image_sign = np.sign(lr_image)
             lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
             stats["mean"] = np.mean(lr_image)
@@ -87,7 +87,7 @@ class SrDataset(Dataset):
             lr_image = Normalize()(lr_image, stats)
             sample = {"lr": lr_image, "hr": hr_image, "stats": stats}
             transforms = Compose(
-                [ToFloatTensor()]
+                [Reshape(), ToFloatTensor()]
             )
             sample = transforms(sample)
         return sample

@@ -1,20 +1,113 @@
 #!/usr/bin/env python3
 
-"""Usage: 	tester (hr|lr) --input <input> --output <output> --model <model>
+"""Usage: 	tester (hr|lr) --input=input --output=output --model=model
 			tester --help | -help | -h
 
 Process input to create super resolution using the model input and plot it.
 Arguments:
-  input       a npz or jpg or a supported format
-  output      a npz or jpg output based on filename output
+  input       a directory with input files
+  output      a directory for saving the output images
   model       a .pt file to use for the model
 Options:
   -h --help -h
 """
+from pathlib import Path
+import os
+import sys
+from time import time
+
+import torch
+from torchsummary import summary
+import torch.optim as optim
+
+from dataset import SrDataset
 from docopt import docopt
+
+import numpy as np
+import matplotlib.pyplot as plt
+from unet import UNET
+from losses import SSIM, L1loss, PSNR
+from logger import Logger
+from tqdm import tqdm
+
+def evaluate(args):
+    """
+
+    Parameters
+    ----------
+    args: the docopt arguments passed
+
+    Returns
+    -------
+
+    """
+    parameters = {"batch_size": 1, "shuffle": False, "num_workers": 6}
+
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda:0" if use_cuda else "cpu")
+    torch.backends.cudnn.benchmark = True
+
+    test_set = SrDataset(args['--input'], test=True, hr=True)
+    test_generator = torch.utils.data.DataLoader(test_set, **parameters)
+
+    # parameters
+    unet = UNET(in_channels=1, out_channels=1, init_features=32)
+    unet.to(device)
+    summary(unet, (1, 256, 256), batch_size=-1, device="cuda")
+    test_loss = 0
+    unet.load_state_dict(torch.load(args['--model']))
+    with torch.no_grad():
+        for batch_idx, data in enumerate(test_generator):
+            unet.eval()
+            #unet.train(False)
+            x_test = data["lr"]
+            y_test = data["hr"]
+            stat_test = data["stats"]
+            x_test = x_test.to(device)
+            y_test = y_test.numpy()
+            y_pred = unet(x_test)
+            stat_test["std"] = stat_test["std"].numpy()
+            stat_test["mean"] = stat_test["mean"].numpy()
+            y_pred = y_pred.cpu().numpy()
+            y_pred = (y_pred * stat_test["std"]) + stat_test["mean"]
+            image_sign = np.sign(y_pred)
+            y_pred = image_sign * (np.exp(np.abs(y_pred)) - 1.0)
+
+            if args['hr']:
+                loss_test = np.mean(np.abs(y_pred - y_test))
+                sr_hr = np.hstack([y_pred.reshape(256, 256), y_test.reshape(256, 256)])
+            x_test = x_test.cpu().numpy()
+            x_test = (x_test * stat_test["std"]) + stat_test["mean"]
+            
+            image_sign = np.sign(x_test)
+            x_test = image_sign * (np.exp(np.abs(x_test)) - 1.0)
+            if args['hr']:
+                error = np.abs(y_pred - y_test).reshape(256, 256)
+                error = error * (255 / np.max(error))
+                lr_error = np.hstack([error, x_test.reshape(256, 256)])
+                save_plots = np.vstack([sr_hr, lr_error])
+            else:
+                save_plots = np.vstack([y_pred.reshape(256, 256), x_test.reshape(256, 256)])
+            filename = os.path.join(args["--output"], f"{batch_idx}.png")
+            
+            plt.imsave(filename, save_plots, cmap='gray')
+            test_loss = test_loss + (loss_test)
+            
+
+        # valid log summary after every 10 epocihs
+        print(len(test_generator))
+        print(
+            "\nTest Loss: {:.6f}".format(
+                test_loss / len(test_generator)
+            )
+        )
+
+
+
 if __name__ == '__main__':
     args = docopt(__doc__)
     print(args)
+    evaluate(args)
     """ An example:
      ./tester hr --input input.npz --output output.npz --model srunet.pt
 	{'--help': False,
@@ -24,9 +117,9 @@ if __name__ == '__main__':
 	 '-e': False,
 	 '-l': False,
 	 '-p': False,
-	 '<input>': 'input.npz',
-	 '<model>': 'srunet.pt',
-	 '<output>': 'output.npz',
+	 'input': 'input_dir',
+	 'model': 'srunet.pt',
+	 'output': 'output_dir',
 	 'hr': True,
 	 'lr': False}
 	"""
