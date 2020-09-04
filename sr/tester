@@ -11,14 +11,9 @@ Arguments:
 Options:
   -h --help -h
 """
-from pathlib import Path
 import os
-import sys
-from time import time
 
 import torch
-from torchsummary import summary
-import torch.optim as optim
 
 from dataset import SrDataset
 from docopt import docopt
@@ -26,9 +21,6 @@ from docopt import docopt
 import numpy as np
 import matplotlib.pyplot as plt
 from unet import UNET
-from losses import SSIM, L1loss, PSNR
-from logger import Logger
-from tqdm import tqdm
 
 def evaluate(args):
     """
@@ -50,10 +42,9 @@ def evaluate(args):
     test_set = SrDataset(args['--input'], test=True, hr=True)
     test_generator = torch.utils.data.DataLoader(test_set, **parameters)
 
-    # parameters
+    # model create and load
     unet = UNET(in_channels=1, out_channels=1, init_features=32)
     unet.to(device)
-    summary(unet, (1, 256, 256), batch_size=-1, device="cuda")
     test_loss = 0
     unet.load_state_dict(torch.load(args['--model']))
     with torch.no_grad():
@@ -66,21 +57,27 @@ def evaluate(args):
             x_test = x_test.to(device)
             y_test = y_test.numpy()
             y_pred = unet(x_test)
+
+            # Inverse of the nomalizations used. Applied on SR data
             stat_test["std"] = stat_test["std"].numpy()
             stat_test["mean"] = stat_test["mean"].numpy()
             y_pred = y_pred.cpu().numpy()
             y_pred = (y_pred * stat_test["std"]) + stat_test["mean"]
             image_sign = np.sign(y_pred)
             y_pred = image_sign * (np.exp(np.abs(y_pred)) - 1.0)
-
+            
+            # Compute the loss if HR is given
             if args['hr']:
                 loss_test = np.mean(np.abs(y_pred - y_test))
                 sr_hr = np.hstack([y_pred.reshape(256, 256), y_test.reshape(256, 256)])
+            
+            # Inverse normalize the LR image
             x_test = x_test.cpu().numpy()
             x_test = (x_test * stat_test["std"]) + stat_test["mean"]
-            
             image_sign = np.sign(x_test)
             x_test = image_sign * (np.exp(np.abs(x_test)) - 1.0)
+
+            # Create and save image consisting of error map, HR, SR, LR
             if args['hr']:
                 error = np.abs(y_pred - y_test).reshape(256, 256)
                 error = error * (255 / np.max(error))
@@ -89,18 +86,16 @@ def evaluate(args):
             else:
                 save_plots = np.vstack([y_pred.reshape(256, 256), x_test.reshape(256, 256)])
             filename = os.path.join(args["--output"], f"{batch_idx}.png")
-            
             plt.imsave(filename, save_plots, cmap='gray')
-            test_loss = test_loss + (loss_test)
+            if args['hr']:
+                test_loss = test_loss + (loss_test)
             
-
-        # valid log summary after every 10 epocihs
-        print(len(test_generator))
-        print(
-            "\nTest Loss: {:.6f}".format(
-                test_loss / len(test_generator)
+        if args['hr']:
+            print(
+                "\nTest Loss: {:.6f}".format(
+                    test_loss / len(test_generator)
+                )
             )
-        )
 
 
 
