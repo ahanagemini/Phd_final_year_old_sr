@@ -22,7 +22,7 @@ from docopt import docopt
 import numpy as np
 import matplotlib.pyplot as plt
 from unet import UNET
-
+from tqdm import tqdm
 
 def evaluate(args):
     """
@@ -50,7 +50,7 @@ def evaluate(args):
     test_loss = 0
     unet.load_state_dict(torch.load(args["--model"]))
     with torch.no_grad():
-        for batch_idx, data in enumerate(test_generator):
+        for batch_idx, data in tqdm(enumerate(test_generator), total = len(test_set.datalist)):
             unet.eval()
             # unet.train(False)
             x_test = data["lr"]
@@ -90,7 +90,9 @@ def evaluate(args):
                     [y_pred.reshape(256, 256), x_test.reshape(256, 256)]
                 )
             filename = os.path.join(args["--output"], f"{batch_idx}.png")
-            plt.imsave(filename, save_plots, cmap="gray")
+            m = np.mean(save_plots)
+            s = np.std(save_plots)
+            plt.imsave(filename, save_plots, cmap="gray", vmin = m-3*s , vmax = m+3*s )
             if args["hr"]:
                 test_loss = test_loss + (loss_test)
 
@@ -102,7 +104,8 @@ if __name__ == "__main__":
     args = docopt(__doc__)
     for a in ["--input", "--output", "--model"]:
         args[a] = Path(args[a]).resolve()
-    print(args)
+    print("Input being read from:", args["--input"])
+    #print(args)
     evaluate(args)
     """ An example:
      ./tester hr --input input.npz --output output.npz --model srunet.pt
