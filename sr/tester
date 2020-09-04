@@ -12,6 +12,7 @@ Options:
   -h --help -h
 """
 import os
+from pathlib import Path
 
 import torch
 
@@ -21,6 +22,7 @@ from docopt import docopt
 import numpy as np
 import matplotlib.pyplot as plt
 from unet import UNET
+
 
 def evaluate(args):
     """
@@ -39,18 +41,18 @@ def evaluate(args):
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    test_set = SrDataset(args['--input'], test=True, hr=True)
+    test_set = SrDataset(args["--input"], test=True, hr=True)
     test_generator = torch.utils.data.DataLoader(test_set, **parameters)
 
     # model create and load
     unet = UNET(in_channels=1, out_channels=1, init_features=32)
     unet.to(device)
     test_loss = 0
-    unet.load_state_dict(torch.load(args['--model']))
+    unet.load_state_dict(torch.load(args["--model"]))
     with torch.no_grad():
         for batch_idx, data in enumerate(test_generator):
             unet.eval()
-            #unet.train(False)
+            # unet.train(False)
             x_test = data["lr"]
             y_test = data["hr"]
             stat_test = data["stats"]
@@ -65,12 +67,12 @@ def evaluate(args):
             y_pred = (y_pred * stat_test["std"]) + stat_test["mean"]
             image_sign = np.sign(y_pred)
             y_pred = image_sign * (np.exp(np.abs(y_pred)) - 1.0)
-            
+
             # Compute the loss if HR is given
-            if args['hr']:
+            if args["hr"]:
                 loss_test = np.mean(np.abs(y_pred - y_test))
                 sr_hr = np.hstack([y_pred.reshape(256, 256), y_test.reshape(256, 256)])
-            
+
             # Inverse normalize the LR image
             x_test = x_test.cpu().numpy()
             x_test = (x_test * stat_test["std"]) + stat_test["mean"]
@@ -78,29 +80,28 @@ def evaluate(args):
             x_test = image_sign * (np.exp(np.abs(x_test)) - 1.0)
 
             # Create and save image consisting of error map, HR, SR, LR
-            if args['hr']:
+            if args["hr"]:
                 error = np.abs(y_pred - y_test).reshape(256, 256)
                 error = error * (255 / np.max(error))
                 lr_error = np.hstack([error, x_test.reshape(256, 256)])
                 save_plots = np.vstack([sr_hr, lr_error])
             else:
-                save_plots = np.vstack([y_pred.reshape(256, 256), x_test.reshape(256, 256)])
-            filename = os.path.join(args["--output"], f"{batch_idx}.png")
-            plt.imsave(filename, save_plots, cmap='gray')
-            if args['hr']:
-                test_loss = test_loss + (loss_test)
-            
-        if args['hr']:
-            print(
-                "\nTest Loss: {:.6f}".format(
-                    test_loss / len(test_generator)
+                save_plots = np.vstack(
+                    [y_pred.reshape(256, 256), x_test.reshape(256, 256)]
                 )
-            )
+            filename = os.path.join(args["--output"], f"{batch_idx}.png")
+            plt.imsave(filename, save_plots, cmap="gray")
+            if args["hr"]:
+                test_loss = test_loss + (loss_test)
+
+        if args["hr"]:
+            print("\nTest Loss: {:.6f}".format(test_loss / len(test_generator)))
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = docopt(__doc__)
+    for a in ["--input", "--output", "--model"]:
+        args[a] = Path(args[a]).resolve()
     print(args)
     evaluate(args)
     """ An example:
