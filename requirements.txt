@@ -2,3 +2,4 @@ torchsummary
 torch
 torchvision
 tqdm
+tensorboard
