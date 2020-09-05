@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
-"""Usage:   tester (hr|lr) --input=input --output=output --model=model
+"""Usage:   tester (hr|lr) --input=input --output=output --model=model --architecture=arch
             tester --help | -help | -h
 
 Process input to create super resolution using the model input and plot it.
 Arguments:
-  input       a directory with input files
-  output      a directory for saving the output images
-  model       a .pt file to use for the model
+  input         a directory with input files
+  output        a directory for saving the output images
+  model         a .pt file to use for the model
+  architecture  architecture to use: unet or axial
 Options:
   -h --help -h
 """
@@ -22,6 +23,7 @@ from docopt import docopt
 import numpy as np
 import matplotlib.pyplot as plt
 from unet import UNET
+from axial_bicubic import AxialNet
 from tqdm import tqdm
 
 from PIL import Image, ImageFont, ImageDraw
@@ -55,7 +57,6 @@ def evaluate(args):
 
     """
     parameters = {"batch_size": 1, "shuffle": False, "num_workers": 6}
-
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
@@ -64,20 +65,24 @@ def evaluate(args):
     test_generator = torch.utils.data.DataLoader(test_set, **parameters)
 
     # model create and load
-    unet = UNET(in_channels=1, out_channels=1, init_features=32)
-    unet.to(device)
+    if args["--architecture"] == 'unet':
+        model = UNET(in_channels=1, out_channels=1, init_features=32)
+    elif args["--architecture"] == 'axial':
+        model = AxialNet(num_channels=1, resblocks=2, skip=1)
+
+    model.to(device)
     test_loss = 0
-    unet.load_state_dict(torch.load(args["--model"]))
+    model.load_state_dict(torch.load(args["--model"]))
     with torch.no_grad():
         for batch_idx, data in tqdm(enumerate(test_generator), total = len(test_set.datalist)):
-            unet.eval()
+            model.eval()
             # unet.train(False)
             x_test = data["lr"]
             y_test = data["hr"]
             stat_test = data["stats"]
             x_test = x_test.to(device)
             y_test = y_test.numpy()
-            y_pred = unet(x_test)
+            y_pred = model(x_test)
 
             # Inverse of the nomalizations used. Applied on SR data
             stat_test["std"] = stat_test["std"].numpy()
@@ -141,6 +146,7 @@ if __name__ == "__main__":
      'input': 'input_dir',
      'model': 'srunet.pt',
      'output': 'output_dir',
+     'architecture': 'arch',
      'hr': True,
      'lr': False}
     """
