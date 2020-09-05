@@ -65,12 +65,13 @@ def training(training_generator, validation_generator, device, log_dir, architec
     #criterion = L1loss()
     criterion = torch.nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
+
+    # learning rate scheduler
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
     best_valid_loss = float('inf')
     logger = Logger(str(log_dir))
     step = 0
     totiter = sum(1 for x in training_generator)
-    # learning rate scheduler
 
     for epoch in range(max_epochs):
         start_time = time()
@@ -109,9 +110,11 @@ def training(training_generator, validation_generator, device, log_dir, architec
 
         del x_train, y_train, mean, sigma, loss_train_list
         torch.cuda.empty_cache()
+
+        scheduler.factor = (1 + (epoch/max_epochs)**0.9)
         with torch.no_grad():
             loss_valid_list = []
-            for batch_idx, data in enumerate(validation_generator):
+            for batch_idx, data in tqdm(enumerate(validation_generator)):
                 # unet.eval()
                 model.train(False)
                 x_valid = data["lr"]
@@ -124,8 +127,10 @@ def training(training_generator, validation_generator, device, log_dir, architec
                 valid_loss = valid_loss + (
                     (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
                 )
+
                 #calling scheduler based on valid loss
-                scheduler.step(valid_loss, epoch=epoch)
+                scheduler.step(valid_loss)
+                print(optimizer.param_groups[0]['lr'])
 
         # valid log summary after every 10 epochs
         log_loss_summary(logger, loss_valid_list, step, prefix="val_")
