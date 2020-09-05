@@ -131,6 +131,8 @@ class PSNR(nn.Module):
         -------
 
         """
-        l1 = L1loss()
-        mae = l1(y_pred=y_pred, y_true=y_true)
-        return 10 * torch.log10(1 / mae)
+        mse = torch.mean((y_pred - y_true) ** 2)
+        return 10 * torch.log10(1.0 / mse)
+        #l1 = L1loss()
+        #mae = l1(y_pred=y_pred, y_true=y_true)
+        #return 10 * torch.log10(1 / mae)
