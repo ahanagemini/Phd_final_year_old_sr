@@ -60,8 +60,8 @@ def training(training_generator, validation_generator, device, log_dir, architec
     summary(model, (1, 256, 256), batch_size=-1, device="cuda")
     max_epochs = 200
     #criterion = SSIM()
-    criterion = PSNR()
-    #criterion = L1loss()
+    #criterion = PSNR()
+    criterion = L1loss()
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
     best_valid_loss = float('inf')
     logger = Logger(str(log_dir))
