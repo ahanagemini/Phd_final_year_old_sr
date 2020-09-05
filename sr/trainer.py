@@ -69,6 +69,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
     best_valid_loss = float('inf')
     logger = Logger(str(log_dir))
     step = 0
+    totiter = sum(1 for x in training_generator)
     # learning rate scheduler
 
     for epoch in range(max_epochs):
@@ -77,7 +78,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
         model.train()
         loss_train_list = []
         step += 1
-        for batch_idx, data in tqdm(enumerate(training_generator)):
+        for batch_idx, data in tqdm(enumerate(training_generator), total = totiter):
             model.train(True)
             x_train = data["lr"]
             y_train = data["hr"]
@@ -132,8 +133,8 @@ def training(training_generator, validation_generator, device, log_dir, architec
 
         del x_valid, y_valid, loss_valid_list
         print(
-            "\nEpoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f} in {:.1f} seconds.".format(
-                epoch, train_loss, valid_loss, time() - start_time
+            "\nEpoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f} in {:.1f} seconds. [lr:{:.8f}]".format(
+                epoch, train_loss, valid_loss, time() - start_time, optimizer.param_groups[0]['lr']
             )
         )
         # Save best validation epoch model
