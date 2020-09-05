@@ -19,6 +19,7 @@ from time import time
 
 import torch
 import torch.optim as optim
+import torch.nn
 
 from torchsummary import summary
 
@@ -61,7 +62,8 @@ def training(training_generator, validation_generator, device, log_dir, architec
     max_epochs = 200
     #criterion = SSIM()
     #criterion = PSNR()
-    criterion = L1loss()
+    #criterion = L1loss()
+    criterion = torch.nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
     best_valid_loss = float('inf')
     logger = Logger(str(log_dir))

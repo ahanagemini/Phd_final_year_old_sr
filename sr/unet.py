@@ -39,6 +39,7 @@ class Conv(nn.Module):
         )
         self.section.append(nn.LeakyReLU())
         self.section.append(nn.BatchNorm2d(num_features=out_channels))
+        #self.section.append(nn.GroupNorm2d(num_features=out_channels))
 
         self.conv = nn.Sequential(*self.section)
 
@@ -88,7 +89,8 @@ class Upsampling(nn.Module):
             )
         elif sample_type == "upsamp":
             self.up_sample = self.up = nn.Sequential(
-                nn.Upsample(mode="bilinear", scale_factor=2),
+                #nn.Upsample(mode="bilinear", scale_factor=2),
+                nn.Upsample(mode="bicubic", scale_factor=2),
                 nn.Conv(
                     in_channels=in_channels,
                     out_channels=out_channels,
@@ -145,7 +147,7 @@ class UNET(nn.Module):
             self.upsample.append(
                 Upsampling(
                     in_channels=self.initial_channels,
-                    out_channels=init_features * (2 ** i),
+                    out_channels=init_features * (2 ** i), sample_type="upsamp"
                 )
             )
             self.initial_channels = init_features * (2 ** i)
