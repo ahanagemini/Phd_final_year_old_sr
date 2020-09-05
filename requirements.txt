@@ -1,3 +1,4 @@
 torchsummary
-pytorch
+torch
+torchvision
 tqdm
