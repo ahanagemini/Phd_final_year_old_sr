@@ -1,40 +1,42 @@
-# sudo nvidia-smi --gpu-reset -i 0
+#!/usr/bin/env python3
+
+"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --architecture=arch
+            trainer.py --help | -help | -h
+
+Train the requested model.
+Arguments:
+  train         a directory with training images/ direcrtories/ numpy
+  output        a directory for validation images/ directories/ numpy
+  log_dir       directory for storing training logs
+  architecture  the architecture to train unet or axial
+Options:
+  -h --help -h
+"""
+
 from pathlib import Path
 import os
-import sys
 from time import time
-import math
 
 import torch
-from torchsummary import summary
 import torch.optim as optim
 
-from dataset import SrDataset
+from torchsummary import summary
+
 from docopt import docopt
 
 import numpy as np
+from tqdm import tqdm
 from unet import UNET
+from dataset import SrDataset
+from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR
 from logger import Logger
-from tqdm import tqdm
-
-"""Usage: model.py
-model.py --Training_X=X_Train --Training_Y=Y_Train --Valid_X=X_Valid --Valid_Y=Y_Valid
-
---Training-X=X_Train path  Some directory [default: ./idata]
---Valid-X=X_Valid path  Some directory [default: ./mdata]
---Log-dir=log_dir path Some directory [default: ./kdata]
-
-Example: python3.8 sr/cutter.py --Training_X=idata --Valid_X=mdata --Log_dir=kdata
-"""
-
 
 def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
-    pass
 
 
-def training(training_generator, validation_generator, device, log_dir):
+def training(training_generator, validation_generator, device, log_dir, architecture):
     """
 
     Parameters
@@ -42,32 +44,37 @@ def training(training_generator, validation_generator, device, log_dir):
     training_generator: contains training data
     validation_generator: contains validation data
     device: Cuda Device
+    log_dir: The log directory for storing logs
+    architecture: The architecture to be used unet or axial
 
     Returns
     -------
 
     """
     # parameters
-    unet = UNET(in_channels=1, out_channels=1, init_features=32)
-    unet.to(device)
-    summary(unet, (1, 256, 256), batch_size=-1, device="cuda")
+    if architecture == "unet":
+        model = UNET(in_channels=1, out_channels=1, init_features=32)
+    elif architecture == "axial":
+        model = AxialNet(num_channels=1, resblocks=2, skip=1)
+    model.to(device)
+    summary(model, (1, 256, 256), batch_size=-1, device="cuda")
     max_epochs = 200
     #criterion = SSIM()
     #criterion = PSNR()
     criterion = L1loss()
-    optimizer = optim.Adam(unet.parameters(), lr=0.0005)
+    optimizer = optim.Adam(model.parameters(), lr=0.0005)
     best_valid_loss = float('inf')
     logger = Logger(str(log_dir))
     step = 0
     for epoch in range(max_epochs):
         start_time = time()
         train_loss = valid_loss = 0.0
-        unet.train()
+        model.train()
         loss_train_list = []
         step += 1
 
         for batch_idx, data in tqdm(enumerate(training_generator)):
-            unet.train(True)
+            model.train(True)
             x_train = data["lr"]
             y_train = data["hr"]
             stat = data["stats"]
@@ -83,7 +90,7 @@ def training(training_generator, validation_generator, device, log_dir):
 
             with torch.autograd.set_detect_anomaly(True):
                 with torch.set_grad_enabled(True):
-                    y_pred = unet(x_train)
+                    y_pred = model(x_train)
                     loss_train = criterion(y_pred, y_train)
                     train_loss = train_loss + (
                         (1 / (batch_idx + 1)) * (loss_train.data - train_loss)
@@ -103,12 +110,12 @@ def training(training_generator, validation_generator, device, log_dir):
             loss_valid_list = []
             for batch_idx, data in enumerate(validation_generator):
                 # unet.eval()
-                unet.train(False)
+                model.train(False)
                 x_valid = data["lr"]
                 y_valid = data["hr"]
 
                 x_valid, y_valid = x_valid.to(device), y_valid.to(device)
-                y_pred = unet(x_valid)
+                y_pred = model(x_valid)
                 loss_valid = criterion(y_pred, y_valid)
                 loss_valid_list.append(loss_valid.item())
                 valid_loss = valid_loss + (
@@ -128,16 +135,15 @@ def training(training_generator, validation_generator, device, log_dir):
         # Save best validation epoch model
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
-            torch.save(unet.state_dict(), os.getcwd() + "/unet_best_model.pt")
+            torch.save(model.state_dict(), f"{os.getcwd()}/{architecture}_best_model.pt")
 
         if step % 10 == 0:
-            print(f"{os.getcwd()}/unet_model_{step}.pt")
-            torch.save(unet.state_dict(), f"{os.getcwd()}/unet_model_{step}.pt")
-        torch.save(unet.state_dict(), os.getcwd() + "/unet_model.pt")
+            torch.save(model.state_dict(), f"{os.getcwd()}/{architecture}_model_{step}.pt")
+        torch.save(model.state_dict(), f"{os.getcwd()}/{architecture}_model.pt")
         torch.cuda.empty_cache()
 
 
-def process(train_path, valid_path, log_dir):
+def process(train_path, valid_path, log_dir, architecture):
     """
 
     Parameters
@@ -161,13 +167,13 @@ def process(train_path, valid_path, log_dir):
 
     validation_set = SrDataset(valid_path)
     validation_generator = torch.utils.data.DataLoader(validation_set, **parameters)
-    training(training_generator, validation_generator, device, log_dir)
+    training(training_generator, validation_generator, device, log_dir, architecture)
 
 
-def main():
-    arguments = docopt(__doc__, version="Div2k_test")
-    train_path = Path(arguments["--Training-X"])
-    valid_path = Path(arguments["--Valid-X"])
-    log_dir = Path(arguments["--Log-dir"])
-
-    process(train_path, valid_path, log_dir)
+if __name__ == "__main__":
+    arguments = docopt(__doc__)
+    train_path = Path(arguments["--train"])
+    valid_path = Path(arguments["--valid"])
+    log_dir = Path(arguments["--log_dir"])
+    architecture = arguments["--architecture"]
+    process(train_path, valid_path, log_dir, architecture)
