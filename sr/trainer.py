@@ -65,7 +65,6 @@ def training(training_generator, validation_generator, device, log_dir, architec
     #criterion = L1loss()
     criterion = torch.nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
     best_valid_loss = float('inf')
     logger = Logger(str(log_dir))
     step = 0
@@ -75,6 +74,10 @@ def training(training_generator, validation_generator, device, log_dir, architec
         model.train()
         loss_train_list = []
         step += 1
+
+        # learning rate scheduler
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3,
+                                                               factor=(1 - (epoch / max_epochs)) ** 0.9)
 
         for batch_idx, data in tqdm(enumerate(training_generator)):
             model.train(True)
@@ -124,7 +127,8 @@ def training(training_generator, validation_generator, device, log_dir, architec
                 valid_loss = valid_loss + (
                     (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
                 )
-                scheduler.step(valid_loss)
+                #calling scheduler based on valid loss
+                scheduler.step(valid_loss, epoch=epoch)
 
         # valid log summary after every 10 epochs
         log_loss_summary(logger, loss_valid_list, step, prefix="val_")
