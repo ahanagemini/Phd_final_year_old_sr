@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-"""Usage: 	tester (hr|lr) --input=input --output=output --model=model
-			tester --help | -help | -h
+"""Usage:   tester (hr|lr) --input=input --output=output --model=model
+            tester --help | -help | -h
 
 Process input to create super resolution using the model input and plot it.
 Arguments:
@@ -23,6 +23,25 @@ import numpy as np
 import matplotlib.pyplot as plt
 from unet import UNET
 from tqdm import tqdm
+
+from PIL import Image, ImageFont, ImageDraw
+
+def writetext(imgfile, e_sr, e_lr):
+    img = Image.open(imgfile)
+    width, height = img.size
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.truetype('./font/dancing.ttf', 20) 
+    draw.text((width/2,0), "HR", font=font)
+    draw.text((0,width/2), "Error", font=font)
+
+    draw.text((0,0), "SR", font=font)
+    draw.text((32,0), "L1="+str(e_sr), font=font, fill=(255,0,0))
+
+    draw.text((height/2,width/2), "LR", font=font, fill=(255,255,255))
+    draw.text((height/2+32,width/2), "L1="+str(e_lr), font=font, fill=(255,0,0))
+
+    img.save("/tmp/test.png")
+    os.system("mv /tmp/test.png " + imgfile)
 
 def evaluate(args):
     """
@@ -95,6 +114,9 @@ def evaluate(args):
             plt.imsave(filename, save_plots, cmap="gray", vmin = m-3*s , vmax = m+3*s )
             if args["hr"]:
                 test_loss = test_loss + (loss_test)
+                lrerror = np.mean(np.abs(y_test - x_test))
+                srerror = np.mean(np.abs(y_test - y_pred))
+                writetext(os.path.abspath(filename), srerror ,lrerror)
 
         if args["hr"]:
             print("\nTest Loss: {:.6f}".format(test_loss / len(test_generator)))
@@ -109,16 +131,16 @@ if __name__ == "__main__":
     evaluate(args)
     """ An example:
      ./tester hr --input input.npz --output output.npz --model srunet.pt
-	{'--help': False,
-	 '--input': True,
-	 '--model': True,
-	 '--output': True,
-	 '-e': False,
-	 '-l': False,
-	 '-p': False,
-	 'input': 'input_dir',
-	 'model': 'srunet.pt',
-	 'output': 'output_dir',
-	 'hr': True,
-	 'lr': False}
-	"""
+    {'--help': False,
+     '--input': True,
+     '--model': True,
+     '--output': True,
+     '-e': False,
+     '-l': False,
+     '-p': False,
+     'input': 'input_dir',
+     'model': 'srunet.pt',
+     'output': 'output_dir',
+     'hr': True,
+     'lr': False}
+    """
