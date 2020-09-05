@@ -37,6 +37,7 @@ def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
 
 
+
 def training(training_generator, validation_generator, device, log_dir, architecture):
     """
 
@@ -65,6 +66,8 @@ def training(training_generator, validation_generator, device, log_dir, architec
     #criterion = L1loss()
     criterion = torch.nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
+    #scheduler
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5)
     best_valid_loss = float('inf')
     logger = Logger(str(log_dir))
     step = 0
@@ -101,6 +104,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
                     loss_train.backward()
                     optimizer.step()
 
+
         # training log summary after every 10 epochs
         log_loss_summary(logger, loss_train_list, step, prefix="train_")
         loss_train_list = []
@@ -123,6 +127,8 @@ def training(training_generator, validation_generator, device, log_dir, architec
                 valid_loss = valid_loss + (
                     (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
                 )
+                #calling scheduler
+                scheduler.step(valid_loss)
 
         # valid log summary after every 10 epochs
         log_loss_summary(logger, loss_valid_list, step, prefix="val_")
