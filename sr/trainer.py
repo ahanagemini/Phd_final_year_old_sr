@@ -65,20 +65,18 @@ def training(training_generator, validation_generator, device, log_dir, architec
     #criterion = L1loss()
     criterion = torch.nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
     best_valid_loss = float('inf')
     logger = Logger(str(log_dir))
     step = 0
+    # learning rate scheduler
+
     for epoch in range(max_epochs):
         start_time = time()
         train_loss = valid_loss = 0.0
         model.train()
         loss_train_list = []
         step += 1
-
-        # learning rate scheduler
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3,
-                                                               factor=(1 - (epoch / max_epochs)) ** 0.9)
-
         for batch_idx, data in tqdm(enumerate(training_generator)):
             model.train(True)
             x_train = data["lr"]
@@ -93,7 +91,6 @@ def training(training_generator, validation_generator, device, log_dir, architec
             )
 
             optimizer.zero_grad()
-
             with torch.autograd.set_detect_anomaly(True):
                 with torch.set_grad_enabled(True):
                     y_pred = model(x_train)
@@ -111,7 +108,6 @@ def training(training_generator, validation_generator, device, log_dir, architec
 
         del x_train, y_train, mean, sigma, loss_train_list
         torch.cuda.empty_cache()
-
         with torch.no_grad():
             loss_valid_list = []
             for batch_idx, data in enumerate(validation_generator):
