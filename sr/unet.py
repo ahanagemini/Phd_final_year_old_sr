@@ -90,7 +90,7 @@ class Upsampling(nn.Module):
         elif sample_type == "upsamp":
             self.up_sample = self.up = nn.Sequential(
                 #nn.Upsample(mode="bilinear", scale_factor=2),
-                nn.Upsample(mode="bicubic", scale_factor=2),
+                nn.Upsample(mode="bicubic", scale_factor=2, align_corners=True),
                 nn.Conv2d(
                     in_channels=in_channels,
                     out_channels=out_channels,
