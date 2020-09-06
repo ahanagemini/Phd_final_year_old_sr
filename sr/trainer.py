@@ -28,6 +28,7 @@ from docopt import docopt
 import numpy as np
 from tqdm import tqdm
 from unet import UNET
+from edsr import EDSR
 from dataset import SrDataset
 from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR
@@ -58,6 +59,8 @@ def training(training_generator, validation_generator, device, log_dir, architec
         model = UNET(in_channels=1, out_channels=1, init_features=32)
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
+    elif architecture == "edsr":
+        model = EDSR(n_resblocks=4, n_feats=64, scale=1)
     model.to(device)
     summary(model, (1, 256, 256), batch_size=-1, device="cuda")
     max_epochs = 200
