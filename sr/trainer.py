@@ -33,6 +33,7 @@ from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR
 from logger import Logger
 
+
 def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
 
@@ -60,18 +61,19 @@ def training(training_generator, validation_generator, device, log_dir, architec
     model.to(device)
     summary(model, (1, 256, 256), batch_size=-1, device="cuda")
     max_epochs = 200
-    #criterion = SSIM()
-    #criterion = PSNR()
-    #criterion = L1loss()
+    # criterion = SSIM()
+    # criterion = PSNR()
+    # criterion = L1loss()
     criterion = torch.nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
 
     # learning rate scheduler
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
-    best_valid_loss = float('inf')
+    best_valid_loss = float("inf")
     logger = Logger(str(log_dir))
     step = 0
     totiter = sum(1 for x in training_generator)
+    valiter = sum(1 for x in validation_generator)
 
     for epoch in range(max_epochs):
         start_time = time()
@@ -79,7 +81,8 @@ def training(training_generator, validation_generator, device, log_dir, architec
         model.train()
         loss_train_list = []
         step += 1
-        for batch_idx, data in tqdm(enumerate(training_generator), total = totiter):
+        # Main training loop for this epoch
+        for batch_idx, data in tqdm(enumerate(training_generator), total=totiter):
             model.train(True)
             x_train = data["lr"]
             y_train = data["hr"]
@@ -111,10 +114,11 @@ def training(training_generator, validation_generator, device, log_dir, architec
         del x_train, y_train, mean, sigma, loss_train_list
         torch.cuda.empty_cache()
 
-        scheduler.factor = (1 + (epoch/max_epochs)**0.9)
+        # Main validation loop for this epoch
+        scheduler.factor = 1 + (epoch / max_epochs) ** 0.9
         with torch.no_grad():
             loss_valid_list = []
-            for batch_idx, data in tqdm(enumerate(validation_generator)):
+            for batch_idx, data in tqdm(enumerate(validation_generator), total=valiter):
                 # unet.eval()
                 model.train(False)
                 x_valid = data["lr"]
@@ -128,9 +132,9 @@ def training(training_generator, validation_generator, device, log_dir, architec
                     (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
                 )
 
-                #calling scheduler based on valid loss
+                # calling scheduler based on valid loss
                 scheduler.step(valid_loss)
-                #print(optimizer.param_groups[0]['lr'])
+                # print(optimizer.param_groups[0]['lr'])
 
         # valid log summary after every 10 epochs
         log_loss_summary(logger, loss_valid_list, step, prefix="val_")
@@ -140,16 +144,25 @@ def training(training_generator, validation_generator, device, log_dir, architec
         memory = torch.cuda.max_memory_allocated() / 1024.0 / 1024.0
         print(
             "\nEpoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f} in {:.1f} seconds. [lr:{:.8f}][max mem:{:.0f}MB]".format(
-                epoch, train_loss, valid_loss, time() - start_time, optimizer.param_groups[0]['lr'], memory
+                epoch,
+                train_loss,
+                valid_loss,
+                time() - start_time,
+                optimizer.param_groups[0]["lr"],
+                memory,
             )
         )
         # Save best validation epoch model
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
-            torch.save(model.state_dict(), f"{os.getcwd()}/{architecture}_best_model.pt")
+            torch.save(
+                model.state_dict(), f"{os.getcwd()}/{architecture}_best_model.pt"
+            )
 
         if step % 10 == 0:
-            torch.save(model.state_dict(), f"{os.getcwd()}/{architecture}_model_{step}.pt")
+            torch.save(
+                model.state_dict(), f"{os.getcwd()}/{architecture}_model_{step}.pt"
+            )
         torch.save(model.state_dict(), f"{os.getcwd()}/{architecture}_model.pt")
         torch.cuda.empty_cache()
 
