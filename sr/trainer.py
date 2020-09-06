@@ -60,7 +60,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif architecture == "edsr":
-        model = EDSR(n_resblocks=5, n_feats=64, scale=1)
+        model = EDSR(n_resblocks=16, n_feats=64, scale=1)
     model.to(device)
     summary(model, (1, 256, 256), batch_size=-1, device="cuda")
     max_epochs = 200
@@ -183,7 +183,7 @@ def process(train_path, valid_path, log_dir, architecture):
     -------
 
     """
-    parameters = {"batch_size": 32, "shuffle": True, "num_workers": 6}
+    parameters = {"batch_size": 8, "shuffle": True, "num_workers": 6}
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
