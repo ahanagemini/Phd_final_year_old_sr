@@ -31,6 +31,7 @@ class Resnet(nn.Module):
                                                kernel=kernel, stride=stride))
         self.identity = nn.Sequential(nn.Conv2d(in_channels= in_channels, out_channels=out_channels,
                                                 kernel_size=kernel, stride=stride, padding=padding))
+        self.leaky_relu = nn.Sequential(nn.LeakyReLU())
 
     def forward(self, x):
         """
@@ -47,7 +48,8 @@ class Resnet(nn.Module):
         """
         out = self.conv_section(x)
         identity_x = self.identity(x)
-        return out + identity_x
+        out = self.leaky_relu(out+identity_x)
+        return out
 
 class Conv(nn.Module):
     """This class performs the Convolution Operation"""
@@ -82,13 +84,14 @@ class Conv(nn.Module):
                 stride=stride,
                 padding=padding,
             ))
+        self.section.append(nn.LeakyReLU())
+        self.section.append(nn.BatchNorm2d(num_features=out_channels))
         self.section.append(nn.Conv2d(in_channels=out_channels,
                   out_channels=out_channels,
                   kernel_size=kernel,
                   stride=stride,
                   padding=padding)
         )
-        self.section.append(nn.LeakyReLU())
         self.section.append(nn.BatchNorm2d(num_features=out_channels))
         #self.section.append(nn.GroupNorm2d(num_features=out_channels))
 
