@@ -3,6 +3,52 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+class Resnet(nn.Module):
+    """This is resnet class"""
+
+    def __init__(self, in_channels, out_channels, kernel=3, stride=1, padding=1):
+        """
+
+        Parameters
+        ----------
+        in_channels:int
+        Number of channels in the input image
+
+        out_channels:int
+        Filters (output channels produced by conv)
+
+        kernel:int
+        Filter size
+
+        stride: int
+        Stride of the convolution
+
+        padding: int
+        Zero-padding added to both sides of the input
+        """
+        super(Resnet, self).__init__()
+        self.conv_section = nn.Sequential(Conv(in_channels=in_channels, out_channels=out_channels,
+                                               kernel=kernel, stride=stride))
+        self.identity = nn.Sequential(nn.Conv2d(in_channels= in_channels, out_channels=out_channels,
+                                                kernel_size=kernel, stride=stride, padding=padding))
+
+    def forward(self, x):
+        """
+
+        Parameters
+        ----------
+        x: Tensor
+        returns the x value
+
+        Returns
+        -------
+        out: Tensor
+        returns the out value after adding the input
+        """
+        out = self.conv_section(x)
+        identity_x = self.identity(x)
+        return out + identity_x
+
 class Conv(nn.Module):
     """This class performs the Convolution Operation"""
 
@@ -27,7 +73,7 @@ class Conv(nn.Module):
         Zero-padding added to both sides of the input
         """
         super(Conv, self).__init__()
-        self.section = []
+        self.section = nn.ModuleList()
         self.section.append(
             nn.Conv2d(
                 in_channels=in_channels,
@@ -35,7 +81,12 @@ class Conv(nn.Module):
                 kernel_size=kernel,
                 stride=stride,
                 padding=padding,
-            )
+            ))
+        self.section.append(nn.Conv2d(in_channels=out_channels,
+                  out_channels=out_channels,
+                  kernel_size=kernel,
+                  stride=stride,
+                  padding=padding)
         )
         self.section.append(nn.LeakyReLU())
         self.section.append(nn.BatchNorm2d(num_features=out_channels))
@@ -133,7 +184,12 @@ class UNET(nn.Module):
         super(UNET, self).__init__()
         self.downsample = nn.ModuleList()
         self.initial_channels = in_channels
+        self.resnet_out_channels = 4
         self.final_channel = out_channels
+
+        #resnet
+        self.resnet = Resnet(in_channels=self.initial_channels, out_channels=self.resnet_out_channels)
+        self.initial_channels = self.resnet_out_channels
         for i in range(depth):
             self.downsample.append(
                 Conv(
@@ -173,6 +229,7 @@ class UNET(nn.Module):
         """
         # downsample
         blocks = []
+        x = self.resnet(x)
         for i, down in enumerate(self.downsample):
             x = down(x)
             if i != len(self.downsample) - 1:
