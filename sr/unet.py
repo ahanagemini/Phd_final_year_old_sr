@@ -28,7 +28,7 @@ class Resnet(nn.Module):
         """
         super(Resnet, self).__init__()
         self.conv_section = nn.Sequential(Conv(in_channels=in_channels, out_channels=out_channels,
-                                               kernel=kernel, stride=stride))
+                                               kernel=kernel, stride=stride, conv_section_type="relu"))
         self.identity = nn.Sequential(nn.Conv2d(in_channels= in_channels, out_channels=out_channels,
                                                 kernel_size=kernel, stride=stride, padding=padding))
         self.leaky_relu = nn.Sequential(nn.LeakyReLU())
@@ -54,7 +54,7 @@ class Resnet(nn.Module):
 class Conv(nn.Module):
     """This class performs the Convolution Operation"""
 
-    def __init__(self, in_channels, out_channels, kernel=3, stride=1, padding=1):
+    def __init__(self, in_channels, out_channels, kernel=3, stride=1, padding=1, conv_section_type="conv"):
         """
 
         Parameters
@@ -73,27 +73,59 @@ class Conv(nn.Module):
 
         padding: int
         Zero-padding added to both sides of the input
+
+        conv_section_type: string
+        Two options conv and resnet
         """
         super(Conv, self).__init__()
         self.section = nn.ModuleList()
-        self.section.append(
-            nn.Conv2d(
-                in_channels=in_channels,
-                out_channels=out_channels,
-                kernel_size=kernel,
-                stride=stride,
-                padding=padding,
-            ))
-        self.section.append(nn.LeakyReLU())
-        self.section.append(nn.BatchNorm2d(num_features=out_channels))
-        self.section.append(nn.Conv2d(in_channels=out_channels,
-                  out_channels=out_channels,
-                  kernel_size=kernel,
-                  stride=stride,
-                  padding=padding)
-        )
-        self.section.append(nn.BatchNorm2d(num_features=out_channels))
-        #self.section.append(nn.GroupNorm2d(num_features=out_channels))
+        if conv_section_type == "conv":
+
+            self.section.append(
+                nn.Conv2d(
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel_size=kernel,
+                    stride=stride,
+                    padding=padding,
+                ))
+
+            self.section.append(nn.BatchNorm2d(num_features=out_channels))
+            self.section.append(nn.Conv2d(in_channels=out_channels,
+                                          out_channels=out_channels,
+                                          kernel_size=kernel,
+                                          stride=stride,
+                                          padding=padding)
+                                )
+            self.section.append(nn.BatchNorm2d(num_features=out_channels))
+            self.section.append(nn.Conv2d(in_channels=out_channels,
+                                          out_channels=out_channels,
+                                          kernel_size=kernel,
+                                          stride=stride,
+                                          padding=padding)
+                                )
+            self.section.append(nn.LeakyReLU())
+            self.section.append(nn.BatchNorm2d(num_features=out_channels))
+
+        elif conv_section_type == "relu":
+            self.section.append(
+                nn.Conv2d(
+                    in_channels=in_channels,
+                    out_channels=out_channels,
+                    kernel_size=kernel,
+                    stride=stride,
+                    padding=padding,
+                ))
+            self.section.append(nn.LeakyReLU())
+            self.section.append(nn.BatchNorm2d(num_features=out_channels))
+            self.section.append(nn.Conv2d(in_channels=out_channels,
+                                          out_channels=out_channels,
+                                          kernel_size=kernel,
+                                          stride=stride,
+                                          padding=padding)
+                                )
+            self.section.append(nn.BatchNorm2d(num_features=out_channels))
+            # self.section.append(nn.GroupNorm2d(num_features=out_channels))
 
         self.conv = nn.Sequential(*self.section)
 
@@ -154,8 +186,8 @@ class Upsampling(nn.Module):
                 ),
             )
         self.up_conv = nn.Sequential(
-            Conv(in_channels=in_channels, out_channels=out_channels),
-            Conv(in_channels=out_channels, out_channels=out_channels),
+            Conv(in_channels=in_channels, out_channels=out_channels, conv_section_type="conv"),
+            Conv(in_channels=out_channels, out_channels=out_channels, conv_section_type="conv"),
         )
 
     def forward(self, input_tensor, skip):
@@ -197,7 +229,7 @@ class UNET(nn.Module):
             self.downsample.append(
                 Conv(
                     in_channels=self.initial_channels,
-                    out_channels=init_features * (2 ** i),
+                    out_channels=init_features * (2 ** i),conv_section_type="conv"
                 )
             )
             self.initial_channels = init_features * (2 ** i)
