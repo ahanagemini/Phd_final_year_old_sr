@@ -130,7 +130,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
 
                 #calling scheduler based on valid loss
                 scheduler.step(valid_loss)
-                print(optimizer.param_groups[0]['lr'])
+                #print(optimizer.param_groups[0]['lr'])
 
         # valid log summary after every 10 epochs
         log_loss_summary(logger, loss_valid_list, step, prefix="val_")
