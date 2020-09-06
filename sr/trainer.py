@@ -137,9 +137,10 @@ def training(training_generator, validation_generator, device, log_dir, architec
         loss_valid_list = []
 
         del x_valid, y_valid, loss_valid_list
+        memory = torch.cuda.max_memory_allocated() / 1024.0 / 1024.0
         print(
-            "\nEpoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f} in {:.1f} seconds. [lr:{:.8f}]".format(
-                epoch, train_loss, valid_loss, time() - start_time, optimizer.param_groups[0]['lr']
+            "\nEpoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f} in {:.1f} seconds. [lr:{:.8f}][max mem:{:.0f}MB]".format(
+                epoch, train_loss, valid_loss, time() - start_time, optimizer.param_groups[0]['lr'], memory
             )
         )
         # Save best validation epoch model
