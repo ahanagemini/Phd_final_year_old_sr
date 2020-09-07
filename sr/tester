@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Usage:   tester (hr|lr) --input=input --output=output --model=model --architecture=arch
+"""Usage:   tester (hr|lr) --input=input --output=output --model=model --architecture=arch [--lognorm]
             tester --help | -help | -h
 
 Process input to create super resolution using the model input and plot it.
@@ -9,6 +9,7 @@ Arguments:
   output        a directory for saving the output images
   model         a .pt file to use for the model
   architecture  architecture to use: unet or axial
+  --lognorm     If we want to use log normalization
 Options:
   -h --help -h
 """
@@ -22,6 +23,7 @@ from docopt import docopt
 
 import numpy as np
 import matplotlib.pyplot as plt
+from skimage import metrics
 from unet import UNET
 from axial_bicubic import AxialNet
 from tqdm import tqdm
@@ -32,15 +34,17 @@ def writetext(imgfile, e_sr, e_lr):
     img = Image.open(imgfile)
     width, height = img.size
     draw = ImageDraw.Draw(img)
-    font = ImageFont.truetype('./font/dancing.ttf', 20) 
+    font = ImageFont.truetype('./font/dancing.ttf', 5) 
     draw.text((width/2,0), "HR", font=font)
     draw.text((0,width/2), "Error", font=font)
 
     draw.text((0,0), "SR", font=font)
-    draw.text((32,0), "L1="+str(e_sr), font=font, fill=(255,0,0))
+    e_sr_str = ",".join(str(x) for x in e_sr)
+    e_lr_str = ",".join(str(x) for x in e_lr)
+    draw.text((32,0), "L1, PSNR, SSIM="+e_sr_str, font=font, fill=(255,0,0))
 
     draw.text((height/2,width/2), "LR", font=font, fill=(255,255,255))
-    draw.text((height/2+32,width/2), "L1="+str(e_lr), font=font, fill=(255,0,0))
+    draw.text((height/2+32,width/2), "L1, PSNR, SSIM="+e_lr_str, font=font, fill=(255,0,0))
 
     img.save("/tmp/test.png")
     os.system("mv /tmp/test.png " + imgfile)
@@ -58,6 +62,7 @@ def evaluate(args):
     """
     parameters = {"batch_size": 1, "shuffle": False, "num_workers": 6}
     use_cuda = torch.cuda.is_available()
+    lognorm = args["--lognorm"]
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
@@ -72,6 +77,7 @@ def evaluate(args):
 
     model.to(device)
     test_loss = 0
+    messed_images = 0
     model.load_state_dict(torch.load(args["--model"]))
     with torch.no_grad():
         for batch_idx, data in tqdm(enumerate(test_generator), total = len(test_set.datalist)):
@@ -89,8 +95,9 @@ def evaluate(args):
             stat_test["mean"] = stat_test["mean"].numpy()
             y_pred = y_pred.cpu().numpy()
             y_pred = (y_pred * stat_test["std"]) + stat_test["mean"]
-            image_sign = np.sign(y_pred)
-            y_pred = image_sign * (np.exp(np.abs(y_pred)) - 1.0)
+            if lognorm:
+                image_sign = np.sign(y_pred)
+                y_pred = image_sign * (np.exp(np.abs(y_pred)) - 1.0)
 
             # Compute the loss if HR is given
             if args["hr"]:
@@ -100,8 +107,9 @@ def evaluate(args):
             # Inverse normalize the LR image
             x_test = x_test.cpu().numpy()
             x_test = (x_test * stat_test["std"]) + stat_test["mean"]
-            image_sign = np.sign(x_test)
-            x_test = image_sign * (np.exp(np.abs(x_test)) - 1.0)
+            if lognorm:
+                image_sign = np.sign(x_test)
+                x_test = image_sign * (np.exp(np.abs(x_test)) - 1.0)
 
             # Create and save image consisting of error map, HR, SR, LR
             if args["hr"]:
@@ -119,12 +127,24 @@ def evaluate(args):
             plt.imsave(filename, save_plots, cmap="gray", vmin = m-3*s , vmax = m+3*s )
             if args["hr"]:
                 test_loss = test_loss + (loss_test)
-                lrerror = np.mean(np.abs(y_test - x_test))
-                srerror = np.mean(np.abs(y_test - y_pred))
+                lr_l1 = np.mean(np.abs(y_test - x_test))
+                sr_l1 = np.mean(np.abs(y_test - y_pred))
+                lr_psnr = metrics.peak_signal_noise_ratio(y_test, x_test,
+                        data_range=stat_test["max_val"])
+                sr_psnr = .metrics.peak_signal_noise_ratio(y_test, y_pred,
+                        data_range=stat_test["max_val"])
+                lr_ssim = metrics.structural_similarity(y_test, x_test,
+                        data_range=stat_test["max_val"])
+                sr_ssim = metrics.structural_similarity(y_test, y_pred,
+                        data_range=stat_test["max_val"])
+                srerror = (sr_l1, sr_psnr, sr_ssim)
+                lrerror = (lr_l1, lr_psnr, lr_ssim)
                 writetext(os.path.abspath(filename), srerror ,lrerror)
-
+                if sr_l1 > lr_l1:
+                    messed_images = messed_images + 1
         if args["hr"]:
             print("\nTest Loss: {:.6f}".format(test_loss / len(test_generator)))
+            print(messed_images)
 
 
 if __name__ == "__main__":

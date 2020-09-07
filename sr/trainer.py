@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --architecture=arch
+"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --architecture=arch [--lognorm]
             trainer.py --help | -help | -h
 
 Train the requested model.
@@ -9,6 +9,7 @@ Arguments:
   output        a directory for validation images/ directories/ numpy
   log_dir       directory for storing training logs
   architecture  the architecture to train unet or axial
+  --lognorm     if we are using log normalization
 Options:
   -h --help -h
 """
@@ -170,7 +171,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
         torch.cuda.empty_cache()
 
 
-def process(train_path, valid_path, log_dir, architecture):
+def process(train_path, valid_path, log_dir, architecture, lognorm):
     """
 
     Parameters
@@ -190,10 +191,12 @@ def process(train_path, valid_path, log_dir, architecture):
     torch.backends.cudnn.benchmark = True
 
     training_set = SrDataset(train_path)
-    training_generator = torch.utils.data.DataLoader(training_set, **parameters)
+    training_generator = torch.utils.data.DataLoader(training_set,
+            lognorm=lognorm, **parameters)
 
     validation_set = SrDataset(valid_path)
-    validation_generator = torch.utils.data.DataLoader(validation_set, **parameters)
+    validation_generator = torch.utils.data.DataLoader(validation_set,
+            lognorm=lognorm, **parameters)
     training(training_generator, validation_generator, device, log_dir, architecture)
 
 
@@ -203,4 +206,5 @@ if __name__ == "__main__":
     valid_path = Path(arguments["--valid"])
     log_dir = Path(arguments["--log_dir"])
     architecture = arguments["--architecture"]
-    process(train_path, valid_path, log_dir, architecture)
+    lognorm = arguments["--lognorm"]
+    process(train_path, valid_path, log_dir, architecturei, lognorm)

@@ -17,25 +17,26 @@ from cutter import loader
 class SrDataset(Dataset):
     """Dataset class for loading large amount of image arrays data"""
 
-    def __init__(self, root_dir, test=False, hr=True):
+    def __init__(self, root_dir, lognorm=False, test=False, hr=True):
         """
         Args:
             root_dir (string): Directory with all the images.
-            test: True if this code is for testing dataset
+            lognorm: True if we ar eusing log normalization
+            test: True only for test dataset
             hr: Input is hr image, lr is computed, then True
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
         self.root_dir = Path(root_dir)
         self.datalist = list(self.root_dir.rglob("*.npz"))
+        self.lognorm = lognorm
         self.test = test
         self.hr = hr
         self.statlist = []
         for fname in self.datalist:
             file_path = Path(fname)
-            if not self.test:
-                stat_file = json.load(open(str(file_path.parent / "stats.json")))
-                self.statlist.append(stat_file)
+            stat_file = json.load(open(str(file_path.parent / "stats.json")))
+            self.statlist.append(stat_file)
         print("Total number of data elements found = ", len(self.datalist))
 
     def __len__(self):
@@ -43,16 +44,17 @@ class SrDataset(Dataset):
 
     def __getitem__(self, idx):
         img_name = Path(self.datalist[idx])
-        if not self.test:
-            stats = self.statlist[idx]
+        stats = self.statlist[idx]
         if self.hr:
             hr_image = loader(img_name)
         if not self.test:
-            image_sign = np.sign(hr_image)
-            hr_image = image_sign * np.log(np.abs(hr_image) + 1.0)
-            stats = {}
-            stats["mean"] = np.mean(hr_image)
-            stats["std"] = np.std(hr_image)
+            if self.log_norm:
+                image_sign = np.sign(hr_image)
+                hr_image = image_sign * np.log(np.abs(hr_image) + 1.0)
+                stats = {}
+                stats["mean"] = np.mean(hr_image)
+                stats["std"] = np.std(hr_image)
+
             if stats["std"] <= 0.001:
                 stats["std"] = 1
             hr_image = Normalize()(hr_image, stats)
@@ -77,17 +79,18 @@ class SrDataset(Dataset):
             for i, trans in enumerate([transforms]):
                 sample = trans(sample)
         else:
-            stats = {}
-            image_sign = np.sign(lr_image)
-            lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
-            stats["mean"] = np.mean(lr_image)
-            stats["std"] = np.std(lr_image)
+            if self.lognorm:
+                stats = {}
+                image_sign = np.sign(lr_image)
+                lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
+                stats["mean"] = np.mean(lr_image)
+                stats["std"] = np.std(lr_image)
             if stats["std"] <= 0.001:
                 stats["std"] = 1
             lr_image = Normalize()(lr_image, stats)
             sample = {"lr": lr_image, "hr": hr_image, "stats": stats}
             transforms = Compose(
-                [Reshape(), ToFloatTensor()]
+                [Pertube(1.00e-6), Reshape(), ToFloatTensor()]
             )
             sample = transforms(sample)
         return sample
