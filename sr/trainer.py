@@ -190,13 +190,11 @@ def process(train_path, valid_path, log_dir, architecture, lognorm):
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    training_set = SrDataset(train_path)
-    training_generator = torch.utils.data.DataLoader(training_set,
-            lognorm=lognorm, **parameters)
+    training_set = SrDataset(train_path, lognorm=lognorm)
+    training_generator = torch.utils.data.DataLoader(training_set, **parameters)
 
     validation_set = SrDataset(valid_path)
-    validation_generator = torch.utils.data.DataLoader(validation_set,
-            lognorm=lognorm, **parameters)
+    validation_generator = torch.utils.data.DataLoader(validation_set, **parameters)
     training(training_generator, validation_generator, device, log_dir, architecture)
 
 
@@ -207,4 +205,4 @@ if __name__ == "__main__":
     log_dir = Path(arguments["--log_dir"])
     architecture = arguments["--architecture"]
     lognorm = arguments["--lognorm"]
-    process(train_path, valid_path, log_dir, architecturei, lognorm)
+    process(train_path, valid_path, log_dir, architecture, lognorm)

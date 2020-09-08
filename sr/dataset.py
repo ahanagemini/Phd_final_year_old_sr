@@ -35,7 +35,7 @@ class SrDataset(Dataset):
         self.statlist = []
         for fname in self.datalist:
             file_path = Path(fname)
-            stat_file = json.load(open(str(file_path.parent / "stats.json")))
+            stat_file = json.load(open(str(file_path.parent / "stat_global.json")))
             self.statlist.append(stat_file)
         print("Total number of data elements found = ", len(self.datalist))
 
@@ -48,7 +48,7 @@ class SrDataset(Dataset):
         if self.hr:
             hr_image = loader(img_name)
         if not self.test:
-            if self.log_norm:
+            if self.lognorm:
                 image_sign = np.sign(hr_image)
                 hr_image = image_sign * np.log(np.abs(hr_image) + 1.0)
                 stats = {}
@@ -222,9 +222,9 @@ class Reshape:
         -------
         sample: dictionary containing reshaped lr and reshaped hr
         """
-
-        sample["hr"] = np.reshape(sample["hr"], (1, 256, 256))
-        sample["lr"] = np.reshape(sample["lr"], (1, 256, 256))
+        width = sample["hr"].shape[-1]
+        sample["hr"] = np.reshape(sample["hr"], (1, -1, width))
+        sample["lr"] = np.reshape(sample["lr"], (1, -1, width))
         return sample
 
 

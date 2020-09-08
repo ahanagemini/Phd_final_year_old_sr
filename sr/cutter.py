@@ -10,6 +10,7 @@ Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata
 import os
 import json
 from PIL import Image
+import tifffile
 from docopt import docopt
 from pathlib import Path
 import numpy as np
@@ -38,6 +39,8 @@ def loader(ifile):
     if fileExt in ImagePaths:
         image = Image.open(ifile)
         image = np.array(image.convert(mode = 'L'))
+    if fileExt == ".tiff":
+        image = tifffile.imread(ifile)
     if fileExt == ".npz":
         image = np.load(ifile)
         image = image.f.arr_0  # Load data from inside file.

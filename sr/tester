@@ -35,18 +35,22 @@ def writetext(imgfile, e_sr, e_lr):
     img = Image.open(imgfile)
     width, height = img.size
     draw = ImageDraw.Draw(img)
-    font = ImageFont.truetype('./font/dancing.ttf', 5) 
-    draw.text((width/2,0), "HR", font=font)
-    draw.text((0,width/2), "Error", font=font)
+    font = ImageFont.truetype('./font/dancing.ttf', 15) 
+    draw.text((width/2, 0), "HR", font=font)
+    draw.text((0, width/2), "Error", font=font)
 
-    draw.text((0,0), "SR", font=font)
-    e_sr_str = ",".join(str(x) for x in e_sr)
-    e_lr_str = ",".join(str(x) for x in e_lr)
-    draw.text((32,0), "L1, PSNR, SSIM="+e_sr_str, font=font, fill=(255,0,0))
+    draw.text((0, 0), "SR", font=font)
+    draw.text((32, 0), "L1="+str(e_sr[0]), font=font, fill=(255, 0, 0))
+    draw.text((32, 16), "PSNR="+str(e_sr[1]), font=font, fill=(255, 0, 0))
+    draw.text((32, 32), "SSIM="+str(e_sr[2]), font=font, fill=(255, 0, 0))
 
-    draw.text((height/2,width/2), "LR", font=font, fill=(255,255,255))
-    draw.text((height/2+32,width/2), "L1, PSNR, SSIM="+e_lr_str, font=font, fill=(255,0,0))
-
+    draw.text((height/2, width/2), "LR", font=font, fill=(255, 255, 255))
+    draw.text((height/2 + 32, width/2), "L1="+str(e_lr[0]),
+              font=font, fill=(255, 0, 0))
+    draw.text((height/2 + 32, width/2 + 16), "PSNR="+str(e_lr[1]),
+              font=font, fill=(255, 0, 0))
+    draw.text((height/2 + 32, width/2 + 32), "SSIM="+str(e_lr[2]),
+              font=font, fill=(255, 0, 0))
     img.save("/tmp/test.png")
     os.system("mv /tmp/test.png " + imgfile)
 
@@ -67,7 +71,7 @@ def evaluate(args):
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    test_set = SrDataset(args["--input"], test=True, hr=True)
+    test_set = SrDataset(args["--input"], lognorm=args["--lognorm"], test=True, hr=True)
     test_generator = torch.utils.data.DataLoader(test_set, **parameters)
 
     # model create and load
@@ -105,7 +109,8 @@ def evaluate(args):
             # Compute the loss if HR is given
             if args["hr"]:
                 loss_test = np.mean(np.abs(y_pred - y_test))
-                sr_hr = np.hstack([y_pred.reshape(256, 256), y_test.reshape(256, 256)])
+                sr_hr = np.hstack([y_pred.reshape(-1, y_pred.shape[-1]),
+                                   y_test.reshape(-1, y_pred.shape[-1])])
 
             # Inverse normalize the LR image
             x_test = x_test.cpu().numpy()
@@ -116,13 +121,14 @@ def evaluate(args):
 
             # Create and save image consisting of error map, HR, SR, LR
             if args["hr"]:
-                error = np.abs(y_pred - y_test).reshape(256, 256)
+                error = np.abs(y_pred - y_test).reshape(-1, y_pred.shape[-1])
                 error = error * (255 / np.max(error))
-                lr_error = np.hstack([error, x_test.reshape(256, 256)])
+                lr_error = np.hstack([error, x_test.reshape(-1, y_pred.shape[-1])])
                 save_plots = np.vstack([sr_hr, lr_error])
             else:
                 save_plots = np.vstack(
-                    [y_pred.reshape(256, 256), x_test.reshape(256, 256)]
+                    [y_pred.reshape(-1, y_pred.shape[-1]),
+                     x_test.reshape(-1, y_pred.shape[-1])]
                 )
             filename = os.path.join(args["--output"], f"{batch_idx}.png")
             m = np.mean(save_plots)
@@ -132,17 +138,22 @@ def evaluate(args):
                 test_loss = test_loss + (loss_test)
                 lr_l1 = np.mean(np.abs(y_test - x_test))
                 sr_l1 = np.mean(np.abs(y_test - y_pred))
+                x_test = x_test.reshape(x_test.shape[3], -1)
+                y_test = y_test.reshape(y_test.shape[3], -1)
+                y_pred = y_pred.reshape(y_pred.shape[3], -1)
                 lr_psnr = metrics.peak_signal_noise_ratio(y_test, x_test,
-                        data_range=stat_test["max_val"])
-                sr_psnr = .metrics.peak_signal_noise_ratio(y_test, y_pred,
-                        data_range=stat_test["max_val"])
+                                                          data_range=stat_test["max_val"].numpy())
+                sr_psnr = metrics.peak_signal_noise_ratio(y_test, y_pred,
+                                                          data_range=stat_test["max_val"].numpy())
                 lr_ssim = metrics.structural_similarity(y_test, x_test,
-                        data_range=stat_test["max_val"])
+                                                        gaussian_weights=True,
+                                                        data_range=stat_test["max_val"].numpy())
                 sr_ssim = metrics.structural_similarity(y_test, y_pred,
-                        data_range=stat_test["max_val"])
-                srerror = (sr_l1, sr_psnr, sr_ssim)
-                lrerror = (lr_l1, lr_psnr, lr_ssim)
-                writetext(os.path.abspath(filename), srerror ,lrerror)
+                                                        gaussian_weights=True,
+                                                        data_range=stat_test["max_val"].numpy())
+                srerror = (sr_l1, sr_psnr[0], sr_ssim)
+                lrerror = (lr_l1, lr_psnr[0], lr_ssim)
+                writetext(os.path.abspath(filename), srerror, lrerror)
                 if sr_l1 > lr_l1:
                     messed_images = messed_images + 1
         if args["hr"]:
