@@ -27,10 +27,24 @@ class Resnet(nn.Module):
         Zero-padding added to both sides of the input
         """
         super(Resnet, self).__init__()
-        self.conv_section = nn.Sequential(Conv(in_channels=in_channels, out_channels=out_channels,
-                                               kernel=kernel, stride=stride, conv_section_type="relu"))
-        self.identity = nn.Sequential(nn.Conv2d(in_channels= in_channels, out_channels=out_channels,
-                                                kernel_size=kernel, stride=stride, padding=padding))
+        self.conv_section = nn.Sequential(
+            Conv(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel=kernel,
+                stride=stride,
+                conv_section_type="relu",
+            )
+        )
+        self.identity = nn.Sequential(
+            nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=kernel,
+                stride=stride,
+                padding=padding,
+            )
+        )
         self.leaky_relu = nn.Sequential(nn.LeakyReLU())
 
     def forward(self, x):
@@ -48,13 +62,22 @@ class Resnet(nn.Module):
         """
         out = self.conv_section(x)
         identity_x = self.identity(x)
-        out = self.leaky_relu(out+identity_x)
+        out = self.leaky_relu(out + identity_x)
         return out
+
 
 class Conv(nn.Module):
     """This class performs the Convolution Operation"""
 
-    def __init__(self, in_channels, out_channels, kernel=3, stride=1, padding=1, conv_section_type="conv"):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel=3,
+        stride=1,
+        padding=1,
+        conv_section_type="conv",
+    ):
         """
 
         Parameters
@@ -88,22 +111,29 @@ class Conv(nn.Module):
                     kernel_size=kernel,
                     stride=stride,
                     padding=padding,
-                ))
+                )
+            )
 
             self.section.append(nn.BatchNorm2d(num_features=out_channels))
-            self.section.append(nn.Conv2d(in_channels=out_channels,
-                                          out_channels=out_channels,
-                                          kernel_size=kernel,
-                                          stride=stride,
-                                          padding=padding)
-                                )
+            self.section.append(
+                nn.Conv2d(
+                    in_channels=out_channels,
+                    out_channels=out_channels,
+                    kernel_size=kernel,
+                    stride=stride,
+                    padding=padding,
+                )
+            )
             self.section.append(nn.BatchNorm2d(num_features=out_channels))
-            self.section.append(nn.Conv2d(in_channels=out_channels,
-                                          out_channels=out_channels,
-                                          kernel_size=kernel,
-                                          stride=stride,
-                                          padding=padding)
-                                )
+            self.section.append(
+                nn.Conv2d(
+                    in_channels=out_channels,
+                    out_channels=out_channels,
+                    kernel_size=kernel,
+                    stride=stride,
+                    padding=padding,
+                )
+            )
             self.section.append(nn.LeakyReLU())
             self.section.append(nn.BatchNorm2d(num_features=out_channels))
 
@@ -115,15 +145,19 @@ class Conv(nn.Module):
                     kernel_size=kernel,
                     stride=stride,
                     padding=padding,
-                ))
+                )
+            )
             self.section.append(nn.LeakyReLU())
             self.section.append(nn.BatchNorm2d(num_features=out_channels))
-            self.section.append(nn.Conv2d(in_channels=out_channels,
-                                          out_channels=out_channels,
-                                          kernel_size=kernel,
-                                          stride=stride,
-                                          padding=padding)
-                                )
+            self.section.append(
+                nn.Conv2d(
+                    in_channels=out_channels,
+                    out_channels=out_channels,
+                    kernel_size=kernel,
+                    stride=stride,
+                    padding=padding,
+                )
+            )
             self.section.append(nn.BatchNorm2d(num_features=out_channels))
             # self.section.append(nn.GroupNorm2d(num_features=out_channels))
 
@@ -175,7 +209,7 @@ class Upsampling(nn.Module):
             )
         elif sample_type == "upsamp":
             self.up_sample = self.up = nn.Sequential(
-                #nn.Upsample(mode="bilinear", scale_factor=2),
+                # nn.Upsample(mode="bilinear", scale_factor=2),
                 nn.Upsample(mode="bicubic", scale_factor=2, align_corners=True),
                 nn.Conv2d(
                     in_channels=in_channels,
@@ -186,8 +220,20 @@ class Upsampling(nn.Module):
                 ),
             )
         self.up_conv = nn.Sequential(
-            Conv(in_channels=in_channels, out_channels=out_channels, conv_section_type="conv"),
-            Conv(in_channels=out_channels, out_channels=out_channels, conv_section_type="conv"),
+            nn.Conv2d(
+                in_channels=in_channels,
+                out_channels=out_channels,
+                kernel_size=3,
+                stride=1,
+                padding=1
+            ),
+            nn.Conv2d(
+                in_channels=out_channels,
+                out_channels=out_channels,
+                kernel_size=3,
+                stride=1,
+                padding=1,
+            ),
         )
 
     def forward(self, input_tensor, skip):
@@ -222,14 +268,17 @@ class UNET(nn.Module):
         self.resnet_out_channels = 4
         self.final_channel = out_channels
 
-        #resnet
-        self.resnet = Resnet(in_channels=self.initial_channels, out_channels=self.resnet_out_channels)
+        # resnet
+        self.resnet = Resnet(
+            in_channels=self.initial_channels, out_channels=self.resnet_out_channels
+        )
         self.initial_channels = self.resnet_out_channels
         for i in range(depth):
             self.downsample.append(
                 Conv(
                     in_channels=self.initial_channels,
-                    out_channels=init_features * (2 ** i),conv_section_type="conv"
+                    out_channels=init_features * (2 ** i),
+                    conv_section_type="conv",
                 )
             )
             self.initial_channels = init_features * (2 ** i)
@@ -238,7 +287,8 @@ class UNET(nn.Module):
             self.upsample.append(
                 Upsampling(
                     in_channels=self.initial_channels,
-                    out_channels=init_features * (2 ** i), sample_type="upsamp"
+                    out_channels=init_features * (2 ** i),
+                    sample_type="upsamp",
                 )
             )
             self.initial_channels = init_features * (2 ** i)

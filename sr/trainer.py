@@ -40,6 +40,25 @@ def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
 
 
+def model_save(train_model, train_model_path):
+    """
+
+    Parameters
+    ----------
+    train_model: model state dictionary
+    train_model_path: model path
+
+    Returns
+    -------
+
+    """
+    model_path = Path(train_model_path)
+    model_folder = model_path.parent
+    if not model_folder.is_dir():
+        os.makedirs(model_folder)
+    torch.save(train_model.state_dict(), model_path)
+
+
 def training(training_generator, validation_generator, device, log_dir, architecture):
     """
 
@@ -63,7 +82,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
     elif architecture == "edsr":
         model = EDSR(n_resblocks=16, n_feats=64, scale=1)
     model.to(device)
-    summary(model, (1, 256, 256), batch_size=-1, device="cuda")
+    summary(model, (1, 256, 256), batch_size=1, device="cuda")
     max_epochs = 200
     # criterion = SSIM()
     # criterion = PSNR()
@@ -159,15 +178,19 @@ def training(training_generator, validation_generator, device, log_dir, architec
         # Save best validation epoch model
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
-            torch.save(
-                model.state_dict(), f"{os.getcwd()}/{architecture}_best_model.pt"
+            model_save(
+                model,
+                f"{os.getcwd()}/{architecture}/{architecture}_best_model.pt",
             )
 
         if step % 10 == 0:
-            torch.save(
-                model.state_dict(), f"{os.getcwd()}/{architecture}_model_{step}.pt"
+            model_save(
+                model,
+                f"{os.getcwd()}/{architecture}/{architecture}_model_{step}.pt",
             )
-        torch.save(model.state_dict(), f"{os.getcwd()}/{architecture}_model.pt")
+        model_save(
+            model, f"{os.getcwd()}/{architecture}/{architecture}_model.pt"
+        )
         torch.cuda.empty_cache()
 
 
