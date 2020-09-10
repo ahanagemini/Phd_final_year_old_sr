@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+
+"""
+usage:   
+file_converter.py --input_files=input_files_path --output_files=output_files_path
+file_converter.py --help | -help | -h
+
+Arguments:
+  input_files_path: Path with directory structure input_directory->ImageFiles
+  output_files_path: Output Path with desired structure input_directory->Image_file_name->ImageFiles
+Options:
+  -h --help -h
+"""
+
 """
 Created on Thu Aug 27 18:33:58 2020
 
@@ -12,31 +25,29 @@ Input_directory->Image_file to Input_directory->Image_file_name->Image_file
 
 """
 
-"""Usage:   file_converter.py --input_files=input_files_path --output_files=output_files_path
-            file_converter.py --help | -help | -h
-
-Arguments:
-  input_files_path: Path with directory structure input_directory->ImageFiles
-  output_files_path: Output Path with desired structure input_directory->Image_file_name->ImageFiles
-Options:
-  -h --help -h
-"""
-
 import os
 from pathlib import Path
 from docopt import docopt
 from PIL import Image
 from tqdm import tqdm
-import tifffile
+
 import numpy as np
+import tifffile
+
 
 
 def process(infile, outfile):
+    '''
+
+    :param infile: Input files directory
+    :param outfile: Ouput files directory
+    :return:
+    '''
     extensions = ["*.npz", "*.npy", "*.png", "*.tif", "*.jpeg", "*.jpg", "*.gif"]
     files_list = []
     [files_list.extend(infile.rglob(x)) for x in extensions]
     for i, files in tqdm(enumerate(files_list), total=len(files_list)):
-        imagePaths = [".png", ".jpg", ".jpeg", ".gif", ".tif"]
+        image_paths = [".png", ".jpg", ".jpeg", ".gif", ".tif"]
         file_folder_name, file_ext = (
             os.path.splitext(files.name)[0],
             os.path.splitext(files.name)[1],
@@ -49,13 +60,13 @@ def process(infile, outfile):
             image = Image.fromarray(image.f.arr_0)
         elif file_ext == ".tiff":
             image = Image.fromarray(tifffile.imread(files))
-        elif file_ext in imagePaths:
+        elif file_ext in image_paths:
             image = Image.open(files)
         image = image.convert(mode="L")
-        outfile = outfile / file_folder_name
-        if not outfile.is_dir():
-            os.makedirs(outfile)
-        np.savez_compressed(outfile / file_name, np.array(image))
+        output_file = outfile / file_folder_name
+        if not output_file.is_dir():
+            os.makedirs(output_file)
+        np.savez_compressed(output_file / file_name, np.array(image))
 
 
 def main():
@@ -63,6 +74,10 @@ def main():
     This function changes the directory structure when given structure has only images
     """
     arguments = docopt(__doc__)
-    idir = Path(arguments["--input-directory"])
-    odir = Path(arguments["--output-directory"])
+    idir = Path(arguments["--input_files"])
+    odir = Path(arguments["--output_files"])
     process(idir, odir)
+
+
+if __name__ == "__main__":
+    main()
