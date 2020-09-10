@@ -26,6 +26,7 @@ import os
 from pathlib import Path
 from docopt import docopt
 from PIL import Image
+from tqdm import tqdm
 import tifffile
 import numpy as np
 
@@ -34,9 +35,12 @@ def process(infile, outfile):
     extensions = ["*.npz", "*.npy", "*.png", "*.tif", "*.jpeg", "*.jpg", "*.gif"]
     files_list = []
     [files_list.extend(infile.rglob(x)) for x in extensions]
-    for i, files in enumerate(files_list):
+    for i, files in tqdm(enumerate(files_list), total=len(files_list)):
         imagePaths = [".png", ".jpg", ".jpeg", ".gif", ".tif"]
-        file_folder_name, file_ext = os.path.splitext(files.name)[0], os.path.splitext(files.name)[1]
+        file_folder_name, file_ext = (
+            os.path.splitext(files.name)[0],
+            os.path.splitext(files.name)[1],
+        )
         file_name = file_folder_name
         if file_ext == ".npy":
             image = Image.fromarray(np.load(files))
@@ -53,6 +57,7 @@ def process(infile, outfile):
             os.makedirs(outfile)
         np.savez_compressed(outfile / file_name, np.array(image))
 
+
 def main():
     """
     This function changes the directory structure when given structure has only images
@@ -61,4 +66,3 @@ def main():
     idir = Path(arguments["--input-directory"])
     odir = Path(arguments["--output-directory"])
     process(idir, odir)
-
