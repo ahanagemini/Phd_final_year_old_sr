@@ -6,7 +6,13 @@ cutter.py --input-directory=IDIR --output-directory=ODIR
 --output-directory=ODIR  Some directory [default: ./mdata]
 
 Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata
+
+cutter expects the input directory of images to be of the following structure.
+Input_directory->patient_folder->patient_image.
+The Output directory will be as follows Output_directory->train/valid/test->
+patient_folder->patient_image and stats.jsonfile
 """
+
 import os
 import json
 from PIL import Image
@@ -69,6 +75,11 @@ def matrix_cutter(img, width=256, height=256):
     """
     images = []
     img_height, img_width = img.shape
+
+    #check if images have 256 width and 256 height if it does skip cutting
+    if img_height == height and img_width == width:
+        return img
+
     for i, ih in enumerate(range(0, img_height, height)):
         for j, iw in enumerate(range(0, img_width, width)):
             posx = iw

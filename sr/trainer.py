@@ -207,7 +207,7 @@ def process(train_path, valid_path, log_dir, architecture, lognorm):
     -------
 
     """
-    parameters = {"batch_size": 8, "shuffle": True, "num_workers": 6}
+    parameters = {"batch_size": 32, "shuffle": True, "num_workers": 6}
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
