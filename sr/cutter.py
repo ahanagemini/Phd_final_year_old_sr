@@ -78,7 +78,7 @@ def matrix_cutter(img, width=256, height=256):
 
     #check if images have 256 width and 256 height if it does skip cutting
     if img_height == height and img_width == width:
-        return img
+        return [(0,0,img)]
 
     for i, ih in enumerate(range(0, img_height, height)):
         for j, iw in enumerate(range(0, img_width, width)):
