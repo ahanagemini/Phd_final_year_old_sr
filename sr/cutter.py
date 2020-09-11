@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
-"""Usage: cutter.py
-cutter.py --input-directory=IDIR --output-directory=ODIR
-
+"""Usage: cutter.py --input-directory=IDIR --output-directory=ODIR
+          cutter.py --help | -help | -h
+Arguments:
 --input-directory=IDIR  Some directory [default: ./data]
 --output-directory=ODIR  Some directory [default: ./mdata]
-
-Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata
 
 cutter expects the input directory of images to be of the following structure.
 Input_directory->patient_folder->patient_image.
 The Output directory will be as follows Output_directory->train/valid/test->
 patient_folder->patient_image and stats.jsonfile
+
+Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata
+
+Options:
+  -h --help -h
+
 """
 
 import os
@@ -78,7 +82,7 @@ def matrix_cutter(img, width=256, height=256):
 
     #check if images have 256 width and 256 height if it does skip cutting
     if img_height == height and img_width == width:
-        return img
+        return 0, 0, img
 
     for i, ih in enumerate(range(0, img_height, height)):
         for j, iw in enumerate(range(0, img_width, width)):
@@ -117,8 +121,6 @@ def process(ifile, ofile):
     """
     print("Processing: ", ifile, "...", end="")
     imatrix = loader(ifile)
-    # imatrix = np.load(ifile)
-    # imatrix = imatrix.f.arr_0  # Load data from inside file.
     stats = computestats(imatrix)
     prefix = ofile.stem
     odir = ofile
@@ -160,7 +162,8 @@ def scan_idir(ipath, opath, train_size = 0.9, valid_size = 0.05):
     [files_list.extend(ipath.rglob(x)) for x in extensions]
     for input_file in files_list:
         folders_list.append(input_file.parent.name)
-        folder_file_map[input_file.parent.name] = input_file
+        folder_file_map[input_file.parent.name] = [input_file.parent.name.rglob(x)
+                                                   for x in extensions]
 
     random.shuffle(folders_list)
     L = []
