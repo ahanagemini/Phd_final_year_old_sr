@@ -180,8 +180,8 @@ def main():
     process every file individually here
     """
     arguments = docopt(__doc__, version="Matrix cutter system")
-    idir = Path(arguments["--input-directory"])
-    odir = Path(arguments["--output-directory"])
+    idir = Path(arguments["--input-directory"]).resolve()
+    odir = Path(arguments["--output-directory"]).resolve()
     assert not odir.is_dir(), "Please provide a non-existent output directory!"
     L = scan_idir(idir, odir)
     for inpfile, outfile in L:
