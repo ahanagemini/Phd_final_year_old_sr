@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Usage: cutter.py --input-directory=IDIR --output-directory=ODIR
-          cutter.py --help | -help | -h
-Arguments:
+"""Usage: cutter.py
+cutter.py --input-directory=IDIR --output-directory=ODIR
+cutter.py --help| -help |-h
+
 --input-directory=IDIR  Some directory [default: ./data]
 --output-directory=ODIR  Some directory [default: ./mdata]
 
@@ -10,10 +11,10 @@ Input_directory->patient_folder->patient_image.
 The Output directory will be as follows Output_directory->train/valid/test->
 patient_folder->patient_image and stats.jsonfile
 
+Options:
+--help | -help | -h
 Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata
 
-Options:
-  -h --help -h
 
 """
 
@@ -82,7 +83,7 @@ def matrix_cutter(img, width=256, height=256):
 
     #check if images have 256 width and 256 height if it does skip cutting
     if img_height == height and img_width == width:
-        return 0, 0, img
+        return [(0,0,img)]
 
     for i, ih in enumerate(range(0, img_height, height)):
         for j, iw in enumerate(range(0, img_width, width)):
@@ -121,10 +122,13 @@ def process(ifile, ofile):
     """
     print("Processing: ", ifile, "...", end="")
     imatrix = loader(ifile)
+    # imatrix = np.load(ifile)
+    # imatrix = imatrix.f.arr_0  # Load data from inside file.
     stats = computestats(imatrix)
     prefix = ofile.stem
     odir = ofile
-    os.makedirs(odir)
+    if not odir.exists():
+        os.makedirs(odir)
     with open(odir / "stats.json", "w") as outfile:
         json.dump(stats, outfile)
 
@@ -152,6 +156,7 @@ def scan_idir(ipath, opath, train_size = 0.9, valid_size = 0.05):
     extensions = ["*.npy", "*.npz", "*.png", "*.jpg", "*.gif", "*.tif", "*.jpeg"]
     folders_list = []
     files_list = []
+    folders_files = []
     folder_file_map = {}
     if train_size+valid_size>1.0:
         print("THe train_size and valid_size is invalid")
@@ -161,20 +166,43 @@ def scan_idir(ipath, opath, train_size = 0.9, valid_size = 0.05):
 
     [files_list.extend(ipath.rglob(x)) for x in extensions]
     for input_file in files_list:
-        folders_list.append(input_file.parent.name)
-        folder_file_map[input_file.parent.name] = [input_file.parent.name.rglob(x)
-                                                   for x in extensions]
+        folder_name = input_file.parent.name
+        if folder_name in folders_list:
+            continue
+        folders_list.append(folder_name)
+        [folders_files.extend(input_file.parent.rglob(x)) for x in extensions]
+        folder_file_map[folder_name] = folders_files
+        folders_files = []
 
     random.shuffle(folders_list)
     L = []
     paths = ["train", "test", "valid"]
-    for i, x in enumerate(folders_list):
-        if i < int(train_size * len(folders_list)):
-            L.append((folder_file_map[x], opath / paths[0] /x))
-        elif i >= int(train_size * len(folders_list)) and i < int((train_size+valid_size) * len(folders_list)):
-            L.append((folder_file_map[x], opath / paths[1] /x))
-        else:
-            L.append((folder_file_map[x], opath / paths[2] /x))
+
+    if len(folders_list) == 1:
+        folders_files = folder_file_map[folders_list[0]]
+        for i, files in enumerate(folders_files):
+            file_name = os.path.splitext(files.name)[0]
+            if i < int(train_size * len(folders_list)):
+                L.append((files, opath / paths[0] / file_name))
+            elif i >= int(train_size * len(folders_list)) and i < int((train_size + valid_size) * len(folders_list)):
+                L.append((files, opath / paths[1] / file_name))
+            else:
+                L.append((files, opath / paths[2] / file_name))
+
+    else:
+        for i, x in enumerate(folders_list):
+            if i < int(train_size * len(folders_list)):
+                folders_files = folder_file_map[folders_list[i]]
+                for files in folders_files:
+                    L.append((files, opath / paths[0] / x))
+            elif i >= int(train_size * len(folders_list)) and i < int((train_size+valid_size) * len(folders_list)):
+                folders_files = folder_file_map[folders_list[i]]
+                for files in folders_files:
+                    L.append((files, opath / paths[1] / x))
+            else:
+                folders_files = folder_file_map[folders_list[i]]
+                for files in folders_files:
+                    L.append((files, opath / paths[2] / x))
     return L
 
 
