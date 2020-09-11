@@ -1,6 +1,9 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.utils.checkpoint as checkpoint
+
+import numpy as np
 
 
 class Resnet(nn.Module):
@@ -163,7 +166,7 @@ class Conv(nn.Module):
 
         self.conv = nn.Sequential(*self.section)
 
-    def forward(self, x):
+    def forward(self, x, dummy=0.0):
         """
 
         Parameters
@@ -236,7 +239,7 @@ class Upsampling(nn.Module):
             ),
         )
 
-    def forward(self, input_tensor, skip):
+    def forward(self, input_tensor, skip, dummy=0.0):
         """
 
         Parameters
@@ -296,6 +299,56 @@ class UNET(nn.Module):
             in_channels=self.initial_channels, out_channels=out_channels, kernel_size=1
         )
 
+    def downsampling(self, x, dummy=0.0):
+        '''
+
+        Parameters
+        ----------
+
+        x: Tensor
+
+        dummy: satisfy checkpoint requirement
+        Input
+
+        Returns:
+        ----------
+
+        x: output after downsample
+        skips: List of skips
+        '''
+        skips = []
+        for i, down in enumerate(self.downsample):
+            torch.tensor(dummy, requires_grad=True)
+            x = checkpoint.checkpoint(down, x, dummy)
+            if i != len(self.downsample) - 1:
+                skips.append(x)
+                x = F.avg_pool2d(x, 2)
+        return x, skips
+
+    def upsampling(self, x, skips, dummy=0.0):
+        '''
+
+        Parameters
+        -----------
+
+        x: Tensor
+        Input
+
+        skips:List
+        contains skips of each layer
+
+        dummy: satisfy checkpoint requirement
+        Returns
+        -----------
+        x: output after upsample
+        '''
+        for i, up in enumerate(self.upsample):
+            dummy = torch.tensor(dummy, requires_grad=True)
+            x = checkpoint.checkpoint(up, x, skips[-i - 1], dummy)
+        return x
+
+
+
     def forward(self, x):
         """
 
@@ -313,13 +366,9 @@ class UNET(nn.Module):
         Output
         """
         # downsample
-        blocks = []
         x = self.resnet(x)
-        for i, down in enumerate(self.downsample):
-            x = down(x)
-            if i != len(self.downsample) - 1:
-                blocks.append(x)
-                x = F.avg_pool2d(x, 2)
-        for i, up in enumerate(self.upsample):
-            x = up(x, blocks[-i - 1])
+        dummy = torch.tensor(0.0, dtype=torch.float32, requires_grad=True)
+        x, skips = self.downsampling(x, dummy)
+        x = self.upsampling(x, skips, dummy)
+
         return self.out_conv(x)

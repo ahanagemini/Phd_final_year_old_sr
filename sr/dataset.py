@@ -35,7 +35,7 @@ class SrDataset(Dataset):
         self.statlist = []
         for fname in self.datalist:
             file_path = Path(fname)
-            stat_file = json.load(open(str(file_path.parent / "stat_global.json")))
+            stat_file = json.load(open(str(file_path.parent / "stats.json")))
             self.statlist.append(stat_file)
         print("Total number of data elements found = ", len(self.datalist))
 

@@ -120,6 +120,7 @@ def process(ifile, ofile):
         or imatrix.shape[0] < 256
         or imatrix.shape[1] < 256
     ):
+
         print("Skipping because file is constant or size is too small.")
         return
 
@@ -135,8 +136,9 @@ def scan_idir(ipath, opath, train_size = 0.9, valid_size = 0.05):
     """
     Returns (x,y) pairs so that x can be processed to create y
     """
-    extensions = [".npy", ".npz", ".png", ".jpg", ".gif", ".tif", ".jpeg"]
+    extensions = ["*.npy", "*.npz", "*.png", "*.jpg", "*.gif", "*.tif", "*.jpeg"]
     folders_list = []
+    files_list = []
     folder_file_map = {}
     if train_size+valid_size>1.0:
         print("THe train_size and valid_size is invalid")
@@ -144,17 +146,12 @@ def scan_idir(ipath, opath, train_size = 0.9, valid_size = 0.05):
     if train_size+valid_size==1.0:
         print("There will be no testing files")
 
-    for patient_folder in os.scandir(ipath):
-        if patient_folder.is_dir():
-            folders_list.append(patient_folder.name)
-            new_path = ipath/patient_folder.name
-            for file_path in new_path.rglob('*.*'):
-                file_ext = os.path.splitext(file_path.name)[1].lower()
-                if file_ext in extensions:
-                    folder_file_map[patient_folder.name] = file_path
+    [files_list.extend(ipath.rglob(x)) for x in extensions]
+    for input_file in files_list:
+        folders_list.append(input_file.parent.name)
+        folder_file_map[input_file.parent.name] = input_file
 
     random.shuffle(folders_list)
-
     L = []
     paths = ["train", "test", "valid"]
     for i, x in enumerate(folders_list):
