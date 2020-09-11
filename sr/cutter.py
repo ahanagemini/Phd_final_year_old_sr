@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """Usage: cutter.py --input-directory=IDIR --output-directory=ODIR
           cutter.py --help | -help | -h
 
@@ -14,9 +15,6 @@ Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata
 
 Options:
 --h | -help | --help
-
-
-
 """
 
 import os
@@ -220,8 +218,8 @@ def main():
     process every file individually here
     """
     arguments = docopt(__doc__, version="Matrix cutter system")
-    idir = Path(arguments["--input-directory"]).resolve()
-    odir = Path(arguments["--output-directory"]).resolve()
+    idir = Path(arguments["--input-directory"])
+    odir = Path(arguments["--output-directory"])
     assert not odir.is_dir(), "Please provide a non-existent output directory!"
     L = scan_idir(idir, odir)
     for inpfile, outfile in L:
