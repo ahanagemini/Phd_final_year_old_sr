@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-"""Usage: cutter.py
-cutter.py --input-directory=IDIR --output-directory=ODIR
-cutter.py --help| -help |-h
+"""Usage: cutter.py --input-directory=IDIR --output-directory=ODIR
+          cutter.py --help | -help | -h
 
 --input-directory=IDIR  Some directory [default: ./data]
 --output-directory=ODIR  Some directory [default: ./mdata]
@@ -11,9 +10,11 @@ Input_directory->patient_folder->patient_image.
 The Output directory will be as follows Output_directory->train/valid/test->
 patient_folder->patient_image and stats.jsonfile
 
-Options:
---help | -help | -h
 Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata
+
+Options:
+--h | -help | --help
+
 
 
 """
