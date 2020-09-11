@@ -100,11 +100,11 @@ def computestats(imatrix):
     """
     Compute basic statistics of the loaded matrix
     """
-    upper_quartile = np.percentile(imatrix, 90)
-    lower_quartile = np.percentile(imatrix, 10)
+    upper_quartile = float(np.percentile(imatrix, 90))
+    lower_quartile = float(np.percentile(imatrix, 10))
     return {
-        "mean": np.mean(imatrix),
-        "std": np.std(imatrix),
+        "mean": float(np.mean(imatrix)),
+        "std": float(np.std(imatrix)),
         "upper_quartile": upper_quartile,
         "lower_quartile": lower_quartile,
     }
