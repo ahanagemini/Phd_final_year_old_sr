@@ -182,10 +182,10 @@ def scan_idir(ipath, opath, train_size=0.9, valid_size=0.05):
         folders_files = folder_file_map[folders_list[0]]
         for i, files in enumerate(folders_files):
             file_name = os.path.splitext(files.name)[0]
-            if i < int(train_size * len(folders_list)):
+            if i < int(train_size * len(folders_files)):
                 L.append((files, opath / paths[0] / file_name))
-            elif i >= int(train_size * len(folders_list)) and i < int(
-                (train_size + valid_size) * len(folders_list)
+            elif i >= int(train_size * len(folders_files)) and i < int(
+                (train_size + valid_size) * len(folders_files)
             ):
                 L.append((files, opath / paths[1] / file_name))
             else:
