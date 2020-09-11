@@ -49,7 +49,7 @@ def loader(ifile):
     fileExt = os.path.splitext(ifile.name)[1].lower()
     if fileExt in ImagePaths:
         image = Image.open(ifile)
-        image = np.array(image.convert(mode = 'L'))
+        image = np.array(image.convert(mode="L"))
     if fileExt == ".tiff":
         image = tifffile.imread(ifile)
     if fileExt == ".npz":
@@ -81,9 +81,9 @@ def matrix_cutter(img, width=256, height=256):
     images = []
     img_height, img_width = img.shape
 
-    #check if images have 256 width and 256 height if it does skip cutting
+    # check if images have 256 width and 256 height if it does skip cutting
     if img_height == height and img_width == width:
-        return [(0,0,img)]
+        return [(0, 0, img)]
 
     for i, ih in enumerate(range(0, img_height, height)):
         for j, iw in enumerate(range(0, img_width, width)):
@@ -149,7 +149,8 @@ def process(ifile, ofile):
     # Fill this direcory up with prefix_xx_xx.npz files.
     print("Done")
 
-def scan_idir(ipath, opath, train_size = 0.9, valid_size = 0.05):
+
+def scan_idir(ipath, opath, train_size=0.9, valid_size=0.05):
     """
     Returns (x,y) pairs so that x can be processed to create y
     """
@@ -158,10 +159,10 @@ def scan_idir(ipath, opath, train_size = 0.9, valid_size = 0.05):
     files_list = []
     folders_files = []
     folder_file_map = {}
-    if train_size+valid_size>1.0:
+    if train_size + valid_size > 1.0:
         print("THe train_size and valid_size is invalid")
         return
-    if train_size+valid_size==1.0:
+    if train_size + valid_size == 1.0:
         print("There will be no testing files")
 
     [files_list.extend(ipath.rglob(x)) for x in extensions]
@@ -184,7 +185,9 @@ def scan_idir(ipath, opath, train_size = 0.9, valid_size = 0.05):
             file_name = os.path.splitext(files.name)[0]
             if i < int(train_size * len(folders_list)):
                 L.append((files, opath / paths[0] / file_name))
-            elif i >= int(train_size * len(folders_list)) and i < int((train_size + valid_size) * len(folders_list)):
+            elif i >= int(train_size * len(folders_list)) and i < int(
+                (train_size + valid_size) * len(folders_list)
+            ):
                 L.append((files, opath / paths[1] / file_name))
             else:
                 L.append((files, opath / paths[2] / file_name))
@@ -194,15 +197,20 @@ def scan_idir(ipath, opath, train_size = 0.9, valid_size = 0.05):
             if i < int(train_size * len(folders_list)):
                 folders_files = folder_file_map[folders_list[i]]
                 for files in folders_files:
-                    L.append((files, opath / paths[0] / x))
-            elif i >= int(train_size * len(folders_list)) and i < int((train_size+valid_size) * len(folders_list)):
+                    file_name = os.path.splitext(files.name)
+                    L.append((files, opath / paths[0] / x / file_name))
+            elif i >= int(train_size * len(folders_list)) and i < int(
+                (train_size + valid_size) * len(folders_list)
+            ):
                 folders_files = folder_file_map[folders_list[i]]
                 for files in folders_files:
-                    L.append((files, opath / paths[1] / x))
+                    file_name = os.path.splitext(files.name)
+                    L.append((files, opath / paths[1] / x / file_name))
             else:
                 folders_files = folder_file_map[folders_list[i]]
                 for files in folders_files:
-                    L.append((files, opath / paths[2] / x))
+                    file_name = os.path.splitext(files.name)
+                    L.append((files, opath / paths[2] / x / file_name))
     return L
 
 
