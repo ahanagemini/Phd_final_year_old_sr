@@ -239,7 +239,7 @@ class Upsampling(nn.Module):
             ),
         )
 
-    def forward(self, input_tensor, skip, dummy=0.0):
+    def forward(self, input_tensor, skip):
         """
 
         Parameters
@@ -299,7 +299,7 @@ class UNET(nn.Module):
             in_channels=self.initial_channels, out_channels=out_channels, kernel_size=1
         )
 
-    def downsampling(self, x, dummy=0.0):
+    def downsampling(self, x):
         '''
 
         Parameters
@@ -318,14 +318,13 @@ class UNET(nn.Module):
         '''
         skips = []
         for i, down in enumerate(self.downsample):
-            torch.tensor(dummy, requires_grad=True)
-            x = checkpoint.checkpoint(down, x, dummy)
+            x = down(x)
             if i != len(self.downsample) - 1:
                 skips.append(x)
                 x = F.avg_pool2d(x, 2)
         return x, skips
 
-    def upsampling(self, x, skips, dummy=0.0):
+    def upsampling(self, x, skips):
         '''
 
         Parameters
@@ -343,8 +342,7 @@ class UNET(nn.Module):
         x: output after upsample
         '''
         for i, up in enumerate(self.upsample):
-            dummy = torch.tensor(dummy, requires_grad=True)
-            x = checkpoint.checkpoint(up, x, skips[-i - 1], dummy)
+            x = up(x, skips[-i - 1])
         return x
 
 
@@ -368,7 +366,7 @@ class UNET(nn.Module):
         # downsample
         x = self.resnet(x)
         dummy = torch.tensor(0.0, dtype=torch.float32, requires_grad=True)
-        x, skips = self.downsampling(x, dummy)
-        x = self.upsampling(x, skips, dummy)
+        x, skips = self.downsampling(x)
+        x = self.upsampling(x, skips)
 
         return self.out_conv(x)
