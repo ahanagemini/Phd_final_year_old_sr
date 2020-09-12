@@ -264,7 +264,7 @@ class Upsampling(nn.Module):
 class UNET(nn.Module):
     """Unet Structure"""
 
-    def __init__(self, in_channels, out_channels, init_features=32, depth=4):
+    def __init__(self, in_channels, out_channels, init_features=32, depth=6):
         super(UNET, self).__init__()
         self.downsample = nn.ModuleList()
         self.initial_channels = in_channels
