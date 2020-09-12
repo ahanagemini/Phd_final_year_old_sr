@@ -204,7 +204,8 @@ class Pertube:
 
         data = sample["stats"]
         sample["hr"] = sample["hr"] + 0.0
-        sample["lr"] = sample["lr"] + (data["std"] / 100.0) * np.random.rand(*(sample["lr"].shape))
+        #sample["lr"] = sample["lr"] + (data["std"] / 100.0) * np.random.rand(*(sample["lr"].shape))
+        sample["lr"] = sample["lr"] + 0.0
         return sample
 
 

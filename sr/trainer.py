@@ -35,6 +35,12 @@ from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR
 from logger import Logger
 
+BATCH_SIZE = {
+    "unet": 32,
+    "axial": 32,
+    "edsr" : 8
+}
+
 
 def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
@@ -207,7 +213,7 @@ def process(train_path, valid_path, log_dir, architecture, lognorm):
     -------
 
     """
-    parameters = {"batch_size": 32, "shuffle": True, "num_workers": 6}
+    parameters = {"batch_size": BATCH_SIZE[architecture], "shuffle": True, "num_workers": 6}
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
