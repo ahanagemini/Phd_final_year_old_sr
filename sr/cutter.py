@@ -114,6 +114,16 @@ def computestats(imatrix):
     }
 
 
+def matrix_dictionary_update(
+    key_matrix_map, matrix_key_map, file_names_map, imatrix, key, ofile, file_name
+):
+    key_matrix_map.append((imatrix, key))
+    matrix_key_map[key] = ofile
+    file_names_map[key] = file_name
+    key = key + 1
+    return file_names_map, key_matrix_map, matrix_key_map, key
+
+
 def process(L):
     """
 
@@ -148,6 +158,20 @@ def process(L):
             """ First matrix"""
             total_mean = total_sum / total_count
             total_variance = np.var(matrix_vector)
+            (
+                file_names_map,
+                key_matrix_map,
+                matrix_key_map,
+                key,
+            ) = matrix_dictionary_update(
+                key_matrix_map,
+                matrix_key_map,
+                file_names_map,
+                imatrix,
+                key,
+                ofile,
+                file_name,
+            )
             continue
 
         # total mean
@@ -165,10 +189,15 @@ def process(L):
             + (total_count * matrix_count * variance_matrix)
             + (total_count * matrix_count * (total_mean - matrix_mean) ** 2)
         ) / ((total_count + matrix_count - 1) * (total_count + matrix_count))
-        key_matrix_map.append((imatrix, key))
-        matrix_key_map[key] = ofile
-        file_names_map[key] = file_name
-        key = key + 1
+        file_names_map, key_matrix_map, matrix_key_map, key = matrix_dictionary_update(
+            key_matrix_map,
+            matrix_key_map,
+            file_names_map,
+            imatrix,
+            key,
+            ofile,
+            file_name,
+        )
         print("\n")
 
     stats = {}
