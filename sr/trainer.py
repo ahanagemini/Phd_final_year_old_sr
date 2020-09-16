@@ -35,11 +35,7 @@ from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR
 from logger import Logger
 
-BATCH_SIZE = {
-    "unet": 32,
-    "axial": 32,
-    "edsr" : 8
-}
+BATCH_SIZE = {"unet": 32, "axial": 32, "edsr": 8}
 
 
 def log_loss_summary(logger, loss, step, prefix=""):
@@ -80,6 +76,10 @@ def training(training_generator, validation_generator, device, log_dir, architec
     -------
 
     """
+    save_model_path = (Path(__file__).parents[1] / "saved_models").resolve()
+    if not save_model_path.is_dir():
+        os.makedirs(save_model_path)
+    save_model_path = str(save_model_path)
     # parameters
     if architecture == "unet":
         model = UNET(in_channels=1, out_channels=1, init_features=32)
@@ -185,18 +185,15 @@ def training(training_generator, validation_generator, device, log_dir, architec
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
             model_save(
-                model,
-                f"{os.getcwd()}/{architecture}/{architecture}_best_model.pt",
+                model, f"{save_model_path}/{architecture}/{architecture}_best_model.pt",
             )
 
         if step % 10 == 0:
             model_save(
                 model,
-                f"{os.getcwd()}/{architecture}/{architecture}_model_{step}.pt",
+                f"{save_model_path}/{architecture}/{architecture}_model_{step}.pt",
             )
-        model_save(
-            model, f"{os.getcwd()}/{architecture}/{architecture}_model.pt"
-        )
+        model_save(model, f"{save_model_path}/{architecture}/{architecture}_model.pt")
         torch.cuda.empty_cache()
 
 
@@ -213,7 +210,11 @@ def process(train_path, valid_path, log_dir, architecture, lognorm):
     -------
 
     """
-    parameters = {"batch_size": BATCH_SIZE[architecture], "shuffle": True, "num_workers": 6}
+    parameters = {
+        "batch_size": BATCH_SIZE[architecture],
+        "shuffle": True,
+        "num_workers": 6,
+    }
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
