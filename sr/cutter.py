@@ -114,39 +114,98 @@ def computestats(imatrix):
     }
 
 
-def process(ifile, ofile):
+def process(L):
     """
-    ifile: input file path for matrix
-    ofile: use this to chop input into pieces and write out
+
+    :param L: contains the input_file path and output_file path
+    :return:
     """
-    print("Processing: ", ifile, "...", end="")
-    imatrix = loader(ifile)
-    # imatrix = np.load(ifile)
-    # imatrix = imatrix.f.arr_0  # Load data from inside file.
-    stats = computestats(imatrix)
-    prefix = ofile.stem
-    odir = ofile
-    if not odir.exists():
-        os.makedirs(odir)
-    with open(odir / "stats.json", "w") as outfile:
-        json.dump(stats, outfile)
+    matrices = []
+    file_names_map = {}
+    key_matrix_map = []
+    matrix_key_map = {}
+    key = 0
+    total_sum = 0
+    total_count = 0
+    total_mean = 0
+    total_variance = 0
+    for i, (ifile, ofile) in enumerate(L):
+        print("processing" + str(ifile), end=" ")
+        imatrix = loader(ifile)
+        file_name = os.path.splitext(ifile.name)[0]
+        if imatrix.shape[0] < 256 or imatrix.shape[1] < 256:
+            print("Skipping because file is constant or size is too small.")
+            continue
+        matrix_vector = np.asarray(imatrix).reshape(-1)
+        matrix_mean = np.mean(matrix_vector)
+        matrix_sum = np.sum(matrix_vector)
+        matrix_count = len(matrix_vector)
 
-    if (
-        (stats["upper_quartile"] - stats["lower_quartile"] < 0.01)
-        or imatrix.shape[0] < 256
-        or imatrix.shape[1] < 256
-    ):
+        # this information is for total mean calculation
+        total_sum = total_sum + matrix_sum
+        total_count = total_count + matrix_count
+        if i == 0:
+            """ First matrix"""
+            total_mean = total_sum / total_count
+            total_variance = np.var(matrix_vector)
+            continue
 
-        print("Skipping because file is constant or size is too small.")
-        return
+        # total mean
+        total_mean = total_sum / total_count
+        variance_matrix = np.var(matrix_vector)
 
-    mlist = matrix_cutter(imatrix)
-    for i, j, mat in mlist:
-        fname = str(prefix) + "_" + str(i) + "_" + str(j)
-        np.savez_compressed(odir / fname, mat)
+        total_variance = (
+            (total_count ** 2 * total_variance)
+            + (matrix_count ** 2 * variance_matrix)
+            - (matrix_count * total_variance)
+            - (matrix_count * variance_matrix)
+            - (total_count * total_variance)
+            - (total_count * variance_matrix)
+            + (total_count * matrix_count * total_variance)
+            + (total_count * matrix_count * variance_matrix)
+            + (total_count * matrix_count * (total_mean - matrix_mean) ** 2)
+        ) / ((total_count + matrix_count - 1) * (total_count + matrix_count))
+        key_matrix_map.append((imatrix, key))
+        matrix_key_map[key] = ofile
+        file_names_map[key] = file_name
+        key = key + 1
+        print("\n")
 
-    # Fill this direcory up with prefix_xx_xx.npz files.
+    stats = {}
+    stats["mean"] = total_mean
+    stats["variance"] = total_variance
+    stats["std"] = np.sqrt(total_variance)
+
+    print("start file creation")
+    for i in range(len(key_matrix_map)):
+        matrix, key = key_matrix_map[i]
+        opath = matrix_key_map[key]
+        prefix = file_names_map[key]
+        odir = opath
+        if not os.path.isdir(odir):
+            os.makedirs(odir)
+        mlist = matrix_cutter(matrix)
+        for i, j, mat in mlist:
+            fname = str(prefix) + "_" + str(i) + "_" + str(j)
+            np.savez_compressed(odir / fname, mat)
+
+        if not os.path.isfile(opath / "stats.json"):
+            with open(odir / "stats.json", "w") as outfile:
+                json.dump(stats, outfile)
+
     print("Done")
+    del (
+        matrices,
+        file_names_map,
+        key_matrix_map,
+        matrix_key_map,
+        key,
+        stats,
+        total_sum,
+        total_count,
+        total_mean,
+        total_variance,
+    )
 
 
 def scan_idir(ipath, opath, train_size=0.9, valid_size=0.05):
@@ -155,7 +214,6 @@ def scan_idir(ipath, opath, train_size=0.9, valid_size=0.05):
     """
     extensions = ["*.npy", "*.npz", "*.png", "*.jpg", "*.gif", "*.tif", "*.jpeg"]
     folders_list = []
-    files_list = []
     folders_files = []
     folder_file_map = {}
     if train_size + valid_size > 1.0:
@@ -164,53 +222,33 @@ def scan_idir(ipath, opath, train_size=0.9, valid_size=0.05):
     if train_size + valid_size == 1.0:
         print("There will be no testing files")
 
-    [files_list.extend(ipath.rglob(x)) for x in extensions]
-    for input_file in files_list:
-        folder_name = input_file.parent.name
-        if folder_name in folders_list:
-            continue
-        folders_list.append(folder_name)
-        [folders_files.extend(input_file.parent.rglob(x)) for x in extensions]
-        folder_file_map[folder_name] = folders_files
+    folders = os.scandir(ipath)
+    for input_folder in folders:
+        if input_folder.is_dir():
+            folder_name = input_folder.name
+            folders_list.append(folder_name)
+            input_folder = Path(input_folder)
+            [folders_files.extend(input_folder.rglob(x)) for x in extensions]
+            folder_file_map[folder_name] = folders_files
         folders_files = []
-
-    random.shuffle(folders_list)
-    L = []
     paths = ["train", "test", "valid"]
+    folder_input_output_map = {}
+    for folder in folders_list:
+        L = []
+        folder_files = folder_file_map[folder]
+        for i, files in enumerate(folder_files):
+            if i < int(train_size * len(folder_files)):
+                L.append((files, opath / paths[0] / folder))
 
-    if len(folders_list) == 1:
-        folders_files = folder_file_map[folders_list[0]]
-        for i, files in enumerate(folders_files):
-            file_name = os.path.splitext(files.name)[0]
-            if i < int(train_size * len(folders_files)):
-                L.append((files, opath / paths[0] / file_name))
-            elif i >= int(train_size * len(folders_files)) and i < int(
-                (train_size + valid_size) * len(folders_files)
+            elif i >= int(train_size * len(folder_files)) and i < int(
+                (train_size + valid_size) * len(folder_files)
             ):
-                L.append((files, opath / paths[1] / file_name))
+                L.append((files, opath / paths[1] / folder))
             else:
-                L.append((files, opath / paths[2] / file_name))
+                L.append((files, opath / paths[2] / folder))
+        folder_input_output_map[folder] = L
 
-    else:
-        for i, x in enumerate(folders_list):
-            if i < int(train_size * len(folders_list)):
-                folders_files = folder_file_map[folders_list[i]]
-                for files in folders_files:
-                    file_name = os.path.splitext(files.name)[0]
-                    L.append((files, opath / paths[0] / x / file_name))
-            elif i >= int(train_size * len(folders_list)) and i < int(
-                (train_size + valid_size) * len(folders_list)
-            ):
-                folders_files = folder_file_map[folders_list[i]]
-                for files in folders_files:
-                    file_name = os.path.splitext(files.name)[0]
-                    L.append((files, opath / paths[1] / x / file_name))
-            else:
-                folders_files = folder_file_map[folders_list[i]]
-                for files in folders_files:
-                    file_name = os.path.splitext(files.name)[0]
-                    L.append((files, opath / paths[2] / x / file_name))
-    return L
+    return folder_input_output_map
 
 
 def main():
@@ -221,9 +259,11 @@ def main():
     idir = Path(arguments["--input-directory"])
     odir = Path(arguments["--output-directory"])
     assert not odir.is_dir(), "Please provide a non-existent output directory!"
-    L = scan_idir(idir, odir)
-    for inpfile, outfile in L:
-        process(inpfile, outfile)
+    folder_map = scan_idir(idir, odir)
+
+    for folder in folder_map.keys():
+        L = folder_map[folder]
+        process(L)
 
 
 if __name__ == "__main__":
