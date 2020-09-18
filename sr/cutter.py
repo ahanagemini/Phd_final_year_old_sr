@@ -124,10 +124,11 @@ def matrix_dictionary_update(
     return file_names_map, key_matrix_map, matrix_key_map, key
 
 
-def process(L):
+def process(L, stats_path):
     """
 
     :param L: contains the input_file path and output_file path
+    :param stats_path: contains the path for the stats json file
     :return:
     """
     matrices = []
@@ -135,10 +136,13 @@ def process(L):
     key_matrix_map = []
     matrix_key_map = {}
     key = 0
-    total_sum = 0
-    total_count = 0
-    total_mean = 0
-    total_variance = 0
+    total_sum = 0.0
+    total_square_sum = 0.0
+    total_count = 0.0
+    total_mean = 0.0
+    total_variance = 0.0
+    min = 0
+    max = 0
     for i, (ifile, ofile) in enumerate(L):
         print("processing" + str(ifile), end=" ")
         imatrix = loader(ifile)
@@ -147,48 +151,25 @@ def process(L):
             print("Skipping because file is constant or size is too small.")
             continue
         matrix_vector = np.asarray(imatrix).reshape(-1)
-        matrix_mean = np.mean(matrix_vector)
-        matrix_sum = np.sum(matrix_vector)
+        square_vector = np.square(matrix_vector, dtype=np.float)
+        matrix_sum = np.sum(matrix_vector, dtype=np.float)
+        square_sum = np.sum(square_vector, dtype=np.float)
         matrix_count = len(matrix_vector)
 
         # this information is for total mean calculation
         total_sum = total_sum + matrix_sum
+        total_square_sum = total_square_sum + square_sum
         total_count = total_count + matrix_count
-        if i == 0:
-            """ First matrix"""
-            total_mean = total_sum / total_count
-            total_variance = np.var(matrix_vector)
-            (
-                file_names_map,
-                key_matrix_map,
-                matrix_key_map,
-                key,
-            ) = matrix_dictionary_update(
-                key_matrix_map,
-                matrix_key_map,
-                file_names_map,
-                imatrix,
-                key,
-                ofile,
-                file_name,
-            )
-            continue
 
-        # total mean
-        total_mean = total_sum / total_count
-        variance_matrix = np.var(matrix_vector)
+        # maximum and minimum
+        matrix_max = np.max(matrix_vector)
+        matrix_min = np.min(matrix_vector)
+        if max < matrix_max:
+            max = matrix_max
 
-        total_variance = (
-            (total_count ** 2 * total_variance)
-            + (matrix_count ** 2 * variance_matrix)
-            - (matrix_count * total_variance)
-            - (matrix_count * variance_matrix)
-            - (total_count * total_variance)
-            - (total_count * variance_matrix)
-            + (total_count * matrix_count * total_variance)
-            + (total_count * matrix_count * variance_matrix)
-            + (total_count * matrix_count * (total_mean - matrix_mean) ** 2)
-        ) / ((total_count + matrix_count - 1) * (total_count + matrix_count))
+        if min > matrix_min:
+            min = matrix_min
+
         file_names_map, key_matrix_map, matrix_key_map, key = matrix_dictionary_update(
             key_matrix_map,
             matrix_key_map,
@@ -200,10 +181,14 @@ def process(L):
         )
         print("\n")
 
+    total_mean = total_sum / total_count
+    total_variance = (total_square_sum / total_count) - (total_sum / total_count) ** 2
     stats = {}
     stats["mean"] = total_mean
     stats["variance"] = total_variance
     stats["std"] = np.sqrt(total_variance)
+    stats["max"] = float(max)
+    stats["min"] = float(min)
 
     print("start file creation")
     for i in range(len(key_matrix_map)):
@@ -217,13 +202,14 @@ def process(L):
         for i, j, mat in mlist:
             fname = str(prefix) + "_" + str(i) + "_" + str(j)
             np.savez_compressed(odir / fname, mat)
-
-        if not os.path.isfile(opath / "stats.json"):
-            with open(odir / "stats.json", "w") as outfile:
-                json.dump(stats, outfile)
+    # saving stats file in train directory
+    with open(stats_path / "stats.json", "w") as outfile:
+        json.dump(stats, outfile)
 
     print("Done")
     del (
+        max,
+        min,
         matrices,
         file_names_map,
         key_matrix_map,
@@ -262,12 +248,14 @@ def scan_idir(ipath, opath, train_size=0.9, valid_size=0.05):
         folders_files = []
     paths = ["train", "test", "valid"]
     folder_input_output_map = {}
+    stats_path = Path("")
     for folder in folders_list:
         L = []
         folder_files = folder_file_map[folder]
         for i, files in enumerate(folder_files):
             if i < int(train_size * len(folder_files)):
                 L.append((files, opath / paths[0] / folder))
+                stats_path = Path(opath / paths[0] / folder)
 
             elif i >= int(train_size * len(folder_files)) and i < int(
                 (train_size + valid_size) * len(folder_files)
@@ -275,7 +263,7 @@ def scan_idir(ipath, opath, train_size=0.9, valid_size=0.05):
                 L.append((files, opath / paths[1] / folder))
             else:
                 L.append((files, opath / paths[2] / folder))
-        folder_input_output_map[folder] = L
+        folder_input_output_map[folder] = L, stats_path
 
     return folder_input_output_map
 
@@ -291,8 +279,8 @@ def main():
     folder_map = scan_idir(idir, odir)
 
     for folder in folder_map.keys():
-        L = folder_map[folder]
-        process(L)
+        L, stats_path = folder_map[folder]
+        process(L, stats_path)
 
 
 if __name__ == "__main__":
