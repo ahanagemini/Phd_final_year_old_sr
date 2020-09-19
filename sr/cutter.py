@@ -24,7 +24,6 @@ import tifffile
 from docopt import docopt
 from pathlib import Path
 import numpy as np
-import random
 
 
 def loader(ifile):
@@ -43,18 +42,18 @@ def loader(ifile):
 
     """
 
-    ImagePaths = [".jpg", ".png", ".jpeg", ".gif", ".tif"]
-    ImageArrayPaths = [".npy", ".npz"]
-    fileExt = os.path.splitext(ifile.name)[1].lower()
-    if fileExt in ImagePaths:
+    image_paths = [".jpg", ".png", ".jpeg", ".gif", ".tif"]
+    image_array_paths = [".npy", ".npz"]
+    file_ext = os.path.splitext(ifile.name)[1].lower()
+    if file_ext in image_paths:
         image = Image.open(ifile)
         image = np.array(image.convert(mode="L"))
-    if fileExt == ".tiff":
+    if file_ext == ".tiff":
         image = tifffile.imread(ifile)
-    if fileExt == ".npz":
+    if file_ext == ".npz":
         image = np.load(ifile)
         image = image.f.arr_0  # Load data from inside file.
-    elif fileExt in ImageArrayPaths:
+    elif file_ext in image_array_paths:
         image = np.load(ifile)
     return image
 
@@ -100,30 +99,6 @@ def matrix_cutter(img, width=256, height=256):
     return images
 
 
-def computestats(imatrix):
-    """
-    Compute basic statistics of the loaded matrix
-    """
-    upper_quartile = float(np.percentile(imatrix, 90))
-    lower_quartile = float(np.percentile(imatrix, 10))
-    return {
-        "mean": float(np.mean(imatrix)),
-        "std": float(np.std(imatrix)),
-        "upper_quartile": upper_quartile,
-        "lower_quartile": lower_quartile,
-    }
-
-
-def matrix_dictionary_update(
-    key_matrix_map, matrix_key_map, file_names_map, imatrix, key, ofile, file_name
-):
-    key_matrix_map.append((imatrix, key))
-    matrix_key_map[key] = ofile
-    file_names_map[key] = file_name
-    key = key + 1
-    return file_names_map, key_matrix_map, matrix_key_map, key
-
-
 def process(L, stats_path):
     """
 
@@ -139,11 +114,9 @@ def process(L, stats_path):
     total_sum = 0.0
     total_square_sum = 0.0
     total_count = 0.0
-    total_mean = 0.0
-    total_variance = 0.0
-    min = 0
-    max = 0
-    for i, (ifile, ofile) in enumerate(L):
+    maxval = 0
+    minval = 0
+    for k, (ifile, ofile) in enumerate(L):
         print("processing" + str(ifile), end=" ")
         imatrix = loader(ifile)
         file_name = os.path.splitext(ifile.name)[0]
@@ -164,21 +137,13 @@ def process(L, stats_path):
         # maximum and minimum
         matrix_max = np.max(matrix_vector)
         matrix_min = np.min(matrix_vector)
-        if max < matrix_max:
-            max = matrix_max
+        maxval = max(maxval, matrix_max)
+        minval = min(minval, matrix_min)
 
-        if min > matrix_min:
-            min = matrix_min
-
-        file_names_map, key_matrix_map, matrix_key_map, key = matrix_dictionary_update(
-            key_matrix_map,
-            matrix_key_map,
-            file_names_map,
-            imatrix,
-            key,
-            ofile,
-            file_name,
-        )
+        key_matrix_map.append((imatrix, key))
+        matrix_key_map[key] = ofile
+        file_names_map[key] = file_name
+        key = key + 1
         print("\n")
 
     total_mean = total_sum / total_count
@@ -187,8 +152,8 @@ def process(L, stats_path):
     stats["mean"] = total_mean
     stats["variance"] = total_variance
     stats["std"] = np.sqrt(total_variance)
-    stats["max"] = float(max)
-    stats["min"] = float(min)
+    stats["max"] = float(maxval)
+    stats["min"] = float(minval)
 
     print("start file creation")
     for i in range(len(key_matrix_map)):
@@ -199,8 +164,8 @@ def process(L, stats_path):
         if not os.path.isdir(odir):
             os.makedirs(odir)
         mlist = matrix_cutter(matrix)
-        for i, j, mat in mlist:
-            fname = str(prefix) + "_" + str(i) + "_" + str(j)
+        for k, j, mat in mlist:
+            fname = str(prefix) + "_" + str(k) + "_" + str(j)
             np.savez_compressed(odir / fname, mat)
     # saving stats file in train directory
     with open(stats_path / "stats.json", "w") as outfile:
@@ -208,8 +173,8 @@ def process(L, stats_path):
 
     print("Done")
     del (
-        max,
-        min,
+        maxval,
+        minval,
         matrices,
         file_names_map,
         key_matrix_map,
