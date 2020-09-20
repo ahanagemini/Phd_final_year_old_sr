@@ -3,3 +3,7 @@ torch
 torchvision
 tqdm
 tensorboard
+numpy 
+Pillow
+tifffile
+docopt
