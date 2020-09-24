@@ -254,6 +254,7 @@ def scan_idir(ipath, opath, percentage, train_size=0.9, valid_size=0.05):
             input_folder = Path(input_folder)
             [folders_files.extend(input_folder.rglob(x)) for x in extensions]
             size = int(len(folders_files) * (percentage / 100))
+            random.Random(4).shuffle(folders_files)
             folders_files = folders_files[:size]
             folder_file_map[folder_name] = folders_files
         folders_files = []
