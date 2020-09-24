@@ -4,6 +4,7 @@ Dataset file
 from pathlib import Path
 import json
 import random
+import os
 
 # from matplotlib import pyplot as plt
 import torch
@@ -44,6 +45,8 @@ class SrDataset(Dataset):
 
     def __getitem__(self, idx):
         img_name = Path(self.datalist[idx])
+        filename = os.path.basename(img_name)
+        filename = filename.split('.')[0]
         stats = self.statlist[idx]
         if self.hr:
             hr_image = loader(img_name)
@@ -72,7 +75,7 @@ class SrDataset(Dataset):
             lr_image =  loader(img_name)
             hr_image = np.zeros_like(lr_image)
         if not self.test:
-            sample = {"lr": lr_image, "hr": hr_image, "stats": stats}
+            sample = {"lr": lr_image, "hr": hr_image, "stats": stats, "file": filename}
             transforms = Compose(
                 [Rotate(), Transpose(), Pertube(1.00e-6), Reshape(), ToFloatTensor()]
             )
@@ -88,7 +91,7 @@ class SrDataset(Dataset):
             if stats["std"] <= 0.001:
                 stats["std"] = 1
             lr_image = Normalize()(lr_image, stats)
-            sample = {"lr": lr_image, "hr": hr_image, "stats": stats}
+            sample = {"lr": lr_image, "hr": hr_image, "stats": stats, "file": filename}
             transforms = Compose(
                 [Pertube(1.00e-6), Reshape(), ToFloatTensor()]
             )
