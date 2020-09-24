@@ -17,6 +17,7 @@ Options:
 from pathlib import Path
 import os
 from time import time
+import datetime
 
 import torch
 import torch.optim as optim
@@ -27,6 +28,7 @@ from torchsummary import summary
 from docopt import docopt
 
 import numpy as np
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from unet import UNET
 from edsr import EDSR
@@ -76,7 +78,8 @@ def training(training_generator, validation_generator, device, log_dir, architec
     -------
 
     """
-    save_model_path = (Path(__file__).parents[1] / "saved_models").resolve()
+    timestamp = f'{datetime.datetime.now().date()}-{datetime.datetime.now().time()}' 
+    save_model_path = (Path(__file__).parent/ "saved_models").resolve()
     if not save_model_path.is_dir():
         os.makedirs(save_model_path)
     save_model_path = str(save_model_path)
@@ -89,7 +92,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
         model = EDSR(n_resblocks=16, n_feats=64, scale=1)
     model.to(device)
     summary(model, (1, 256, 256), batch_size=1, device="cuda")
-    max_epochs = 200
+    max_epochs = 300
     # criterion = SSIM()
     # criterion = PSNR()
     # criterion = L1loss()
@@ -103,6 +106,10 @@ def training(training_generator, validation_generator, device, log_dir, architec
     step = 0
     totiter = sum(1 for x in training_generator)
     valiter = sum(1 for x in validation_generator)
+    # TODO: Remove after debugging is done
+    input_save_path = "input_pics"
+    if not input_save_path.is_dir():
+        os.makedirs(input_save_path)
 
     for epoch in range(max_epochs):
         start_time = time()
@@ -123,7 +130,15 @@ def training(training_generator, validation_generator, device, log_dir, architec
                 mean.to(device),
                 sigma.to(device),
             )
-
+            # TODO: Remove this after debugging is over
+            x_np = x_train.cpu().numpy()
+            y_np = y_train.cpu().numpy()
+            for i in range(x_np.shape[0]):
+                filename = data["file"][i]
+                save_plots = np.hstack([x_np[i].reshape(256, 256), y_np[i].reshape(256, 256)])
+                filename = os.path.join(f"{input_save_path}/{filename}_{batch_idx}_{i}.png")
+                plt.imsave(filename, save_plots, cmap='gray')
+            
             optimizer.zero_grad()
             with torch.autograd.set_detect_anomaly(True):
                 with torch.set_grad_enabled(True):
@@ -185,15 +200,15 @@ def training(training_generator, validation_generator, device, log_dir, architec
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
             model_save(
-                model, f"{save_model_path}/{architecture}/{architecture}_best_model.pt",
+                model, f"{save_model_path}/{architecture}/{timestamp}_best_model.pt",
             )
 
         if step % 10 == 0:
             model_save(
                 model,
-                f"{save_model_path}/{architecture}/{architecture}_model_{step}.pt",
+                f"{save_model_path}/{architecture}/{timestamp}_model_{step}.pt",
             )
-        model_save(model, f"{save_model_path}/{architecture}/{architecture}_model.pt")
+        model_save(model, f"{save_model_path}/{architecture}/{timestamp}_model.pt")
         torch.cuda.empty_cache()
 
 

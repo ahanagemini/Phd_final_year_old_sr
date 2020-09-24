@@ -85,6 +85,8 @@ def evaluate(args):
     model.to(device)
     test_loss = 0
     messed_images = 0
+    test_psnr = 0.0
+    test_ssim = 0.0
     model.load_state_dict(torch.load(args["--model"]))
     with torch.no_grad():
         for batch_idx, data in tqdm(enumerate(test_generator), total = len(test_set.datalist)):
@@ -109,6 +111,7 @@ def evaluate(args):
             # Compute the loss if HR is given
             if args["hr"]:
                 loss_test = np.mean(np.abs(y_pred - y_test))
+                # loss_test = loss_test / stat_test["std"]
                 sr_hr = np.hstack([y_pred.reshape(-1, y_pred.shape[-1]),
                                    y_test.reshape(-1, y_pred.shape[-1])])
 
@@ -135,22 +138,24 @@ def evaluate(args):
             s = np.std(save_plots)
             plt.imsave(filename, save_plots, cmap="gray", vmin = m-3*s , vmax = m+3*s )
             if args["hr"]:
-                test_loss = test_loss + (loss_test)
+                test_loss = test_loss + loss_test
                 lr_l1 = np.mean(np.abs(y_test - x_test))
                 sr_l1 = np.mean(np.abs(y_test - y_pred))
                 x_test = x_test.reshape(x_test.shape[3], -1)
                 y_test = y_test.reshape(y_test.shape[3], -1)
                 y_pred = y_pred.reshape(y_pred.shape[3], -1)
                 lr_psnr = metrics.peak_signal_noise_ratio(y_test, x_test,
-                                                          data_range=stat_test["max_val"].numpy())
+                                                          data_range=stat_test["max"].numpy())
                 sr_psnr = metrics.peak_signal_noise_ratio(y_test, y_pred,
-                                                          data_range=stat_test["max_val"].numpy())
+                                                          data_range=stat_test["max"].numpy())
                 lr_ssim = metrics.structural_similarity(y_test, x_test,
                                                         gaussian_weights=True,
-                                                        data_range=stat_test["max_val"].numpy())
+                                                        data_range=stat_test["max"].numpy())
                 sr_ssim = metrics.structural_similarity(y_test, y_pred,
                                                         gaussian_weights=True,
-                                                        data_range=stat_test["max_val"].numpy())
+                                                        data_range=stat_test["max"].numpy())
+                test_psnr = test_psnr + sr_psnr[0]
+                test_ssim = test_ssim + sr_ssim
                 srerror = (sr_l1, sr_psnr[0], sr_ssim)
                 lrerror = (lr_l1, lr_psnr[0], lr_ssim)
                 writetext(os.path.abspath(filename), srerror, lrerror)
@@ -158,7 +163,9 @@ def evaluate(args):
                     messed_images = messed_images + 1
         if args["hr"]:
             print("\nTest Loss: {:.6f}".format(test_loss / len(test_generator)))
-            print(messed_images)
+            print("\nTest PSNR: {:.6f}".format(test_psnr / len(test_generator)))
+            print("\nTest SSIM: {:.6f}".format(test_ssim / len(test_generator)))
+            print(f"NUmber of images where SR L1 is worse than LR: {messed_images}")
 
 
 if __name__ == "__main__":
