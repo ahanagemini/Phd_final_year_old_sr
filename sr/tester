@@ -87,6 +87,8 @@ def evaluate(args):
     messed_images = 0
     test_psnr = 0.0
     test_ssim = 0.0
+    lr_tot_psnr = 0.0
+    lr_tot_ssim = 0.0
     model.load_state_dict(torch.load(args["--model"]))
     with torch.no_grad():
         for batch_idx, data in tqdm(enumerate(test_generator), total = len(test_set.datalist)):
@@ -157,6 +159,8 @@ def evaluate(args):
                                                         data_range=stat_test["max"].numpy())
                 test_psnr = test_psnr + sr_psnr[0]
                 test_ssim = test_ssim + sr_ssim
+                lr_tot_psnr = lr_tot_psnr + lr_psnr[0]
+                lr_tot_ssim = lr_tot_ssim + lr_ssim
                 srerror = (sr_l1, sr_psnr[0], sr_ssim)
                 lrerror = (lr_l1, lr_psnr[0], lr_ssim)
                 writetext(os.path.abspath(filename), srerror, lrerror)
@@ -166,6 +170,8 @@ def evaluate(args):
             print("\nTest Loss: {:.6f}".format(test_loss / len(test_generator)))
             print("\nTest PSNR: {:.6f}".format(test_psnr / len(test_generator)))
             print("\nTest SSIM: {:.6f}".format(test_ssim / len(test_generator)))
+            print("\nLR PSNR: {:.6f}".format(lr_tot_psnr / len(test_generator)))
+            print("\nLR SSIM: {:.6f}".format(lr_tot_ssim / len(test_generator)))
             print(f"NUmber of images where SR L1 is worse than LR: {messed_images}")
 
 
