@@ -70,14 +70,15 @@ class SrDataset(Dataset):
         # hr_image /= abs(interval_length)
         # hr_image = (hr_image - 0.5)*2.0
         if self.hr:
-            lr_image = scipy.ndimage.zoom(scipy.ndimage.zoom(hr_image, 0.5), 2.0)
+            lr_image = scipy.ndimage.zoom(scipy.ndimage.zoom(hr_image, 0.25), 4.0)
         else:
             lr_image =  loader(img_name)
             hr_image = np.zeros_like(lr_image)
         if not self.test:
             sample = {"lr": lr_image, "hr": hr_image, "stats": stats, "file": filename}
             transforms = Compose(
-                [Rotate(), Transpose(), Pertube(1.00e-6), Reshape(), ToFloatTensor()]
+                [Rotate(), Transpose(), HorizontalFlip(), VerticalFlip(),
+                    Pertube(1.00e-6), Reshape(), ToFloatTensor()]
             )
             for i, trans in enumerate([transforms]):
                 sample = trans(sample)
@@ -176,11 +177,51 @@ class Transpose:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
-        sample["hr"] = np.transpose(sample["hr"])
-        sample["lr"] = np.transpose(sample["lr"])
+        if random.randint(1, 10) > 5:
+            sample["hr"] = np.transpose(sample["hr"])
+            sample["lr"] = np.transpose(sample["lr"])
 
         return sample
 
+class VerticalFlip:
+    """VerticalFlip class to probailistically return vertical flip of the matrix"""
+
+    def __call__(self, sample):
+        """
+
+        Parameters
+        ----------
+        sample: dictionary containing lr, hr and stats
+
+        Returns
+        -------
+        sample: dictionary containing transformed lr and transformed hr
+        """
+        if random.randint(1, 10) > 5:
+            sample["hr"] = np.flipud(sample["hr"])
+            sample["lr"] = np.flipud(sample["lr"])
+
+        return sample
+
+class HorizontalFlip:
+    """HorizontalFlip class to probailistically return horizontal flip of the matrix"""
+
+    def __call__(self, sample):
+        """
+
+        Parameters
+        ----------
+        sample: dictionary containing lr, hr and stats
+
+        Returns
+        -------
+        sample: dictionary containing transformed lr and transformed hr
+        """
+        if random.randint(1, 10) > 5:
+            sample["hr"] = np.fliplr(sample["hr"])
+            sample["lr"] = np.fliplr(sample["lr"])
+
+        return sample
 
 class Pertube:
     """ Pertube class transforms image array by adding very small values to the array """
