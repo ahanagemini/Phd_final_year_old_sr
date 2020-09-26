@@ -53,7 +53,7 @@ def loader(ifile):
         image = np.array(image.convert(mode="L"))
     if fileExt in TiffPaths:
         # 16 bit tifffiles are not read correctly by Pillow
-        image = tifffile.imread(ifile)
+        image = tifffile.imread(str(ifile))
     if fileExt == ".npz":
         image = np.load(ifile)
         image = image.f.arr_0  # Load data from inside file.

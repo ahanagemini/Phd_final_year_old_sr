@@ -28,6 +28,7 @@ from torchsummary import summary
 from docopt import docopt
 
 import numpy as np
+import tifffile
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from unet import UNET
@@ -92,7 +93,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
         model = EDSR(n_resblocks=16, n_feats=64, scale=1)
     model.to(device)
     summary(model, (1, 256, 256), batch_size=1, device="cuda")
-    max_epochs = 300
+    max_epochs = 150
     # criterion = SSIM()
     # criterion = PSNR()
     # criterion = L1loss()
@@ -107,7 +108,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
     totiter = sum(1 for x in training_generator)
     valiter = sum(1 for x in validation_generator)
     # TODO: Remove after debugging is done
-    input_save_path = "input_pics"
+    input_save_path = Path("input_pics").resolve()
     if not input_save_path.is_dir():
         os.makedirs(input_save_path)
 
@@ -135,9 +136,20 @@ def training(training_generator, validation_generator, device, log_dir, architec
             y_np = y_train.cpu().numpy()
             for i in range(x_np.shape[0]):
                 filename = data["file"][i]
-                save_plots = np.hstack([x_np[i].reshape(256, 256), y_np[i].reshape(256, 256)])
-                filename = os.path.join(f"{input_save_path}/{filename}_{batch_idx}_{i}.png")
-                plt.imsave(filename, save_plots, cmap='gray')
+                x_rescale = x_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
+                y_rescale = y_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
+
+                save_plots = np.hstack([x_rescale.reshape(256, 256), y_rescale.reshape(256, 256)])
+                save_plots = np.clip(save_plots, stat["min"][i].numpy(), stat["max"][i].numpy())
+                vmax = stat["mean"][i].numpy() + 3 * stat["std"][i].numpy()
+                vmin = stat["min"][i].numpy()
+                # save_plots = save_plots * stat["std"][i].numpy() +  stat["mean"][i].numpy()
+                #save_plots = save_plots.astype(np.uint16)
+                #x_rescale = np.clip(x_rescale, stat["min"][i].numpy(), stat["max"][i].numpy())
+                #print(np.mean(np.abs(x_rescale - y_rescale)), np.amax(y_rescale))
+                filename = os.path.join(f"{input_save_path}/{filename}_{batch_idx}_{i}.tiff")
+                plt.imsave(filename, save_plots, vmin=vmin, vmax=vmax, cmap='gray')
+                #tifffile.imsave(filename, save_plots)
             
             optimizer.zero_grad()
             with torch.autograd.set_detect_anomaly(True):

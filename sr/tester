@@ -87,6 +87,8 @@ def evaluate(args):
     messed_images = 0
     test_psnr = 0.0
     test_ssim = 0.0
+    lr_tot_psnr = 0.0
+    lr_tot_ssim = 0.0
     model.load_state_dict(torch.load(args["--model"]))
     with torch.no_grad():
         for batch_idx, data in tqdm(enumerate(test_generator), total = len(test_set.datalist)):
@@ -104,6 +106,7 @@ def evaluate(args):
             stat_test["mean"] = stat_test["mean"].numpy()
             y_pred = y_pred.cpu().numpy()
             y_pred = (y_pred * stat_test["std"]) + stat_test["mean"]
+            y_pred =  np.clip(y_pred, stat_test["min"].numpy(), stat_test["max"].numpy())
             if lognorm:
                 image_sign = np.sign(y_pred)
                 y_pred = image_sign * (np.exp(np.abs(y_pred)) - 1.0)
@@ -136,7 +139,7 @@ def evaluate(args):
             filename = os.path.join(args["--output"], f"{batch_idx}.png")
             m = np.mean(save_plots)
             s = np.std(save_plots)
-            plt.imsave(filename, save_plots, cmap="gray", vmin = m-3*s , vmax = m+3*s )
+            plt.imsave(filename, save_plots, cmap="gray", vmin = stat_test["min"], vmax = m+3*s )
             if args["hr"]:
                 test_loss = test_loss + loss_test
                 lr_l1 = np.mean(np.abs(y_test - x_test))
@@ -156,6 +159,8 @@ def evaluate(args):
                                                         data_range=stat_test["max"].numpy())
                 test_psnr = test_psnr + sr_psnr[0]
                 test_ssim = test_ssim + sr_ssim
+                lr_tot_psnr = lr_tot_psnr + lr_psnr[0]
+                lr_tot_ssim = lr_tot_ssim + lr_ssim
                 srerror = (sr_l1, sr_psnr[0], sr_ssim)
                 lrerror = (lr_l1, lr_psnr[0], lr_ssim)
                 writetext(os.path.abspath(filename), srerror, lrerror)
@@ -165,6 +170,8 @@ def evaluate(args):
             print("\nTest Loss: {:.6f}".format(test_loss / len(test_generator)))
             print("\nTest PSNR: {:.6f}".format(test_psnr / len(test_generator)))
             print("\nTest SSIM: {:.6f}".format(test_ssim / len(test_generator)))
+            print("\nLR PSNR: {:.6f}".format(lr_tot_psnr / len(test_generator)))
+            print("\nLR SSIM: {:.6f}".format(lr_tot_ssim / len(test_generator)))
             print(f"NUmber of images where SR L1 is worse than LR: {messed_images}")
 
 
