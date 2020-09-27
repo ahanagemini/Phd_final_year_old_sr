@@ -128,7 +128,7 @@ def evaluate(args):
             # Create and save image consisting of error map, HR, SR, LR
             if args["hr"]:
                 error = np.abs(y_pred - y_test).reshape(-1, y_pred.shape[-1])
-                error = error * (255 / np.max(error))
+                error = error * (stat_test["max"].numpy() / np.max(error))
                 lr_error = np.hstack([error, x_test.reshape(-1, y_pred.shape[-1])])
                 save_plots = np.vstack([sr_hr, lr_error])
             else:
