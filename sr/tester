@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Usage:   tester (hr|lr) --input=input --output=output --model=model --architecture=arch [--lognorm]
+"""Usage:   tester (hr|lr) --input=input --output=output --model=model --architecture=arch [--lognorm] [--active]
             tester --help | -help | -h
 
 Process input to create super resolution using the model input and plot it.
@@ -10,6 +10,7 @@ Arguments:
   model         a .pt file to use for the model
   architecture  architecture to use: unet or axial
   --lognorm     If we want to use log normalization
+  --active      Whether to save per-image metrics for active learning selection
 Options:
   -h --help -h
 """
@@ -22,6 +23,7 @@ from dataset import SrDataset
 from docopt import docopt
 
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 from skimage import metrics
 from unet import UNET
@@ -68,6 +70,7 @@ def evaluate(args):
     parameters = {"batch_size": 1, "shuffle": False, "num_workers": 6}
     use_cuda = torch.cuda.is_available()
     lognorm = args["--lognorm"]
+    active_learning = args["--active"]
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
@@ -90,6 +93,7 @@ def evaluate(args):
     lr_tot_psnr = 0.0
     lr_tot_ssim = 0.0
     model.load_state_dict(torch.load(args["--model"]))
+    active_list = []
     with torch.no_grad():
         for batch_idx, data in tqdm(enumerate(test_generator), total = len(test_set.datalist)):
             model.eval()
@@ -115,8 +119,9 @@ def evaluate(args):
             if args["hr"]:
                 loss_test = np.mean(np.abs(y_pred - y_test))
                 # loss_test = loss_test / stat_test["std"]
-                sr_hr = np.hstack([y_pred.reshape(-1, y_pred.shape[-1]),
-                                   y_test.reshape(-1, y_pred.shape[-1])])
+                if not active_learning:
+                    sr_hr = np.hstack([y_pred.reshape(-1, y_pred.shape[-1]),
+                                       y_test.reshape(-1, y_pred.shape[-1])])
 
             # Inverse normalize the LR image
             x_test = x_test.cpu().numpy()
@@ -126,20 +131,21 @@ def evaluate(args):
                 x_test = image_sign * (np.exp(np.abs(x_test)) - 1.0)
 
             # Create and save image consisting of error map, HR, SR, LR
-            if args["hr"]:
-                error = np.abs(y_pred - y_test).reshape(-1, y_pred.shape[-1])
-                error = error * (stat_test["max"].numpy() / np.max(error))
-                lr_error = np.hstack([error, x_test.reshape(-1, y_pred.shape[-1])])
-                save_plots = np.vstack([sr_hr, lr_error])
-            else:
-                save_plots = np.vstack(
-                    [y_pred.reshape(-1, y_pred.shape[-1]),
-                     x_test.reshape(-1, y_pred.shape[-1])]
-                )
-            filename = os.path.join(args["--output"], f"{batch_idx}.png")
-            m = np.mean(save_plots)
-            s = np.std(save_plots)
-            plt.imsave(filename, save_plots, cmap="gray", vmin = stat_test["min"], vmax = m+3*s )
+            if not active_learning:
+                if args["hr"]:
+                    error = np.abs(y_pred - y_test).reshape(-1, y_pred.shape[-1])
+                    error = error * (stat_test["max"].numpy() / np.max(error))
+                    lr_error = np.hstack([error, x_test.reshape(-1, y_pred.shape[-1])])
+                    save_plots = np.vstack([sr_hr, lr_error])
+                else:
+                    save_plots = np.vstack(
+                        [y_pred.reshape(-1, y_pred.shape[-1]),
+                         x_test.reshape(-1, y_pred.shape[-1])]
+                    )
+                filename = os.path.join(args["--output"], f"{batch_idx}.png")
+                m = np.mean(save_plots)
+                s = np.std(save_plots)
+                plt.imsave(filename, save_plots, cmap="gray", vmin = stat_test["min"], vmax = m+3*s )
             if args["hr"]:
                 test_loss = test_loss + loss_test
                 lr_l1 = np.mean(np.abs(y_test - x_test))
@@ -163,9 +169,14 @@ def evaluate(args):
                 lr_tot_ssim = lr_tot_ssim + lr_ssim
                 srerror = (sr_l1, sr_psnr[0], sr_ssim)
                 lrerror = (lr_l1, lr_psnr[0], lr_ssim)
-                writetext(os.path.abspath(filename), srerror, lrerror)
+                if not active_learning:
+                    writetext(os.path.abspath(filename), srerror, lrerror)
                 if sr_l1 > lr_l1:
                     messed_images = messed_images + 1
+                if active_learning:
+                    active_list.append([data["file"][0], sr_l1, sr_psnr[0],
+                                        sr_ssim, lr_l1, lr_psnr[0], lr_ssim])
+
         if args["hr"]:
             print("\nTest Loss: {:.6f}".format(test_loss / len(test_generator)))
             print("\nTest PSNR: {:.6f}".format(test_psnr / len(test_generator)))
@@ -173,7 +184,10 @@ def evaluate(args):
             print("\nLR PSNR: {:.6f}".format(lr_tot_psnr / len(test_generator)))
             print("\nLR SSIM: {:.6f}".format(lr_tot_ssim / len(test_generator)))
             print(f"NUmber of images where SR L1 is worse than LR: {messed_images}")
-
+            if active_learning:
+                df = pd.DataFrame(active_list, columns=['filename', 'SR_L1', 'SR_PSNR',
+                                                   'SR_SSIM', 'LR_L1', 'LR_PSNR', 'LR_SSIM'])
+                df.to_csv("active_metrics.csv")
 
 if __name__ == "__main__":
     args = docopt(__doc__)
