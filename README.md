@@ -5,9 +5,9 @@ Super Resolution
 cutter
 ======
 
-Input for cutter is a directory which has subdirectories, perhaps for different patients. Lets call the input directory, idir. Then:
+Input for cutter is a directory which has subdirectories, perhaps for different daat domains. Lets call the input directory, idir. Then:
 
-idir has subdirectories patient1, patient2, ... , patientn
+idir has subdirectories div2k, earth1, earth2, MPRAGE (for medical), b0_MUSE
 
 such that each of these subdirectories has matrices of different sizes.
 
@@ -24,6 +24,32 @@ Each of these directories must have subdirectories for each type of data. For ex
 These directories must be disjoint for test/train/validate. So if patient1 is in test, it cant be in train or validate.
 
 In these directories there must exist a .json file and multiple .npz files containing 256 x 256 x float data.
+
+Running the trainer
+========
+
+# executing the code for training a network
+
+The command for performing training:
+
+```
+python ./trainer.py --train=TRAIN_PATH --valid=VALID_PATH --log_dir=logs/ --architecture=edsr
+```
+The TRAIN_PATH and VALID_PATH contain *.npz files and a stats.json file
+Possible architectures are edsr, unet and axial
+
+Running the tester
+========
+
+# executing the code for testing a network
+
+The command for performing testing:
+
+```
+./sr/tester hr --input=TEST_PATH --output=OUTPUT_PATH --model=MODEL_PATH --architecture=edsr
+```
+The TEST contains *.npz files and a stats.json file
+Possible architectures are edsr, unet and axial
 
 tensorboard
 ========
