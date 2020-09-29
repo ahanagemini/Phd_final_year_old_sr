@@ -148,7 +148,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
                 #save_plots = save_plots.astype(np.uint16)
                 #x_rescale = np.clip(x_rescale, stat["min"][i].numpy(), stat["max"][i].numpy())
                 #print(np.mean(np.abs(x_rescale - y_rescale)), np.amax(y_rescale))
-                filename = os.path.join(f"{input_save_path}/{filename}_{batch_idx}_{i}.tiff")
+                filename = os.path.join(f"{input_save_path}/{filename}.tiff")
                 plt.imsave(filename, save_plots, vmin=vmin, vmax=vmax, cmap='gray')
                 #tifffile.imsave(filename, save_plots)
             
