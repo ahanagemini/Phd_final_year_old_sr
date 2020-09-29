@@ -68,7 +68,9 @@ def data_download(dataname, odir):
     """
     datadict = {
         "div2k": r"http://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_train_HR.zip",
-        "medical": r"https://www.dropbox.com/s/ri3cpsunqed32my/Medical_data.tar.gz?dl=0",
+        "earth1": r"https://www.dropbox.com/s/hzqcuct3phd7g5s/earth1.tar?dl=0",
+        # "earth2": r"https://www.dropbox.com/s/e9p0dt001mrej99/earth2.tar?dl=0",
+        # "medical": r"https://www.dropbox.com/s/ri3cpsunqed32my/Medical_data.tar.gz?dl=0",
     }
     down_path = Path(os.getcwd()+r"/Download")
     os.mkdir(down_path)
@@ -77,14 +79,16 @@ def data_download(dataname, odir):
             url = datadict[url_key]
             file_name, file_ext = get_file_name(url)
             file_down_path = down_path / (file_name+"."+file_ext)
-            file_tmp = wget.download(url, out=str(file_down_path), bar=bar_progress)
-            file_extraction(file_tmp, file_ext, odir)
+            # file_tmp = wget.download(url, out=str(file_down_path), bar=bar_progress)
+            os.system(f'wget {url} -O {file_down_path}')
+            file_extraction(file_down_path, file_ext, odir)
     else:
         url = datadict[dataname]
         file_name, file_ext = get_file_name(url)
-        down_path = down_path / (file_name+"."+file_ext)
-        file_tmp = wget.download(url, out=str(down_path), bar=bar_progress)
-        file_extraction(file_tmp, file_ext, odir)
+        file_down_path = down_path / (file_name+"."+file_ext)
+        # file_tmp = wget.download(url, out=str(file_down_path), bar=bar_progress)
+        os.system(f'wget {url} -O {file_down_path}')
+        file_extraction(file_down_path, file_ext, odir)
     shutil.rmtree(down_path)
 
 if __name__ == "__main__":
