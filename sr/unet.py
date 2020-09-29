@@ -264,17 +264,20 @@ class Upsampling(nn.Module):
 class UNET(nn.Module):
     """Unet Structure"""
 
-    def __init__(self, in_channels, out_channels, init_features=32, depth=6):
+    def __init__(self, in_channels, out_channels, init_features=32, depth=6, k=1):
         super(UNET, self).__init__()
         self.downsample = nn.ModuleList()
         self.initial_channels = in_channels
-        self.resnet_out_channels = 4
+        self.resnet_out_channels = 32
         self.final_channel = out_channels
 
         # resnet
-        self.resnet = Resnet(
+        self.resnet_blocks_left = []
+        for i in range(k):
+            self.resnet_blocks_left.append(Resnet(
             in_channels=self.initial_channels, out_channels=self.resnet_out_channels
-        )
+        ))
+        self.resnet_left = nn.Sequential(*self.resnet_blocks_left)
         self.initial_channels = self.resnet_out_channels
         for i in range(depth):
             self.downsample.append(
@@ -295,8 +298,16 @@ class UNET(nn.Module):
                 )
             )
             self.initial_channels = init_features * (2 ** i)
+        self.resnet_blocks_right = []
+        for i in range(k):
+            self.resnet_blocks_right.append(Resnet(
+                in_channels=self.initial_channels,
+                out_channels=self.initial_channels
+                ))
+        self.resnet_right = nn.Sequential(*self.resnet_blocks_right)
         self.out_conv = nn.Conv2d(
-            in_channels=self.initial_channels, out_channels=out_channels, kernel_size=1
+            in_channels=self.initial_channels, out_channels=out_channels,
+            kernel_size=3, padding=1
         )
 
     def downsampling(self, x):
@@ -364,9 +375,10 @@ class UNET(nn.Module):
         Output
         """
         # downsample
-        x = self.resnet(x)
+        x = self.resnet_left(x)
         dummy = torch.tensor(0.0, dtype=torch.float32, requires_grad=True)
         x, skips = self.downsampling(x)
         x = self.upsampling(x, skips)
+        x = self.resnet_right(x)
 
         return self.out_conv(x)

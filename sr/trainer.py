@@ -38,8 +38,8 @@ from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR
 from logger import Logger
 
-BATCH_SIZE = {"unet": 32, "axial": 32, "edsr": 8}
-
+BATCH_SIZE = {"unet": 16, "axial": 16, "edsr": 8}
+LR = {"unet": 0.00005, "axial": 0.0005, "edsr": 0.0005}
 
 def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
@@ -85,6 +85,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
         os.makedirs(save_model_path)
     save_model_path = str(save_model_path)
     # parameters
+    lr = LR[architecture]
     if architecture == "unet":
         model = UNET(in_channels=1, out_channels=1, init_features=32)
     elif architecture == "axial":
@@ -94,14 +95,14 @@ def training(training_generator, validation_generator, device, log_dir, architec
     model.to(device)
     summary(model, (1, 256, 256), batch_size=1, device="cuda")
     max_epochs = 150
-    # criterion = SSIM()
-    # criterion = PSNR()
-    # criterion = L1loss()
     criterion = torch.nn.L1Loss()
-    optimizer = optim.Adam(model.parameters(), lr=0.0005)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
 
     # learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
+    if architecture == "edsr":
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
+    else:
+        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30], gamma=0.5)
     best_valid_loss = float("inf")
     logger = Logger(str(log_dir))
     step = 0
@@ -162,7 +163,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
                     loss_train_list.append(loss_train.item())
                     loss_train.backward()
                     optimizer.step()
-
+        
         # training log summary after every 10 epochs
         log_loss_summary(logger, loss_train_list, step, prefix="train_")
         loss_train_list = []
@@ -171,7 +172,8 @@ def training(training_generator, validation_generator, device, log_dir, architec
         torch.cuda.empty_cache()
 
         # Main validation loop for this epoch
-        scheduler.factor = 1 + (epoch / max_epochs) ** 0.9
+        if architecture == "edsr":
+            scheduler.factor = 1 + (epoch / max_epochs) ** 0.9
         with torch.no_grad():
             loss_valid_list = []
             for batch_idx, data in tqdm(enumerate(validation_generator), total=valiter):
@@ -187,11 +189,13 @@ def training(training_generator, validation_generator, device, log_dir, architec
                 valid_loss = valid_loss + (
                     (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
                 )
-
-                # calling scheduler based on valid loss
-                scheduler.step(valid_loss)
-                # print(optimizer.param_groups[0]['lr'])
-
+        
+        if architecture == "edsr":
+            # calling scheduler based on valid loss
+            scheduler.step(valid_loss)
+            # print(optimizer.param_groups[0]['lr'])
+        else:
+            scheduler.step()
         # valid log summary after every 10 epochs
         log_loss_summary(logger, loss_valid_list, step, prefix="val_")
         loss_valid_list = []
