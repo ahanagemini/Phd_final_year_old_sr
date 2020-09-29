@@ -1,6 +1,6 @@
 """
-Usage:   experiment_downloader.py --download=all --output_directory=output_path
-         experiment_downloader.py --help | -help | -h
+Usage:   downloader.py --download=all --output_directory=output_path
+         downloader.py --help | -help | -h
 
     This script is for downloading and extracting files
 Arguments:
@@ -14,15 +14,15 @@ import zipfile
 import tarfile
 from pathlib import Path
 import wget
-from wget import bar_thermometer
 from docopt import docopt
+import sys
+import shutil
 
 
-def get_file_name(url, odir):
+def get_file_name(url):
     """
 
     :param url: file url
-    :param odir: output directory
     :return: file_name, file_ext, odir
     """
     base_name = os.path.basename(url)
@@ -31,9 +31,8 @@ def get_file_name(url, odir):
         str.split(base_name, sep=".")[0],
         str.split(base_name, sep=".")[1],
     )
-    odir = odir / file_name
 
-    return file_name, file_ext, odir
+    return file_name, file_ext
 
 
 def file_extraction(file_tmp, file_ext, odir):
@@ -54,6 +53,12 @@ def file_extraction(file_tmp, file_ext, odir):
         tar.extractall(odir)
 
 
+
+def bar_progress(current, total, width=80):
+    progress_message = "Downloading: %d%% [%d / %d] bytes" % (current / total * 100, current, total)
+    sys.stdout.write("\r" + progress_message)
+    sys.stdout.flush()
+
 def data_download(dataname, odir):
     """
 
@@ -65,24 +70,28 @@ def data_download(dataname, odir):
         "div2k": r"http://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_train_HR.zip",
         "medical": r"https://www.dropbox.com/s/ri3cpsunqed32my/Medical_data.tar.gz?dl=0",
     }
+    down_path = Path(os.getcwd()+r"/Download")
+    os.mkdir(down_path)
     if dataname == "all":
         for i, url_key in enumerate(datadict):
             url = datadict[url_key]
-            file_name, file_ext, odir = get_file_name(url, odir)
-            file_tmp = wget.download(url, bar=bar_thermometer)
+            file_name, file_ext = get_file_name(url)
+            file_down_path = down_path / (file_name+"."+file_ext)
+            file_tmp = wget.download(url, out=str(file_down_path), bar=bar_progress)
             file_extraction(file_tmp, file_ext, odir)
     else:
         url = datadict[dataname]
-        file_name, file_ext, odir = get_file_name(url, odir)
-        file_tmp = wget.download(url)
+        file_name, file_ext = get_file_name(url)
+        down_path = down_path / (file_name+"."+file_ext)
+        file_tmp = wget.download(url, out=str(down_path), bar=bar_progress)
         file_extraction(file_tmp, file_ext, odir)
-
+    shutil.rmtree(down_path)
 
 if __name__ == "__main__":
     arguments = docopt(__doc__)
     down = str(arguments["--download"])
     odir = Path(arguments["--output_directory"])
-    downloader = data_download(down, odir)
+    data_download(down, odir)
 
 
 """
