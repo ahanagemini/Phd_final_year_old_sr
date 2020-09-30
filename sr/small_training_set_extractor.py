@@ -1,4 +1,5 @@
 """Usage:   small_training_set_extractor.py --input_directory=input --output_directory=output
+                                            --train_size=2700 --valid_size=150 --test_size=150
             small_training_set_extractor.py --help | -help | -h
 
     This file is for extracting a higher loos files calculated using L1 loss. The input folder structure for this file
@@ -6,6 +7,7 @@
 Arguments:
     --input_directory: Input directory containing images.
     --output_directory: The directory where the images are present after processing
+    --percentage:       Percentage of data to be extracted
 Options:
     -h --help -h
 """
@@ -19,17 +21,20 @@ from tqdm import tqdm
 from docopt import docopt
 
 class TrainingSet_Extractor:
-    def __init__(self, input_directory, output_directory, percentage=0.9):
+    def __init__(self, input_directory, output_directory, train_size, valid_size, test_size):
         """
         This extractor extracts a small portion of dataset based on l1 error of images. The dataset should be a
         :param input_directory: Input path of the files
         :param output_directory: Output path for the small dataset
-        :param percentage: How much percentage of dataset required. values between 0 and 1 where
-               1 is 100% and 0 is 0%, default: 0.9 (90%)
+        :param train_size: number of training sample sto be extracted
+        :param valid_size: number of validation samples to be extracted
+        :param test_size: number of test samples to be extracted
         """
         self.input_directory = Path(input_directory)
         self.output_directory = Path(output_directory)
-        self.percentage = percentage
+        self.train_size = train_size
+        self.valid_size = valid_size
+        self.test_size = test_size
 
     def l1_loss(self, matrix_1, matrix_2):
         """
@@ -60,14 +65,14 @@ class TrainingSet_Extractor:
         loss_val = self.l1_loss(lr_imatrix, hr_imatrix)
         return loss_val
 
-    def loss_sorting_extracting(self, loss_list, percentage):
-        loss_list = np.sort(loss_list)
-        new_loss_list = loss_list[int(percentage * len(loss_list)) :]
-        return new_loss_list
+    def loss_sorting_extracting(self, key_loss_map, size):
+        sorted_keys = sorted(key_loss_map, key=key_loss_map.__getitem__, reverse=True)
+        new_key_list = sorted_keys[:size]
+        new_key_loss_map = {k: key_loss_map[k] for k in new_key_list}
+        return new_key_loss_map
 
-    def final_save_directory(self, loss_list, loss_key_map, key_matrix_map, stat_file):
-        for loss_val in tqdm(loss_list, total=len(loss_list)):
-            key = loss_key_map[loss_val]
+    def final_save_directory(self, loss_key_map, key_matrix_map, stat_file):
+        for key in tqdm(loss_key_map, total=len(loss_key_map.keys())):
             hr_imatrix, train_valid_test, distribution, file_name = key_matrix_map[key]
             opath = self.output_directory / train_valid_test / distribution
             if not os.path.isdir(opath):
@@ -102,31 +107,31 @@ class TrainingSet_Extractor:
                 key_matrix_map[key] = (hr_imatrix, "train", distribution, file_name)
                 loss_val = self.loss_matrix_extract(hr_imatrix)
                 train_loss_list.append(loss_val)
-                key_train_loss_map[loss_val] = key
+                key_train_loss_map[key] = loss_val
             elif train_valid_test == "valid":
                 key_matrix_map[key] = (hr_imatrix, "valid", distribution, file_name)
                 loss_val = self.loss_matrix_extract(hr_imatrix)
                 valid_loss_list.append(loss_val)
-                key_valid_loss_map[loss_val] = key
+                key_valid_loss_map[key] = loss_val
             elif train_valid_test == "test":
                 key_matrix_map[key] = (hr_imatrix, "test", distribution, file_name)
                 loss_val = self.loss_matrix_extract(hr_imatrix)
                 test_loss_list.append(loss_val)
-                key_test_loss_map[loss_val] = key
+                key_test_loss_map[key] = loss_val
             key = key + 1
 
-        train_loss_list = self.loss_sorting_extracting(train_loss_list, self.percentage)
-        valid_loss_list = self.loss_sorting_extracting(valid_loss_list, self.percentage)
-        test_loss_list = self.loss_sorting_extracting(test_loss_list, self.percentage)
+        key_train_loss_map = self.loss_sorting_extracting(key_train_loss_map, self.train_size)
+        key_valid_loss_map = self.loss_sorting_extracting(key_valid_loss_map, self.valid_size)
+        key_test_loss_map = self.loss_sorting_extracting(key_test_loss_map, self.test_size)
 
         self.final_save_directory(
-            train_loss_list, key_train_loss_map, key_matrix_map, stat_file
+            key_train_loss_map, key_matrix_map, stat_file
         )
         self.final_save_directory(
-            valid_loss_list, key_valid_loss_map, key_matrix_map, stat_file
+            key_valid_loss_map, key_matrix_map, stat_file
         )
         self.final_save_directory(
-            test_loss_list, key_test_loss_map, key_matrix_map, stat_file
+            key_test_loss_map, key_matrix_map, stat_file
         )
 
     def folder_extraction(self, input_directory):
@@ -163,5 +168,8 @@ if __name__ == "__main__":
     arguments = docopt(__doc__)
     idir = Path(arguments["--input_directory"])
     odir = Path(arguments["--output_directory"])
-    trainer = TrainingSet_Extractor(idir, odir, 0.9)
+    train_size = int(arguments["--train_size"])
+    valid_size = int(arguments["--valid_size"])
+    test_size = int(arguments["--test_size"])
+    trainer = TrainingSet_Extractor(idir, odir, train_size, valid_size, test_size)
     trainer.run()
