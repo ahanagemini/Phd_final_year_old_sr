@@ -101,8 +101,6 @@ def training(training_generator, validation_generator, device, log_dir, architec
     # learning rate scheduler
     if architecture == "edsr":
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
-    else:
-        scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[30], gamma=0.5)
     best_valid_loss = float("inf")
     logger = Logger(str(log_dir))
     step = 0
@@ -144,13 +142,8 @@ def training(training_generator, validation_generator, device, log_dir, architec
                 save_plots = np.clip(save_plots, stat["min"][i].numpy(), stat["max"][i].numpy())
                 vmax = stat["mean"][i].numpy() + 3 * stat["std"][i].numpy()
                 vmin = stat["min"][i].numpy()
-                # save_plots = save_plots * stat["std"][i].numpy() +  stat["mean"][i].numpy()
-                #save_plots = save_plots.astype(np.uint16)
-                #x_rescale = np.clip(x_rescale, stat["min"][i].numpy(), stat["max"][i].numpy())
-                #print(np.mean(np.abs(x_rescale - y_rescale)), np.amax(y_rescale))
                 filename = os.path.join(f"{input_save_path}/{filename}.tiff")
                 plt.imsave(filename, save_plots, vmin=vmin, vmax=vmax, cmap='gray')
-                #tifffile.imsave(filename, save_plots)
             
             optimizer.zero_grad()
             with torch.autograd.set_detect_anomaly(True):
@@ -194,8 +187,6 @@ def training(training_generator, validation_generator, device, log_dir, architec
             # calling scheduler based on valid loss
             scheduler.step(valid_loss)
             # print(optimizer.param_groups[0]['lr'])
-        else:
-            scheduler.step()
         # valid log summary after every 10 epochs
         log_loss_summary(logger, loss_valid_list, step, prefix="val_")
         loss_valid_list = []
