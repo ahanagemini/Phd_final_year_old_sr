@@ -187,7 +187,8 @@ def evaluate(args):
             if active_learning:
                 df = pd.DataFrame(active_list, columns=['filename', 'SR_L1', 'SR_PSNR',
                                                    'SR_SSIM', 'LR_L1', 'LR_PSNR', 'LR_SSIM'])
-                df.to_csv("active_metrics.csv")
+                active_file = str(args["--input"]).split('/')[-1]
+                df.to_csv(f"active_metrics/{active_file}.csv")
 
 if __name__ == "__main__":
     args = docopt(__doc__)
