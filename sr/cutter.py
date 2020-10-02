@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 
-"""Usage: cutter.py --input-directory=IDIR --output-directory=ODIR --percentage=100
+"""Usage: cutter.py --input-directory=IDIR --output-directory=ODIR --percentage=100 --patch_size=256
           cutter.py --help | -help | -h
 
 --input-directory=IDIR  Some directory [default: ./data]
 --output-directory=ODIR  Some directory [default: ./mdata]
 --percentage=100 percentage of data to process [default: 100]
+--patch_size=256 the image patch size is width, height [default: 256]
 
 cutter expects the input directory of images to be of the following structure.
 Input_directory->patient_folder->patient_image.
 The Output directory will be as follows Output_directory->train/valid/test->
 patient_folder->patient_image and stats.jsonfile
 
-Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata --percentage=100
+Example: python3.8 sr/cutter.py --input-directory=idata --output-directory=mdata --percentage=100 --patch_size=256
 
 Options:
 --h | -help | --help
@@ -127,12 +128,13 @@ def matrix_dictionary_update(
     return file_names_map, key_matrix_map, matrix_key_map, key
 
 
-def process(L, stats_paths, train_size):
+def process(L, stats_paths, train_size, patch_size):
     """
 
     :param L: contains the input_file path and output_file path
     :param stats_paths: contains the paths for the stats json files
     :param train_size: train set size
+    :param patch_size: this will cut the images to desired size
     :return:
     """
     matrices = []
@@ -147,7 +149,7 @@ def process(L, stats_paths, train_size):
     total_variance = 0.0
     min = 0
     max = 0
-    train_len = int(train_size * len(L)) 
+    train_len = int(train_size * len(L))
     for i, (ifile, ofile) in enumerate(L):
         # print("processing" + str(ifile), end=" ")
         imatrix = loader(ifile)
@@ -168,7 +170,7 @@ def process(L, stats_paths, train_size):
             total_square_sum = total_square_sum + square_sum
             total_count = total_count + matrix_count
 
-        # maximum and minimum
+            # maximum and minimum
             matrix_max = np.max(matrix_vector)
             matrix_min = np.min(matrix_vector)
             if max < matrix_max:
@@ -196,7 +198,7 @@ def process(L, stats_paths, train_size):
     stats["std"] = np.sqrt(total_variance)
     stats["max"] = float(max)
     stats["min"] = float(min)
-
+    width, height = patch_size, patch_size
     print("start file creation")
     for i in range(len(key_matrix_map)):
         matrix, key = key_matrix_map[i]
@@ -205,7 +207,7 @@ def process(L, stats_paths, train_size):
         odir = opath
         if not os.path.isdir(odir):
             os.makedirs(odir)
-        mlist = matrix_cutter(matrix)
+        mlist = matrix_cutter(matrix, height=height, width=width)
         for i, j, mat in mlist:
             fname = str(prefix) + "_" + str(i) + "_" + str(j)
             np.savez_compressed(odir / fname, mat)
@@ -228,6 +230,8 @@ def process(L, stats_paths, train_size):
         total_count,
         total_mean,
         total_variance,
+        width,
+        height,
     )
 
 
@@ -236,7 +240,16 @@ def scan_idir(ipath, opath, percentage, train_size=0.9, valid_size=0.05):
     Returns (x,y) pairs so that x can be processed to create y
             train length to decide the images over which stats are computed
     """
-    extensions = ["*.npy", "*.npz", "*.png", "*.jpg", "*.gif", "*.tif", "*.jpeg", "*.tiff"]
+    extensions = [
+        "*.npy",
+        "*.npz",
+        "*.png",
+        "*.jpg",
+        "*.gif",
+        "*.tif",
+        "*.jpeg",
+        "*.tiff",
+    ]
     folders_list = []
     folders_files = []
     folder_file_map = {}
@@ -290,13 +303,14 @@ def main():
     idir = Path(arguments["--input-directory"])
     odir = Path(arguments["--output-directory"])
     percentage = int(arguments["--percentage"])
+    patch_size = int(arguments["--patch_size"])
     assert not odir.is_dir(), "Please provide a non-existent output directory!"
     folder_map, train_size = scan_idir(idir, odir, percentage)
     print(folder_map.keys())
     for folder in folder_map.keys():
         print(folder)
         L, stats_paths = folder_map[folder]
-        process(L, stats_paths, train_size)
+        process(L, stats_paths, train_size, patch_size)
 
 
 if __name__ == "__main__":
