@@ -39,5 +39,4 @@ torchsummary==1.5.1
 torchvision==0.7.0
 tornado==6.0.4
 tqdm==4.48.2
-urllib3==1.25.10
-Werkzeug==1.0.1
+scikit-metrics
