@@ -28,7 +28,7 @@ class SrDataset(Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        self.root_dir = Path(root_dir)
+        self.root_dir = Path(root_dir).expanduser().resolve().absolute()
         self.datalist = list(self.root_dir.rglob("*.npz"))
         self.lognorm = lognorm
         self.test = test
