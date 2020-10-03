@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --architecture=arch [--lognorm]
+"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --num_epochs=epochs
+                       --architecture=arch [--lognorm] [--debug_input_pics]
             trainer.py --help | -help | -h
 
 Train the requested model.
@@ -8,8 +9,10 @@ Arguments:
   train         a directory with training images/ direcrtories/ numpy
   output        a directory for validation images/ directories/ numpy
   log_dir       directory for storing training logs
+  num_epochs    number of epochs
   architecture  the architecture to train unet or axial
   --lognorm     if we are using log normalization
+  --debug_input_pics  If we want to save input pics for debugging
 Options:
   -h --help -h
 """
@@ -64,7 +67,8 @@ def model_save(train_model, train_model_path):
     torch.save(train_model.state_dict(), model_path)
 
 
-def training(training_generator, validation_generator, device, log_dir, architecture):
+def training(training_generator, validation_generator, device, log_dir,
+             architecture, num_epochs, debug_pics):
     """
 
     Parameters
@@ -74,7 +78,8 @@ def training(training_generator, validation_generator, device, log_dir, architec
     device: Cuda Device
     log_dir: The log directory for storing logs
     architecture: The architecture to be used unet or axial
-
+    num_epochs:   The number of epochs
+    debug_pics: True if we want to save pictures in input_pics
     Returns
     -------
 
@@ -94,7 +99,7 @@ def training(training_generator, validation_generator, device, log_dir, architec
         model = EDSR(n_resblocks=16, n_feats=64, scale=1)
     model.to(device)
     summary(model, (1, 256, 256), batch_size=1, device="cuda")
-    max_epochs = 150
+    max_epochs = num_epochs
     criterion = torch.nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
@@ -107,10 +112,11 @@ def training(training_generator, validation_generator, device, log_dir, architec
     totiter = sum(1 for x in training_generator)
     valiter = sum(1 for x in validation_generator)
     # TODO: Remove after debugging is done
-    input_save_path = Path("input_pics").resolve()
-    if not input_save_path.is_dir():
+    if debug_pics:
+        input_save_path = Path("input_pics").resolve()
+        if input_save_path.is_dir():
+            shutil.rmtree(input_save_path)
         os.makedirs(input_save_path)
-
     for epoch in range(max_epochs):
         start_time = time()
         train_loss = valid_loss = 0.0
@@ -131,19 +137,20 @@ def training(training_generator, validation_generator, device, log_dir, architec
                 sigma.to(device),
             )
             # TODO: Remove this after debugging is over
-            x_np = x_train.cpu().numpy()
-            y_np = y_train.cpu().numpy()
-            for i in range(x_np.shape[0]):
-                filename = data["file"][i]
-                x_rescale = x_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
-                y_rescale = y_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
+            if debug_pics:
+                x_np = x_train.cpu().numpy()
+                y_np = y_train.cpu().numpy()
+                for i in range(x_np.shape[0]):
+                    filename = data["file"][i]
+                    x_rescale = x_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
+                    y_rescale = y_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
 
-                save_plots = np.hstack([x_rescale.reshape(256, 256), y_rescale.reshape(256, 256)])
-                save_plots = np.clip(save_plots, stat["min"][i].numpy(), stat["max"][i].numpy())
-                vmax = stat["mean"][i].numpy() + 3 * stat["std"][i].numpy()
-                vmin = stat["min"][i].numpy()
-                filename = os.path.join(f"{input_save_path}/{filename}.tiff")
-                plt.imsave(filename, save_plots, vmin=vmin, vmax=vmax, cmap='gray')
+                    save_plots = np.hstack([x_rescale.reshape(256, 256), y_rescale.reshape(256, 256)])
+                    save_plots = np.clip(save_plots, stat["min"][i].numpy(), stat["max"][i].numpy())
+                    vmax = stat["mean"][i].numpy() + 3 * stat["std"][i].numpy()
+                    vmin = stat["min"][i].numpy()
+                    filename = os.path.join(f"{input_save_path}/{filename}.tiff")
+                    plt.imsave(filename, save_plots, vmin=vmin, vmax=vmax, cmap='gray')
             
             optimizer.zero_grad()
             with torch.autograd.set_detect_anomaly(True):
@@ -219,19 +226,24 @@ def training(training_generator, validation_generator, device, log_dir, architec
         torch.cuda.empty_cache()
 
 
-def process(train_path, valid_path, log_dir, architecture, lognorm):
+def process(arguments):
     """
 
     Parameters
     ----------
-    train_path: contains the path of training values
-    valid_path: contains the path of validation values
-    log_dir: contains the path where log summary is stored
+    arguments: all the argumennts passed to trainer.py
 
     Returns
     -------
 
     """
+    train_path = Path(arguments["--train"])
+    valid_path = Path(arguments["--valid"])
+    log_dir = Path(arguments["--log_dir"])
+    architecture = arguments["--architecture"]
+    num_epochs = int(arguments["--num_epochs"]) 
+    lognorm = arguments["--lognorm"]
+    debug_pics = arguments["--debug_input_pics"]
     parameters = {
         "batch_size": BATCH_SIZE[architecture],
         "shuffle": True,
@@ -247,14 +259,10 @@ def process(train_path, valid_path, log_dir, architecture, lognorm):
 
     validation_set = SrDataset(valid_path)
     validation_generator = torch.utils.data.DataLoader(validation_set, **parameters)
-    training(training_generator, validation_generator, device, log_dir, architecture)
+    training(training_generator, validation_generator, device, log_dir,
+             architecture, num_epochs, debug_pics)
 
 
 if __name__ == "__main__":
     arguments = docopt(__doc__)
-    train_path = Path(arguments["--train"])
-    valid_path = Path(arguments["--valid"])
-    log_dir = Path(arguments["--log_dir"])
-    architecture = arguments["--architecture"]
-    lognorm = arguments["--lognorm"]
-    process(train_path, valid_path, log_dir, architecture, lognorm)
+    process(arguments)
