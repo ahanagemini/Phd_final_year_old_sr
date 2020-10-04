@@ -3,7 +3,7 @@
 """Usage:   tester (hr|lr) --input=input --output=output --model=model --architecture=arch [--lognorm] [--active]
             tester --help | -help | -h
 
-Process input to create super resolution using the model input and plot it.
+Process input to create super resolution using the model input and plot it. In hr mode, the input is assumed to be high resolution. In lr mode the input is assumed to be low resolution.
 Arguments:
   input         a directory with input files
   output        a directory for saving the output images
@@ -78,7 +78,7 @@ def evaluate(args):
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    test_set = SrDataset(args["--input"], lognorm=args["--lognorm"], test=True, hr=True)
+    test_set = SrDataset(args["--input"], lognorm=args["--lognorm"], test=True, hr=args["hr"])
     test_generator = torch.utils.data.DataLoader(test_set, **parameters)
 
     # model create and load
