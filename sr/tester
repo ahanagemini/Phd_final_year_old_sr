@@ -39,11 +39,11 @@ def writetext(imgfile, e_sr=None, e_lr=None):
     draw = ImageDraw.Draw(img)
     font = ImageFont.truetype('./font/dancing.ttf', 15) 
     if e_sr is None:
-         draw.text((width/2, 0), "LR", font=font)
-         draw.text((0, 0), "SR", font=font)
+         draw.text((width/2, 0), "LR", font=font, fill=(0, 0, 255))
+         draw.text((0, 0), "SR", font=font, fill=(0, 0, 255))
     else:
-        draw.text((width/2, 0), "HR", font=font)
-        draw.text((0, width/2), "Error", font=font)
+        draw.text((width/2, 0), "HR", font=font, fill=(0, 0, 255))
+        draw.text((0, width/2), "Error", font=font, fill=(0, 0, 255))
 
         draw.text((0, 0), "SR", font=font)
         draw.text((32, 0), "L1="+str(e_sr[0]), font=font, fill=(255, 0, 0))
@@ -142,7 +142,7 @@ def evaluate(args):
                     lr_error = np.hstack([error, x_test.reshape(-1, y_pred.shape[-1])])
                     save_plots = np.vstack([sr_hr, lr_error])
                 else:
-                    save_plots = np.vstack(
+                    save_plots = np.hstack(
                         [y_pred.reshape(-1, y_pred.shape[-1]),
                          x_test.reshape(-1, y_pred.shape[-1])]
                     )
