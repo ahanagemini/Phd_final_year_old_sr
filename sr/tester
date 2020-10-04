@@ -33,26 +33,30 @@ from tqdm import tqdm
 
 from PIL import Image, ImageFont, ImageDraw
 
-def writetext(imgfile, e_sr, e_lr):
+def writetext(imgfile, e_sr=None, e_lr=None):
     img = Image.open(imgfile)
     width, height = img.size
     draw = ImageDraw.Draw(img)
     font = ImageFont.truetype('./font/dancing.ttf', 15) 
-    draw.text((width/2, 0), "HR", font=font)
-    draw.text((0, width/2), "Error", font=font)
+    if e_sr is None:
+         draw.text((width/2, 0), "LR", font=font)
+         draw.text((0, 0), "SR", font=font)
+    else:
+        draw.text((width/2, 0), "HR", font=font)
+        draw.text((0, width/2), "Error", font=font)
 
-    draw.text((0, 0), "SR", font=font)
-    draw.text((32, 0), "L1="+str(e_sr[0]), font=font, fill=(255, 0, 0))
-    draw.text((32, 16), "PSNR="+str(e_sr[1]), font=font, fill=(255, 0, 0))
-    draw.text((32, 32), "SSIM="+str(e_sr[2]), font=font, fill=(255, 0, 0))
+        draw.text((0, 0), "SR", font=font)
+        draw.text((32, 0), "L1="+str(e_sr[0]), font=font, fill=(255, 0, 0))
+        draw.text((32, 16), "PSNR="+str(e_sr[1]), font=font, fill=(255, 0, 0))
+        draw.text((32, 32), "SSIM="+str(e_sr[2]), font=font, fill=(255, 0, 0))
 
-    draw.text((height/2, width/2), "LR", font=font, fill=(255, 255, 255))
-    draw.text((height/2 + 32, width/2), "L1="+str(e_lr[0]),
-              font=font, fill=(255, 0, 0))
-    draw.text((height/2 + 32, width/2 + 16), "PSNR="+str(e_lr[1]),
-              font=font, fill=(255, 0, 0))
-    draw.text((height/2 + 32, width/2 + 32), "SSIM="+str(e_lr[2]),
-              font=font, fill=(255, 0, 0))
+        draw.text((height/2, width/2), "LR", font=font, fill=(255, 255, 255))
+        draw.text((height/2 + 32, width/2), "L1="+str(e_lr[0]),
+                  font=font, fill=(255, 0, 0))
+        draw.text((height/2 + 32, width/2 + 16), "PSNR="+str(e_lr[1]),
+                  font=font, fill=(255, 0, 0))
+        draw.text((height/2 + 32, width/2 + 32), "SSIM="+str(e_lr[2]),
+                  font=font, fill=(255, 0, 0))
     img.save("/tmp/test.png")
     os.system("mv /tmp/test.png " + imgfile)
 
@@ -146,6 +150,8 @@ def evaluate(args):
                 m = np.mean(save_plots)
                 s = np.std(save_plots)
                 plt.imsave(filename, save_plots, cmap="gray", vmin = stat_test["min"], vmax = m+3*s )
+            if not args["hr"]:
+                writetext(os.path.abspath(filename))
             if args["hr"]:
                 test_loss = test_loss + loss_test
                 lr_l1 = np.mean(np.abs(y_test - x_test))
