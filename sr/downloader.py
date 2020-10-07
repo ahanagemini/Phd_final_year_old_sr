@@ -29,7 +29,7 @@ def get_file_name(url):
     base_name = str.split(base_name, sep="?")[0]
     file_name, file_ext = (
         str.split(base_name, sep=".")[0],
-        str.split(base_name, sep=".")[1],
+        ".".join(str.split(base_name, sep=".")[1:]),
     )
 
     return file_name, file_ext
@@ -48,7 +48,7 @@ def file_extraction(file_tmp, file_ext, odir):
     if file_ext == "zip":
         with zipfile.ZipFile(file_tmp) as zip_ref:
             zip_ref.extractall(odir)
-    if file_ext == "tar":
+    if file_ext == "tar" or file_ext == "tar.gz":
         tar = tarfile.open(file_tmp)
         tar.extractall(odir)
 
@@ -69,8 +69,11 @@ def data_download(dataname, odir):
     datadict = {
         "div2k": r"http://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_train_HR.zip",
         "earth1": r"https://www.dropbox.com/s/hzqcuct3phd7g5s/earth1.tar?dl=0",
-        # "earth2": r"https://www.dropbox.com/s/e9p0dt001mrej99/earth2.tar?dl=0",
-        # "medical": r"https://www.dropbox.com/s/ri3cpsunqed32my/Medical_data.tar.gz?dl=0",
+        "earth2": r"https://www.dropbox.com/s/e9p0dt001mrej99/earth2.tar?dl=0",
+        "BloodData": r"http://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_train_HR.zip",
+        "chest_xray": r"https://www.dropbox.com/s/hzqcuct3phd7g5s/earth1.tar?dl=0",
+        "Retinal_OCT": r"https://www.dropbox.com/s/e9p0dt001mrej99/earth2.tar?dl=0",
+        "Medical_3D": r"https://www.dropbox.com/s/ri3cpsunqed32my/Medical_data.tar.gz?dl=0",
     }
     down_path = Path(os.getcwd()+r"/Download")
     os.mkdir(down_path)
@@ -82,6 +85,11 @@ def data_download(dataname, odir):
             # file_tmp = wget.download(url, out=str(file_down_path), bar=bar_progress)
             os.system(f'wget {url} -O {file_down_path}')
             file_extraction(file_down_path, file_ext, odir)
+            if url_key == "Medical_3D":
+                files = os.listdir(odir / "Medical_3D")
+                for compressed_file in files:
+                    file_extraction(odir / "Medical_3D" / compressed_file, file_ext, odir / "Medical_3D")
+                    os.remove(odir / "Medical_3D" / compressed_file)
     else:
         url = datadict[dataname]
         file_name, file_ext = get_file_name(url)
