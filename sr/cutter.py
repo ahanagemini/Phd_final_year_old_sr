@@ -1,12 +1,16 @@
 #!/usr/bin/env python3
 
-"""Usage: cutter.py --input-directory=IDIR --output-directory=ODIR --percentage=100 --patch_size=256
+"""Usage: cutter.py --input-directory=IDIR --output-directory=ODIR --percentage=100 --patch_size=256 \
+                    --train_size=0.9 --val_size=0.05 [--no_test_patch]
           cutter.py --help | -help | -h
 
 --input-directory=IDIR  Some directory [default: ./data]
 --output-directory=ODIR  Some directory [default: ./mdata]
 --percentage=100 percentage of data to process [default: 100]
 --patch_size=256 the image patch size is width, height [default: 256]
+--train_size=0.9  the percentage of files in the train set
+--val_size=0.05 the percentage of files in the validation set
+--no_test_patch  No breaking the test set image sinto patches
 
 cutter expects the input directory of images to be of the following structure.
 Input_directory->patient_folder->patient_image.
@@ -27,6 +31,7 @@ from docopt import docopt
 from pathlib import Path
 import numpy as np
 import random
+import nibabel as nib
 
 
 def loader(ifile):
@@ -48,7 +53,9 @@ def loader(ifile):
     ImagePaths = [".jpg", ".png", ".jpeg", ".gif"]
     ImageArrayPaths = [".npy", ".npz"]
     TiffPaths = [".tiff", ".tif"]
-    fileExt = os.path.splitext(ifile.name)[1].lower()
+    niftiPaths = [".nii", ".nii.gz"]
+    fname = str(ifile.name).lower()
+    fileExt = "." + ".".join(fname.split(".")[1:])
     if fileExt in ImagePaths:
         image = Image.open(ifile)
         image = np.array(image.convert(mode="L"))
@@ -60,6 +67,10 @@ def loader(ifile):
         image = image.f.arr_0  # Load data from inside file.
     elif fileExt in ImageArrayPaths:
         image = np.load(ifile)
+    elif fileExt in niftiPaths:
+        img = nib.load(ifile)
+        image = img.get_data()
+
     return image
 
 
@@ -85,7 +96,7 @@ def matrix_cutter(img, width=256, height=256):
     img_height, img_width = img.shape
 
     # check if images have 256 width and 256 height if it does skip cutting
-    if img_height == height and img_width == width:
+    if img_height <= height and img_width <= width:
         return [(0, 0, img)]
 
     for i, ih in enumerate(range(0, img_height, height)):
@@ -121,20 +132,42 @@ def computestats(imatrix):
 def matrix_dictionary_update(
     key_matrix_map, matrix_key_map, file_names_map, imatrix, key, ofile, file_name
 ):
-    key_matrix_map.append((imatrix, key))
-    matrix_key_map[key] = ofile
-    file_names_map[key] = file_name
-    key = key + 1
+    if imatrix.ndim == 2:
+        key_matrix_map.append((imatrix, key))
+        matrix_key_map[key] = ofile
+        file_names_map[key] = file_name
+        key = key + 1
+    else:
+        # slicing in axial orientation for 3D data
+        if "Sag_" in file_name:
+            # slicing to get axial slices from sagitally collected data
+            for i in range(imatrix.shape[1]):
+                slice_i = imatrix[:,i,:]
+                key_matrix_map.append((slice_i, key))
+                matrix_key_map[key] = ofile
+                file_names_map[key] = f"{file_name}_{i}"
+                key = key + 1
+        else:
+            # Slicing to get axial slices from axially collected data
+            for i in range(imatrix.shape[2]):
+                slice_i = imatrix[:,:,i]
+                key_matrix_map.append((slice_i, key))
+                matrix_key_map[key] = ofile
+                file_names_map[key] = f"{file_name}_{i}"
+                key = key + 1
+
     return file_names_map, key_matrix_map, matrix_key_map, key
 
 
-def process(L, stats_paths, train_size, patch_size):
+def process(L, stats_paths, train_size, val_size, patch_size, no_test_patch):
     """
 
     :param L: contains the input_file path and output_file path
     :param stats_paths: contains the paths for the stats json files
     :param train_size: train set size
+    :param val_size: validation set size
     :param patch_size: this will cut the images to desired size
+    :param no_test_patch: this ensures test set dtaa is not patched
     :return:
     """
     matrices = []
@@ -150,13 +183,15 @@ def process(L, stats_paths, train_size, patch_size):
     min = 0
     max = 0
     train_len = int(train_size * len(L))
+    test_start = int(train_size * len(L)) + int(val_size * len(L))
     for i, (ifile, ofile) in enumerate(L):
         # print("processing" + str(ifile), end=" ")
         imatrix = loader(ifile)
-        file_name = os.path.splitext(ifile.name)[0]
-        if imatrix.shape[0] < 256 or imatrix.shape[1] < 256:
-            print("Skipping because file is constant or size is too small.")
-            continue
+        # file_name = os.path.splitext(ifile.name)[0]
+        file_name = str(ifile.name).split(".")[0]
+        #if imatrix.shape[0] < patch_size or imatrix.shape[1] < patch_size:
+        #    print("Skipping because file is constant or size is too small.")
+        #    continue
 
         matrix_vector = np.asarray(imatrix).reshape(-1)
         if i < train_len:
@@ -178,7 +213,9 @@ def process(L, stats_paths, train_size, patch_size):
 
             if min > matrix_min:
                 min = matrix_min
-
+        # Keep track of key at which test set starts 
+        if i == test_start:
+            test_start_key = key
         file_names_map, key_matrix_map, matrix_key_map, key = matrix_dictionary_update(
             key_matrix_map,
             matrix_key_map,
@@ -189,7 +226,7 @@ def process(L, stats_paths, train_size, patch_size):
             file_name,
         )
         # print("\n")
-
+    
     total_mean = total_sum / total_count
     total_variance = (total_square_sum / total_count) - (total_sum / total_count) ** 2
     stats = {}
@@ -207,7 +244,13 @@ def process(L, stats_paths, train_size, patch_size):
         odir = opath
         if not os.path.isdir(odir):
             os.makedirs(odir)
-        mlist = matrix_cutter(matrix, height=height, width=width)
+        # if this is part of test set and no_test_patch is set,
+        # Prevent patching of test set image
+        if i >= test_start_key and no_test_patch:
+            mlist = matrix_cutter(matrix, height=matrix.shape[0],
+                                  width=matrix.shape[1])
+        else:
+            mlist = matrix_cutter(matrix, height=height, width=width)
         for i, j, mat in mlist:
             fname = str(prefix) + "_" + str(i) + "_" + str(j)
             np.savez_compressed(odir / fname, mat)
@@ -249,6 +292,8 @@ def scan_idir(ipath, opath, percentage, train_size=0.9, valid_size=0.05):
         "*.tif",
         "*.jpeg",
         "*.tiff",
+        "*.nii",
+        "*.nii.gz"
     ]
     folders_list = []
     folders_files = []
@@ -263,15 +308,33 @@ def scan_idir(ipath, opath, percentage, train_size=0.9, valid_size=0.05):
     for input_folder in folders:
         if input_folder.is_dir():
             folder_name = input_folder.name
-            folders_list.append(folder_name)
             input_folder = Path(input_folder)
-            [folders_files.extend(input_folder.rglob(x)) for x in extensions]
-            size = int(len(folders_files) * (percentage / 100))
-            random.Random(4).shuffle(folders_files)
-            folders_files = folders_files[:size]
-            folder_file_map[folder_name] = folders_files
+            # if we have paired data for LR and HE,
+            # we randomly shuffle to ensure order of paired data is maintained
+            # and then treat LR and HR data as 2 separate distributions
+            if set(os.listdir(input_folder)) == set(["LR", "HR"]):
+                print("Found separate LR and HR directory. Creating paired dataset")
+                folders_list.append(folder_name + "/LR")
+                folders_list.append(folder_name + "/HR")
+                [folders_files.extend(input_folder.rglob(x)) for x in extensions]
+                sorted(folders_files)
+                num_pairs = len(folders_files) // 2
+                paired_files = [(folders_files[i],
+                                 folders_files[num_pairs + i]) for i in range(num_pairs)]
+                size = int(len(paired_files) * (percentage / 100))
+                random.Random(4).shuffle(paired_files)
+                paired_files = paired_files[:size]
+                folder_file_map[folder_name+"/HR"] = [elem[0] for elem in paired_files]
+                folder_file_map[folder_name+"/LR"] = [elem[1] for elem in paired_files]
+            else:
+                folders_list.append(folder_name)
+                [folders_files.extend(input_folder.rglob(x)) for x in extensions]
+                size = int(len(folders_files) * (percentage / 100))
+                random.Random(4).shuffle(folders_files)
+                folders_files = folders_files[:size]
+                folder_file_map[folder_name] = folders_files
         folders_files = []
-    paths = ["train", "test", "valid"]
+    paths = ["train", "valid", "test"]
     folder_input_output_map = {}
     for folder in folders_list:
         L = []
@@ -304,13 +367,17 @@ def main():
     odir = Path(arguments["--output-directory"])
     percentage = int(arguments["--percentage"])
     patch_size = int(arguments["--patch_size"])
+    train_size = float(arguments["--train_size"])
+    val_size = float(arguments["--val_size"])
+    no_test_patch = arguments["--no_test_patch"]
     assert not odir.is_dir(), "Please provide a non-existent output directory!"
-    folder_map, train_size = scan_idir(idir, odir, percentage)
+    folder_map, train_size = scan_idir(idir, odir, percentage,
+                                       train_size, val_size)
     print(folder_map.keys())
     for folder in folder_map.keys():
         print(folder)
         L, stats_paths = folder_map[folder]
-        process(L, stats_paths, train_size, patch_size)
+        process(L, stats_paths, train_size, val_size, patch_size, no_test_patch)
 
 
 if __name__ == "__main__":
