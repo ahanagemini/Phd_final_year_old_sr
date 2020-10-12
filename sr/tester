@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Usage:   tester (hr|lr) --input=input --output=output --model=model --architecture=arch [--lognorm] [--active]
+"""Usage:   tester (hr|lr) --input=input --output=output --model=model --architecture=arch [--lognorm] [--active] [--save_slice]
             tester --help | -help | -h
 
 Process input to create super resolution using the model input and plot it. In hr mode, the input is assumed to be high resolution. In lr mode the input is assumed to be low resolution.
@@ -11,15 +11,18 @@ Arguments:
   architecture  architecture to use: unet or axial
   --lognorm     If we want to use log normalization
   --active      Whether to save per-image metrics for active learning selection
+  --save_slice  If we want to save the slice as a png image
+
 Options:
   -h --help -h
 """
 import os
 from pathlib import Path
-
+import shutil
 import torch
 
-from dataset import SrDataset
+import tifffile
+from dataset import SrDataset, PairedDataset
 from docopt import docopt
 
 import numpy as np
@@ -60,6 +63,25 @@ def writetext(imgfile, e_sr=None, e_lr=None):
     img.save("/tmp/test.png")
     os.system("mv /tmp/test.png " + imgfile)
 
+def create_dataset(path, lognorm=False, test=True, hr=True):
+    """
+
+    Parameters
+    ----------
+    path: path to data directory
+    lognorm: Is log normalization used?
+
+    Returns
+    -------
+    Loaded dataset
+
+    """
+
+    if set(os.listdir(path)) == set(["LR", "HR"]):
+        return PairedDataset(path, lognorm=lognorm, test=test)
+    else:
+        return SrDataset(path, lognorm=lognorm, test=test, hr=hr)
+
 def evaluate(args):
     """
 
@@ -78,7 +100,7 @@ def evaluate(args):
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    test_set = SrDataset(args["--input"], lognorm=args["--lognorm"], test=True, hr=args["hr"])
+    test_set = create_dataset(args["--input"], lognorm=args["--lognorm"], test=True, hr=args["hr"])
     test_generator = torch.utils.data.DataLoader(test_set, **parameters)
 
     # model create and load
@@ -86,8 +108,12 @@ def evaluate(args):
         model = UNET(in_channels=1, out_channels=1, init_features=32)
     elif args["--architecture"] == 'axial':
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
-    elif  args["--architecture"] == 'edsr':
+    elif  args["--architecture"] == 'edsr_16_64':
         model = EDSR(n_resblocks=16, n_feats=64, scale=1)
+    elif  args["--architecture"] == 'edsr_8_256':
+        model = EDSR(n_resblocks=8, n_feats=256, scale=1)
+    elif  args["--architecture"] == 'edsr_16_256':
+        model = EDSR(n_resblocks=16, n_feats=256, scale=1)
 
     model.to(device)
     test_loss = 0
@@ -98,8 +124,9 @@ def evaluate(args):
     lr_tot_ssim = 0.0
     model.load_state_dict(torch.load(args["--model"]))
     active_list = []
+    length = sum(1 for x in test_generator)
     with torch.no_grad():
-        for batch_idx, data in tqdm(enumerate(test_generator), total = len(test_set.datalist)):
+        for batch_idx, data in tqdm(enumerate(test_generator), total = length):
             model.eval()
             # unet.train(False)
             x_test = data["lr"]
@@ -128,8 +155,9 @@ def evaluate(args):
                                        y_test.reshape(-1, y_pred.shape[-1])])
 
             # Inverse normalize the LR image
-            x_test = x_test.cpu().numpy()
-            x_test = (x_test * stat_test["std"]) + stat_test["mean"]
+            #x_test = x_test.cpu().numpy()
+            #x_test = (x_test * stat_test["std"]) + stat_test["mean"]
+            x_test = data["lr_un"].cpu().numpy()
             if lognorm:
                 image_sign = np.sign(x_test)
                 x_test = image_sign * (np.exp(np.abs(x_test)) - 1.0)
@@ -146,6 +174,12 @@ def evaluate(args):
                         [y_pred.reshape(-1, y_pred.shape[-1]),
                          x_test.reshape(-1, y_pred.shape[-1])]
                     )
+                if args["--save_slice"]:
+                    save_img = y_pred.astype(np.uint16)
+                    shutil.rmtree(str(args["--output"]) + "/slices")
+                    os.mkdir(str(args["--output"]) + "/slices")
+                    outFilepath = str(args["--output"]) + "/slices/" + data["file"][0] + ".tiff"
+                    tifffile.imsave(outFilepath, save_img)
                 filename = os.path.join(args["--output"], f"{batch_idx}.png")
                 m = np.mean(save_plots)
                 s = np.std(save_plots)
@@ -159,16 +193,17 @@ def evaluate(args):
                 x_test = x_test.reshape(x_test.shape[3], -1)
                 y_test = y_test.reshape(y_test.shape[3], -1)
                 y_pred = y_pred.reshape(y_pred.shape[3], -1)
+                data_range = stat_test["max"].numpy()
                 lr_psnr = metrics.peak_signal_noise_ratio(y_test, x_test,
-                                                          data_range=stat_test["max"].numpy())
+                                                          data_range=data_range)
                 sr_psnr = metrics.peak_signal_noise_ratio(y_test, y_pred,
-                                                          data_range=stat_test["max"].numpy())
+                                                          data_range=data_range)
                 lr_ssim = metrics.structural_similarity(y_test, x_test,
                                                         gaussian_weights=True,
-                                                        data_range=stat_test["max"].numpy())
+                                                        data_range=data_range)
                 sr_ssim = metrics.structural_similarity(y_test, y_pred,
                                                         gaussian_weights=True,
-                                                        data_range=stat_test["max"].numpy())
+                                                        data_range=data_range)
                 test_psnr = test_psnr + sr_psnr[0]
                 test_ssim = test_ssim + sr_ssim
                 lr_tot_psnr = lr_tot_psnr + lr_psnr[0]

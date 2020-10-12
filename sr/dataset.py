@@ -14,6 +14,87 @@ import scipy.ndimage
 import numpy as np
 from cutter import loader
 
+class PairedDataset(Dataset):
+    """Dataset class for loading large amount of image arrays data"""
+
+    def __init__(self, root_dir, lognorm=False, test=False):
+        """
+        Args:
+            root_dir (string): Directory with all the images.
+            lognorm: True if we ar eusing log normalization
+            test: True only for test dataset
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+        self.root_dir = Path(root_dir).expanduser().resolve().absolute()
+        self.lr_dir = self.root_dir / "LR"
+        self.hr_dir = self.root_dir / "HR"
+        self.lrlist = sorted(list(self.lr_dir.rglob("*.npz")))
+        self.hrlist = sorted(list(self.hr_dir.rglob("*.npz")))
+        self.lognorm = lognorm
+        self.test = test
+        self.hrstatlist = []
+        for fname in self.hrlist:
+            file_path = Path(fname)
+            stat_file = json.load(open(str(file_path.parent / "stats.json")))
+            self.hrstatlist.append(stat_file)
+        self.lrstatlist = []
+        for fname in self.lrlist:
+            file_path = Path(fname)
+            stat_file = json.load(open(str(file_path.parent / "stats.json")))
+            self.lrstatlist.append(stat_file)
+
+        print("Total number of data elements found = ", len(self.hrlist))
+
+    def __len__(self):
+        return len(self.hrlist)
+
+    def __getitem__(self, idx):
+        hrimg_name = Path(self.hrlist[idx])
+        lrimg_name = Path(self.lrlist[idx])
+        filename = os.path.basename(hrimg_name)
+        filename = filename.split('.')[0]
+        stats_hr = self.hrstatlist[idx]
+        stats_lr = self.lrstatlist[idx]
+        hr_image =  loader(hrimg_name)
+
+        lr_image =  loader(lrimg_name)
+        lr_unorm = lr_image.copy()
+        if self.lognorm:
+            stats_lr = {}
+            image_sign = np.sign(lr_image)
+            lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
+            stats_lr["mean"] = np.mean(lr_image)
+            stats_lr["std"] = np.std(lr_image)
+            if not self.test:
+                stats_hr = {}
+                image_sign = np.sign(hr_image)
+                hr_image = image_sign * np.log(np.abs(hr_image) + 1.0)
+                stats_hr["mean"] = np.mean(hr_image)
+                stats_hr["std"] = np.std(hr_image)
+        if stats_lr["std"] <= 0.001:
+            stats_lr["std"] = 1
+        if stats_hr["std"] <= 0.001:
+            stats_hr["std"] = 1
+
+        if not self.test:
+            hr_image = Normalize()(hr_image, stats_hr)
+        lr_image = Normalize()(lr_image, stats_lr)
+        sample = {"lr": lr_image, "lr_un": lr_unorm, "hr": hr_image, "stats": stats_hr, "file": filename}
+        if not self.test:
+            transforms = Compose(
+                [Rotate(), Transpose(), HorizontalFlip(), VerticalFlip(),
+                    Pertube(1.00e-6), Reshape(), ToFloatTensor()]
+            )
+            for i, trans in enumerate([transforms]):
+                sample = trans(sample)
+        if self.test:
+            transforms = Compose(
+                [Pertube(1.00e-6), Reshape(), ToFloatTensor()]
+            )
+            sample = transforms(sample)
+        return sample
+
 
 class SrDataset(Dataset):
     """Dataset class for loading large amount of image arrays data"""
@@ -61,21 +142,14 @@ class SrDataset(Dataset):
             if stats["std"] <= 0.001:
                 stats["std"] = 1
             hr_image = Normalize()(hr_image, stats)
-        # upper_quartile = stats['upper_quartile']
-        # lower_quartile = stats['lower_quartile']
-        # hr_image[hr_image > upper_quartile] = upper_quartile
-        # hr_image[hr_image < lower_quartile] = lower_quartile
-        # interval_length = upper_quartile - lower_quartile
-        # hr_image -= lower_quartile
-        # hr_image /= abs(interval_length)
-        # hr_image = (hr_image - 0.5)*2.0
+        
         if self.hr:
             lr_image = scipy.ndimage.zoom(scipy.ndimage.zoom(hr_image, 0.25), 4.0)
         else:
             lr_image =  loader(img_name)
             hr_image = np.zeros_like(lr_image)
         if not self.test:
-            sample = {"lr": lr_image, "hr": hr_image, "stats": stats, "file": filename}
+            sample = {"lr": lr_image, "lr_un": lr_image, "hr": hr_image, "stats": stats, "file": filename}
             transforms = Compose(
                 [Rotate(), Transpose(), HorizontalFlip(), VerticalFlip(),
                     Pertube(1.00e-6), Reshape(), ToFloatTensor()]
@@ -91,8 +165,9 @@ class SrDataset(Dataset):
                 stats["std"] = np.std(lr_image)
             if stats["std"] <= 0.001:
                 stats["std"] = 1
+            lr_unorm = lr_image.copy()
             lr_image = Normalize()(lr_image, stats)
-            sample = {"lr": lr_image, "hr": hr_image, "stats": stats, "file": filename}
+            sample = {"lr": lr_image, "lr_un": lr_unorm, "hr": hr_image, "stats": stats, "file": filename}
             transforms = Compose(
                 [Pertube(1.00e-6), Reshape(), ToFloatTensor()]
             )
@@ -270,6 +345,7 @@ class Reshape:
         width = sample["hr"].shape[-1]
         sample["hr"] = np.reshape(sample["hr"], (1, -1, width))
         sample["lr"] = np.reshape(sample["lr"], (1, -1, width))
+        sample["lr_un"] = np.reshape(sample["lr_un"], (1, -1, width))
         return sample
 
 

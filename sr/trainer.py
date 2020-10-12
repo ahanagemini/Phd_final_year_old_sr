@@ -19,6 +19,7 @@ Options:
 
 from pathlib import Path
 import os
+import shutil
 from time import time
 import datetime
 
@@ -36,17 +37,37 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from unet import UNET
 from edsr import EDSR
-from dataset import SrDataset
+from dataset import SrDataset, PairedDataset
 from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR
 from logger import Logger
 
-BATCH_SIZE = {"unet": 16, "axial": 16, "edsr": 8}
-LR = {"unet": 0.00005, "axial": 0.0005, "edsr": 0.0005}
+BATCH_SIZE = {"unet": 16, "axial": 16, "edsr_16_64": 8, "edsr_8_256": 16,
+              "edsr_16_256": 8}
+LR = {"unet": 0.00005, "axial": 0.0005, "edsr_16_64": 0.0005,
+      "edsr_8_256": 0.0001,  "edsr_16_256": 0.0001}
 
 def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
 
+def create_dataset(path, lognorm=False):
+    """
+
+    Parameters
+    ----------
+    path: path to data directory
+    lognorm: Is log normalization used?
+
+    Returns
+    -------
+    Loaded dataset
+
+    """
+
+    if set(os.listdir(path)) == set(["LR", "HR"]):
+        return PairedDataset(path, lognorm=lognorm)
+    else:
+        return SrDataset(path, lognorm=lognorm)
 
 def model_save(train_model, train_model_path):
     """
@@ -95,8 +116,12 @@ def training(training_generator, validation_generator, device, log_dir,
         model = UNET(in_channels=1, out_channels=1, init_features=32)
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
-    elif architecture == "edsr":
+    elif architecture == "edsr_16_64":
         model = EDSR(n_resblocks=16, n_feats=64, scale=1)
+    elif architecture == "edsr_8_256":
+        model = EDSR(n_resblocks=8, n_feats=256, scale=1)
+    elif architecture == "edsr_16_256":
+        model = EDSR(n_resblocks=16, n_feats=256, scale=1)
     model.to(device)
     summary(model, (1, 256, 256), batch_size=1, device="cuda")
     max_epochs = num_epochs
@@ -145,7 +170,7 @@ def training(training_generator, validation_generator, device, log_dir,
                     x_rescale = x_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
                     y_rescale = y_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
 
-                    save_plots = np.hstack([x_rescale.reshape(256, 256), y_rescale.reshape(256, 256)])
+                    save_plots = np.hstack([x_rescale.reshape(x_rescale.shape[1], -1), y_rescale.reshape(y_rescale.shape[1], -1)])
                     save_plots = np.clip(save_plots, stat["min"][i].numpy(), stat["max"][i].numpy())
                     vmax = stat["mean"][i].numpy() + 3 * stat["std"][i].numpy()
                     vmin = stat["min"][i].numpy()
@@ -254,10 +279,10 @@ def process(arguments):
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    training_set = SrDataset(train_path, lognorm=lognorm)
+    training_set = create_dataset(train_path, lognorm=lognorm)
     training_generator = torch.utils.data.DataLoader(training_set, **parameters)
 
-    validation_set = SrDataset(valid_path)
+    validation_set = create_dataset(valid_path, lognorm=lognorm)
     validation_generator = torch.utils.data.DataLoader(validation_set, **parameters)
     training(training_generator, validation_generator, device, log_dir,
              architecture, num_epochs, debug_pics)

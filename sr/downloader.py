@@ -88,7 +88,7 @@ def data_download(dataname, odir):
             if url_key == "Medical_3D":
                 files = os.listdir(odir / "Medical_3D")
                 for compressed_file in files:
-                    file_extraction(odir / "Medical_3D" / compressed_file, file_ext, odir / "Medical_3D")
+                    file_extraction(odir / "Medical_3D" / compressed_file, file_ext, odir)
                     os.remove(odir / "Medical_3D" / compressed_file)
     else:
         url = datadict[dataname]
