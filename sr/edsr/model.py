@@ -14,19 +14,30 @@ url = {
 
 
 class EDSR(nn.Module):
-    def __init__(self, n_resblocks=16, n_feats=64, scale=4, conv=common.default_conv):
+    def __init__(self, n_resblocks=16, n_feats=64, scale=4, aspp=False,
+                 dilation=False, act='relu', conv=common.default_conv):
         super(EDSR, self).__init__()
 
         # n_resblocks = 16 * 2
         # n_feats = 64 * 4
         kernel_size = 3
-        act = nn.ReLU(True)
+        if act == "relu":
+            act = nn.ReLU(True)
+        elif act == "leakyrelu":
+            act = nn.LeakyReLU(0.1)
+        self.dilation = dilation
+        self.aspp = aspp
         #self.url = url['r{}f{}x{}'.format(n_resblocks, n_feats, scale)]
         #self.sub_mean = common.MeanShift(1)
         #self.add_mean = common.MeanShift(1, sign=1)
 
         # define head module
-        m_head = [conv(1, n_feats, kernel_size)]
+        if self.dilation:
+            m_head = [conv(args.n_colors, n_feats, kernel_size, dilation=1)]
+            m_head1 = [conv(n_feats, n_feats, kernel_size, dilation=2)]
+            m_head2 = [conv(n_feats, n_feats, kernel_size, dilation=4)]
+        else:
+            m_head = [conv(1, n_feats, kernel_size)]
 
         # define body module
         m_body = [
@@ -37,22 +48,42 @@ class EDSR(nn.Module):
         m_body.append(conv(n_feats, n_feats, kernel_size))
 
         # define tail module
+        tail_feats = n_feats
+        if self.aspp:
+            m_aspp1 = [conv(n_feats, n_feats, kernel_size, dilation=1)]
+            m_aspp2 = [conv(n_feats, n_feats, kernel_size, dilation=2)]
+            m_aspp3 = [conv(n_feats, n_feats, kernel_size, dilation=4)]
+            tail_feats = n_feats * 3
+
         m_tail = [
-            common.Upsampler(conv, scale, n_feats, act=False),
-            conv(n_feats, 1, kernel_size)
+            common.Upsampler(conv, scale, tail_feats, act=False),
+            conv(tail_feats, 1, kernel_size)
         ]
 
         self.head = nn.Sequential(*m_head)
+        if self.dilation:
+            self.head1 = nn.Sequential(*m_head1)
+            self.head2 = nn.Sequential(*m_head2)
         self.body = nn.Sequential(*m_body)
+        if self.aspp:
+            self.aspp1 = nn.Sequential(*m_aspp1)
+            self.aspp2 = nn.Sequential(*m_aspp2)
+            self.aspp3 = nn.Sequential(*m_aspp3)
         self.tail = nn.Sequential(*m_tail)
 
     def forward(self, x):
         #x = self.sub_mean(x)
         x = self.head(x)
-
+        if self.dilation:
+            x = self.head1(x)
+            x = self.head2(x)
         res = self.body(x)
         res += x
-
+        if self.aspp:
+            aspp1 = self.aspp1(res)
+            aspp2 = self.aspp2(res)
+            aspp3 = self.aspp3(res)
+            res = torch.cat((aspp1, aspp2, aspp3), dim=1)
         x = self.tail(res)
         #x = self.add_mean(x)
 

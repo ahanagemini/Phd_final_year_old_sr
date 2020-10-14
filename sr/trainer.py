@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --num_epochs=epochs
-                       --architecture=arch [--lognorm] [--debug_input_pics]
+                       --architecture=arch --act=act [--lognorm] [--debug_input_pics] [--aspp] [--dilation]
             trainer.py --help | -help | -h
 
 Train the requested model.
@@ -11,8 +11,11 @@ Arguments:
   log_dir       directory for storing training logs
   num_epochs    number of epochs
   architecture  the architecture to train unet or axial
+  act activations can be relu or leakyrelu FOR EDSR ONLY
   --lognorm     if we are using log normalization
   --debug_input_pics  If we want to save input pics for debugging
+  --aspp        use ASPP in EDSR
+  --dilation    use dilation at the beginning in edsr
 Options:
   -h --help -h
 """
@@ -89,7 +92,7 @@ def model_save(train_model, train_model_path):
 
 
 def training(training_generator, validation_generator, device, log_dir,
-             architecture, num_epochs, debug_pics):
+             architecture, num_epochs, debug_pics, aspp, dilation, act):
     """
 
     Parameters
@@ -101,6 +104,9 @@ def training(training_generator, validation_generator, device, log_dir,
     architecture: The architecture to be used unet or axial
     num_epochs:   The number of epochs
     debug_pics: True if we want to save pictures in input_pics
+    aspp: True if EDSR is going to use aspp
+    dilation True if EDSR is going to use dilation
+    act: activation function to be used
     Returns
     -------
 
@@ -117,11 +123,11 @@ def training(training_generator, validation_generator, device, log_dir,
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif architecture == "edsr_16_64":
-        model = EDSR(n_resblocks=16, n_feats=64, scale=1)
+        model = EDSR(n_resblocks=16, n_feats=64, scale=1, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_8_256":
-        model = EDSR(n_resblocks=8, n_feats=256, scale=1)
+        model = EDSR(n_resblocks=8, n_feats=256, scale=1, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_16_256":
-        model = EDSR(n_resblocks=16, n_feats=256, scale=1)
+        model = EDSR(n_resblocks=16, n_feats=256, scale=1, aspp=aspp, dilation=dilation, act=act)
     model.to(device)
     summary(model, (1, 256, 256), batch_size=1, device="cuda")
     max_epochs = num_epochs
@@ -269,6 +275,10 @@ def process(arguments):
     num_epochs = int(arguments["--num_epochs"]) 
     lognorm = arguments["--lognorm"]
     debug_pics = arguments["--debug_input_pics"]
+    aspp = arguments["--aspp"]
+    dilation = arguments["--dilation"]
+    act = arguments["--act"]
+
     parameters = {
         "batch_size": BATCH_SIZE[architecture],
         "shuffle": True,
@@ -285,7 +295,7 @@ def process(arguments):
     validation_set = create_dataset(valid_path, lognorm=lognorm)
     validation_generator = torch.utils.data.DataLoader(validation_set, **parameters)
     training(training_generator, validation_generator, device, log_dir,
-             architecture, num_epochs, debug_pics)
+             architecture, num_epochs, debug_pics, aspp, dilation, act)
 
 
 if __name__ == "__main__":
