@@ -33,7 +33,7 @@ class EDSR(nn.Module):
 
         # define head module
         if self.dilation:
-            m_head = [conv(args.n_colors, n_feats, kernel_size, dilation=1)]
+            m_head = [conv(1, n_feats, kernel_size, dilation=1)]
             m_head1 = [conv(n_feats, n_feats, kernel_size, dilation=2)]
             m_head2 = [conv(n_feats, n_feats, kernel_size, dilation=4)]
         else:
