@@ -43,9 +43,9 @@ from losses import SSIM, L1loss, PSNR
 from logger import Logger
 
 BATCH_SIZE = {"unet": 16, "axial": 16, "edsr_16_64": 8, "edsr_8_256": 16,
-              "edsr_16_256": 8}
+        "edsr_16_256": 8, "edsr_32_256": 8}
 LR = {"unet": 0.00005, "axial": 0.0005, "edsr_16_64": 0.0005,
-      "edsr_8_256": 0.0001,  "edsr_16_256": 0.0001}
+        "edsr_8_256": 0.0001,  "edsr_16_256": 0.0001, "edsr_32_256": 0.0001}
 
 def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
@@ -122,6 +122,8 @@ def training(training_generator, validation_generator, device, log_dir,
         model = EDSR(n_resblocks=8, n_feats=256, scale=1)
     elif architecture == "edsr_16_256":
         model = EDSR(n_resblocks=16, n_feats=256, scale=1)
+    elif architecture == "edsr_32_256":
+        model = EDSR(n_resblocks=32, n_feats=256, scale=1)
     model.to(device)
     summary(model, (1, 256, 256), batch_size=1, device="cuda")
     max_epochs = num_epochs
