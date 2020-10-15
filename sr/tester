@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
-"""Usage:   tester (hr|lr) --input=input --output=output --model=model --architecture=arch [--lognorm] [--active] [--save_slice]
+"""Usage:   tester (hr|lr) --input=input --output=output --model=model --architecture=arch
+                           --act=act [--lognorm] [--active] [--save_slice] [--aspp] [--dilation]
             tester --help | -help | -h
 
 Process input to create super resolution using the model input and plot it. In hr mode, the input is assumed to be high resolution. In lr mode the input is assumed to be low resolution.
@@ -9,9 +10,12 @@ Arguments:
   output        a directory for saving the output images
   model         a .pt file to use for the model
   architecture  architecture to use: unet or axial
+  act           activation used in EDSR 'relu' or 'leakyrelu'
   --lognorm     If we want to use log normalization
   --active      Whether to save per-image metrics for active learning selection
   --save_slice  If we want to save the slice as a png image
+  --dilation    Use dilation in head convolutions for EDSR
+  --aspp        Use aspp at the end of the model in EDSR
 
 Options:
   -h --help -h
@@ -102,18 +106,23 @@ def evaluate(args):
 
     test_set = create_dataset(args["--input"], lognorm=args["--lognorm"], test=True, hr=args["hr"])
     test_generator = torch.utils.data.DataLoader(test_set, **parameters)
-
+    dilation = args["--dilation"]
+    aspp = args["--aspp"]
+    act = args["--act"]
     # model create and load
     if args["--architecture"] == 'unet':
         model = UNET(in_channels=1, out_channels=1, init_features=32)
     elif args["--architecture"] == 'axial':
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif  args["--architecture"] == 'edsr_16_64':
-        model = EDSR(n_resblocks=16, n_feats=64, scale=1)
+        model = EDSR(n_resblocks=16, n_feats=64, scale=1,
+                     dilation=dilation, aspp=aspp, act=act)
     elif  args["--architecture"] == 'edsr_8_256':
-        model = EDSR(n_resblocks=8, n_feats=256, scale=1)
+        model = EDSR(n_resblocks=8, n_feats=256, scale=1,
+                     dilation=dilation, aspp=aspp, act=act)
     elif  args["--architecture"] == 'edsr_16_256':
-        model = EDSR(n_resblocks=16, n_feats=256, scale=1)
+        model = EDSR(n_resblocks=16, n_feats=256, scale=1,
+                     dilation=dilation, aspp=aspp, act=act)
 
     model.to(device)
     test_loss = 0
