@@ -270,6 +270,7 @@ def process(arguments):
     -------
 
     """
+    print("Processing arguments...")
     train_path = Path(arguments["--train"])
     valid_path = Path(arguments["--valid"])
     log_dir = Path(arguments["--log_dir"])
