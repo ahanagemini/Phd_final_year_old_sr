@@ -48,7 +48,7 @@ from logger import Logger
 BATCH_SIZE = {"unet": 16, "axial": 16, "edsr_16_64": 8, "edsr_8_256": 16,
         "edsr_16_256": 8, "edsr_32_256": 8}
 LR = {"unet": 0.00005, "axial": 0.0005, "edsr_16_64": 0.0005,
-        "edsr_8_256": 0.0001,  "edsr_16_256": 0.0001, "edsr_32_256": 0.0001}
+        "edsr_8_256": 0.0002,  "edsr_16_256": 0.0001, "edsr_32_256": 0.0001}
 
 def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
@@ -281,9 +281,14 @@ def process(arguments):
     dilation = arguments["--dilation"]
     act = arguments["--act"]
 
-    parameters = {
+    parameters_train = {
         "batch_size": BATCH_SIZE[architecture],
         "shuffle": True,
+        "num_workers": 6,
+    }
+    parameters_val = {
+        "batch_size": 1,
+        "shuffle": False,
         "num_workers": 6,
     }
 
@@ -292,10 +297,10 @@ def process(arguments):
     torch.backends.cudnn.benchmark = True
 
     training_set = create_dataset(train_path, lognorm=lognorm)
-    training_generator = torch.utils.data.DataLoader(training_set, **parameters)
+    training_generator = torch.utils.data.DataLoader(training_set, **parameters_train)
 
     validation_set = create_dataset(valid_path, lognorm=lognorm)
-    validation_generator = torch.utils.data.DataLoader(validation_set, **parameters)
+    validation_generator = torch.utils.data.DataLoader(validation_set, **parameters_val)
     training(training_generator, validation_generator, device, log_dir,
              architecture, num_epochs, debug_pics, aspp, dilation, act)
 
