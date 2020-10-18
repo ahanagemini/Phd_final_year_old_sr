@@ -131,6 +131,7 @@ def evaluate(args):
     test_ssim = 0.0
     lr_tot_psnr = 0.0
     lr_tot_ssim = 0.0
+    lr_l1_tot = 0.0
     model.load_state_dict(torch.load(args["--model"]))
     active_list = []
     length = sum(1 for x in test_generator)
@@ -217,6 +218,7 @@ def evaluate(args):
                 test_ssim = test_ssim + sr_ssim
                 lr_tot_psnr = lr_tot_psnr + lr_psnr[0]
                 lr_tot_ssim = lr_tot_ssim + lr_ssim
+                lr_l1_tot = lr_l1_tot + lr_l1
                 srerror = (sr_l1, sr_psnr[0], sr_ssim)
                 lrerror = (lr_l1, lr_psnr[0], lr_ssim)
                 if not active_learning:
@@ -233,6 +235,7 @@ def evaluate(args):
             print("\nTest SSIM: {:.6f}".format(test_ssim / len(test_generator)))
             print("\nLR PSNR: {:.6f}".format(lr_tot_psnr / len(test_generator)))
             print("\nLR SSIM: {:.6f}".format(lr_tot_ssim / len(test_generator)))
+            print("\nLR Loss: {:.6f}".format(lr_l1_tot / len(test_generator)))
             print(f"NUmber of images where SR L1 is worse than LR: {messed_images}")
             if active_learning:
                 df = pd.DataFrame(active_list, columns=['filename', 'SR_L1', 'SR_PSNR',
