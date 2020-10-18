@@ -1,6 +1,5 @@
 from sr import __version__
 import unittest
-from PIL import Image
 import numpy as np
 import os
 from pathlib import Path
