@@ -123,6 +123,9 @@ def evaluate(args):
     elif  args["--architecture"] == 'edsr_16_256':
         model = EDSR(n_resblocks=16, n_feats=256, scale=1,
                      dilation=dilation, aspp=aspp, act=act)
+    elif  args["--architecture"] == 'edsr_32_256':
+            model = EDSR(n_resblocks=32, n_feats=256, scale=1,
+                         dilation=dilation, aspp=aspp, act=act)
 
     model.to(device)
     test_loss = 0
