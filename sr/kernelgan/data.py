@@ -28,8 +28,10 @@ class DataGenerator(Dataset):
 
         # Read input image
         self.input_image = conf.image
-        self.stat_file = conf.stats
-        self.input_image = Normalize()(self.input_image, self.stat_file)
+        print("Datagenerator:", sum(self.input_image))
+        self.stat = conf.stats
+        self.input_image = Normalize(self.input_image, self.stat)
+        print("Datagenerator:", sum(self.input_image))
         self.shave_edges(scale_factor=conf.scale_factor, real_image=conf.real_image)
 
         self.in_rows, self.in_cols = self.input_image.shape[0:2]
@@ -48,7 +50,7 @@ class DataGenerator(Dataset):
         g_in = self.next_crop(for_g=True, idx=idx)
         d_in = self.next_crop(for_g=False, idx=idx)
 
-        return g_in, d_in, self.input_image, self.stat_file
+        return g_in, d_in, self.input_image, self.stat
 
     def next_crop(self, for_g, idx):
         """Return a crop according to the pre-determined list of indices. Noise is added to crops for D"""
@@ -76,6 +78,7 @@ class DataGenerator(Dataset):
 
     def create_prob_maps(self, scale_factor):
         # Create loss maps for input image and downscaled one
+        print("data/create_prob_maps input :", sum(self.input_image))
         loss_map_big = create_gradient_map(self.input_image)
         loss_map_sml = create_gradient_map(
             imresize(im=self.input_image, scale_factor=scale_factor, kernel="cubic")
@@ -118,11 +121,12 @@ class DataGenerator(Dataset):
         return top - top % 2, left - left % 2
 
 
-class Normalize:
-    def __call__(self, image, stat):
-        image = (image * stat["mean"]) / stat["std"]
-        print(f"image shape after normalization is {image.shape}")
-        return image
+def Normalize(image, stat):
+    print("Normalization:", stat, image)
+    image = (image - stat["mean"]) / stat["std"]
+    print("Normalization:", stat, image)
+    print(f"image shape after normalization is {image.shape}")
+    return image
 
 
 class Reshape:

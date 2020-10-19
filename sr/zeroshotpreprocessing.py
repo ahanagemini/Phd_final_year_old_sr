@@ -55,9 +55,9 @@ def image_stat_processing(conf):
         for image_file in image_path_dict[image_parent]:
             image_name = os.path.splitext(image_file.name)[0]
             image = loader(image_file)
-            conf.image = image
+            conf.image = image.reshape( (image.shape[0], image.shape[1], 1) )
             conf.stats = stats
-            print(image)
+            print(image, "Sum = ", sum(image))
             print(stats)
             kernel = train(conf)
             sample_list = []
