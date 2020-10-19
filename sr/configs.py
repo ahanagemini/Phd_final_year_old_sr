@@ -42,6 +42,9 @@ class Config:
         # Kernel post processing
         self.parser.add_argument('--n_filtering', type=float, default=40, help='Filtering small values of the kernel')
 
+        # Number of resize operations
+        self.parser.add_argument('--n_resize', type=int, default=10, help='Number of resize operations/scales.')
+
         # ZSSR configuration
         self.parser.add_argument('--do_ZSSR', action='store_true', help='when activated - ZSSR is not performed')
         self.parser.add_argument('--noise_scale', type=float, default=1., help='ZSSR uses this to partially de-noise images')
