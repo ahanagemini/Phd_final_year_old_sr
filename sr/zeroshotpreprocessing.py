@@ -56,8 +56,8 @@ def image_stat_processing(conf):
         for image_file in image_path_dict[image_parent]:
             image_name = os.path.splitext(image_file.name)[0]
             image = loader(image_file)
-            image = image.reshape( (image.shape[0], image.shape[1], 1) )
-            conf.image = image.reshape( (image.shape[0], image.shape[1], 1) )
+            image = image.reshape((image.shape[0], image.shape[1], 1))
+            conf.image = image.reshape((image.shape[0], image.shape[1], 1))
             conf.stats = stats
             print(image, "Sum = ", sum(image))
             print(stats)
@@ -70,14 +70,11 @@ def image_stat_processing(conf):
                 image = out_image
             for i, image_patch in enumerate(sample_list):
                 np.savez_compressed(
-                    str(output_directory / image_parent.name / image_name) + str(i),
-                    image_patch,
+                    str(output_directory / image_name) + "_" + str(i), image_patch,
                 )
-            print(str(output_directory) +"\t" +str(image_parent))
-            np.savez_compressed(
-                str(output_directory / image_parent / "kernel"), image_patch
-            )
-        with open(str(output_directory / image_parent / "stats.json"), "w") as sfile:
+            print(str(output_directory) + "\t" + str(image_parent))
+            np.savez_compressed(str(output_directory / "kernel"), kernel)
+        with open(str(output_directory / "stats.json"), "w") as sfile:
             json.dump(stats, sfile)
 
 
