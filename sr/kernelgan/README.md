@@ -7,27 +7,13 @@ Paper: https://arxiv.org/abs/1909.06581
 
 Project page: http://www.wisdom.weizmann.ac.il/~vision/kernelgan/  
 
-**Accepted NeurIPS 2019 (oral)**
-
 
 ## Usage:
 
-### Quick usage on your data:  
-To run KernelGAN on all images in <input_image_path>:
+``` python3 -m pip install -r requirements.txt ```
 
-``` python train.py --input-dir <input_image_path> ```
-
-
-This will produce kernel estimations in the results folder
-
-### Extra configurations:  
-```--X4``` : Estimate the X4 kernel
-
-```--SR``` : Perform ZSSR using the estimated kernel
-
-```--real``` : Real-image configuration (effects only the ZSSR)
-
-```--output-dir``` : Output folder for the images (default is results)
+Then use the function train in train.py from the parent package.
+This will produce the kernel you need.
 
 
 ### Data:
