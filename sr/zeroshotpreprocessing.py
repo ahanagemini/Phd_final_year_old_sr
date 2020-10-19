@@ -72,4 +72,6 @@ def image_stat_processing(input_directory, output_directory, samples):
 
 if __name__ == "__main__":
     conf = Config().parse()
+    from pprint import pprint
+    pprint(conf)
     #image_stat_processing(conf)
