@@ -136,13 +136,7 @@ class KernelGAN:
         final_kernel = post_process_k(self.curr_k, n=self.conf.n_filtering)
         save_final_kernel(final_kernel, self.conf)
         print('KernelGAN estimation complete!')
-        image = self.input_image
-        if self.X4:
-            out_image = self.downscale(im=image, kernel=final_kernel, scale_factor=4)
-        else:
-            out_image = self.downscale(im=image, kernel=final_kernel, scale_factor=2)
-        print(" FINISHED RUN ")
-        return out_image
+        return final_kernel
 
     def stat_calculator_save(self, image, image_2, image_4):
         stat_image = {}

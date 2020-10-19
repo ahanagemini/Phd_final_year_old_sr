@@ -161,7 +161,7 @@ def numeric_kernel(im, kernel, scale_factor, output_shape, kernel_shift_flag):
 
     # First run a correlation (convolution with flipped kernel)
     out_im = np.zeros_like(im)
-    for channel in range(np.ndim(im)):
+    for channel in range(im.shape[-1]):
         out_im[:, :, channel] = filters.correlate(im[:, :, channel], kernel)
 
     # Then subsample and return
