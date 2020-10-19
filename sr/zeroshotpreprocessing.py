@@ -14,8 +14,8 @@ Options:
 """
 
 from cutter import loader
-from kernelgan.imresize import imresize
-from kernelgan.train import train
+from kernelgan import imresize
+from kernelgan import train
 import numpy as np
 import os
 from pathlib import Path
