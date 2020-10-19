@@ -1,11 +1,11 @@
 import json
 
 import torch
-import loss
-import networks
+from .loss import GANLoss, DownScaleLoss, SumOfWeightsLoss, BoundariesLoss, CentralizedLoss, SparsityLoss
+from .networks import Generator, Discriminator, weights_init_G, weights_init_D
 import torch.nn.functional as F
 from torchsummary import summary
-from util import save_final_kernel,  post_process_k, read_image
+from .util import save_final_kernel,  post_process_k, read_image
 from scipy.ndimage import filters
 import numpy as np
 import matplotlib.pyplot as plt
