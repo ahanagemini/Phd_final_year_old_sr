@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
-"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --num_epochs=epochs
-                       --architecture=arch --act=act [--lognorm] [--debug_input_pics] [--aspp] [--dilation]
+"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --num_epochs=epochs --architecture=arch --act=act [--lognorm] [--debug_input_pics] [--aspp] [--dilation]
             trainer.py --help | -help | -h
 
 Train the requested model.
@@ -20,8 +19,12 @@ Options:
   -h --help -h
 """
 
+# Example run : 
+#  python3.8 ./trainer.py --train=../earth_data/train/f3 --valid=../earth_data/valid/f3 --log_dir=logs --num_epochs=100 --architecture=edsr_16_64 --act=relu 
+
 from pathlib import Path
 import os
+import sys
 import shutil
 from time import time
 import datetime
