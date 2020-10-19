@@ -59,8 +59,6 @@ def image_stat_processing(conf):
             image = image.reshape((image.shape[0], image.shape[1], 1))
             conf.image = image.reshape((image.shape[0], image.shape[1], 1))
             conf.stats = stats
-            print(image, "Sum = ", sum(image))
-            print(stats)
             kernel = train(conf)
             sample_list = []
 
@@ -80,10 +78,4 @@ def image_stat_processing(conf):
 
 if __name__ == "__main__":
     conf = Config().parse()
-    print(type(conf))
-    conf.x = 1000
-    from pprint import pprint
-
-    pprint(conf)
-    print("samples = ", conf.n_resize)
     image_stat_processing(conf)
