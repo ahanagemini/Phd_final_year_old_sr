@@ -17,4 +17,3 @@ def train(image, stats, X4=False):
         learner.update(iteration, gan)
     output_image = gan.finish()
     return output_image
-
