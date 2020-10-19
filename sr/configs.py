@@ -52,9 +52,7 @@ class Config:
 
     def parse(self, args=None):
         """Parse the configuration"""
-        print("Parsing now...")
         self.conf = self.parser.parse_args(args=args)
-        print("And here...")
         self.set_gpu_device()
         self.conf.G_structure = [7, 5, 3, 1, 1, 1]
         return self.conf

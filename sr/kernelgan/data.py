@@ -76,7 +76,6 @@ class DataGenerator(Dataset):
 
     def create_prob_maps(self, scale_factor):
         # Create loss maps for input image and downscaled one
-        print("data/create_prob_maps input :", sum(self.input_image))
         loss_map_big = create_gradient_map(self.input_image)
         loss_map_sml = create_gradient_map(
             imresize(im=self.input_image, scale_factor=scale_factor, kernel="cubic")
@@ -120,10 +119,7 @@ class DataGenerator(Dataset):
 
 
 def Normalize(image, stat):
-    print("Normalization:", stat, image)
     image = (image - stat["mean"]) / stat["std"]
-    print("Normalization:", stat, image)
-    print(f"image shape after normalization is {image.shape}")
     return image
 
 
