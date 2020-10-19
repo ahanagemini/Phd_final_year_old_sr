@@ -74,4 +74,5 @@ if __name__ == "__main__":
     conf = Config().parse()
     from pprint import pprint
     pprint(conf)
+    print("samples = ", conf.n_resize)
     #image_stat_processing(conf)
