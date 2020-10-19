@@ -1,11 +1,18 @@
 import json
 
 import torch
-from .loss import GANLoss, DownScaleLoss, SumOfWeightsLoss, BoundariesLoss, CentralizedLoss, SparsityLoss
+from .loss import (
+    GANLoss,
+    DownScaleLoss,
+    SumOfWeightsLoss,
+    BoundariesLoss,
+    CentralizedLoss,
+    SparsityLoss,
+)
 from .networks import Generator, Discriminator, weights_init_G, weights_init_D
 import torch.nn.functional as F
 from torchsummary import summary
-from .util import save_final_kernel,  post_process_k, read_image
+from .util import save_final_kernel, post_process_k, read_image
 from scipy.ndimage import filters
 import numpy as np
 import matplotlib.pyplot as plt
@@ -21,56 +28,70 @@ class KernelGAN:
     lambda_centralized = 0
     lambda_sparse = 0
 
-    def __init__(self, conf, X4):
+    def __init__(self, conf):
         # Acquire configuration
         self.conf = conf
 
         # Define the GAN
-        self.G = networks.Generator(conf).cuda()
-        summary(self.G, (1, 256, 256), batch_size=1, device='cuda')
-        self.D = networks.Discriminator(conf).cuda()
-        summary(self.D, (1, 256, 256), batch_size=1, device='cuda')
+        self.G = Generator(conf).cuda()
+        summary(self.G, (1, 256, 256), batch_size=1, device="cuda")
+        self.D = Discriminator(conf).cuda()
+        summary(self.D, (1, 256, 256), batch_size=1, device="cuda")
 
         # Calculate D's input & output shape according to the shaving done by the networks
-        self.X4 = X4
+        self.X4 = conf.X4
         self.d_input_shape = self.G.output_size
         self.d_output_shape = self.d_input_shape - self.D.forward_shave
 
         # Input tensors
-        self.g_input = torch.FloatTensor(1, 1, conf.input_crop_size, conf.input_crop_size).cuda()
-        self.d_input = torch.FloatTensor(1, 1, self.d_input_shape, self.d_input_shape).cuda()
+        self.g_input = torch.FloatTensor(
+            1, 1, conf.input_crop_size, conf.input_crop_size
+        ).cuda()
+        self.d_input = torch.FloatTensor(
+            1, 1, self.d_input_shape, self.d_input_shape
+        ).cuda()
 
         # The kernel G is imitating
         self.curr_k = torch.FloatTensor(conf.G_kernel_size, conf.G_kernel_size).cuda()
 
         # Losses
-        self.GAN_loss_layer = loss.GANLoss(d_last_layer_size=self.d_output_shape).cuda()
-        self.bicubic_loss = loss.DownScaleLoss(scale_factor=conf.scale_factor).cuda()
-        self.sum2one_loss = loss.SumOfWeightsLoss().cuda()
-        self.boundaries_loss = loss.BoundariesLoss(k_size=conf.G_kernel_size).cuda()
-        self.centralized_loss = loss.CentralizedLoss(k_size=conf.G_kernel_size, scale_factor=conf.scale_factor).cuda()
-        self.sparse_loss = loss.SparsityLoss().cuda()
+        self.GAN_loss_layer = GANLoss(d_last_layer_size=self.d_output_shape).cuda()
+        self.bicubic_loss = DownScaleLoss(scale_factor=conf.scale_factor).cuda()
+        self.sum2one_loss = SumOfWeightsLoss().cuda()
+        self.boundaries_loss = BoundariesLoss(k_size=conf.G_kernel_size).cuda()
+        self.centralized_loss = CentralizedLoss(
+            k_size=conf.G_kernel_size, scale_factor=conf.scale_factor
+        ).cuda()
+        self.sparse_loss = SparsityLoss().cuda()
         self.loss_bicubic = 0
 
         # Define loss function
         self.criterionGAN = self.GAN_loss_layer.forward
 
         # Initialize networks weights
-        self.G.apply(networks.weights_init_G)
-        self.D.apply(networks.weights_init_D)
+        self.G.apply(weights_init_G)
+        self.D.apply(weights_init_D)
 
         # Optimizers
-        self.optimizer_G = torch.optim.Adam(self.G.parameters(), lr=conf.g_lr, betas=(conf.beta1, 0.999))
-        self.optimizer_D = torch.optim.Adam(self.D.parameters(), lr=conf.d_lr, betas=(conf.beta1, 0.999))
+        self.optimizer_G = torch.optim.Adam(
+            self.G.parameters(), lr=conf.g_lr, betas=(conf.beta1, 0.999)
+        )
+        self.optimizer_D = torch.optim.Adam(
+            self.D.parameters(), lr=conf.d_lr, betas=(conf.beta1, 0.999)
+        )
 
-        print('*' * 60 + '\nSTARTED KernelGAN on: \"%s\"...' % conf.input_image_path)
+        print("*" * 60 + '\nSTARTED KernelGAN on: "%s"...' % conf.input_image_path)
 
     # noinspection PyUnboundLocalVariable
     def calc_curr_k(self):
         """given a generator network, the function calculates the kernel it is imitating"""
-        delta = torch.Tensor([1.]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1).cuda()
+        delta = torch.Tensor([1.0]).unsqueeze(0).unsqueeze(-1).unsqueeze(-1).cuda()
         for ind, w in enumerate(self.G.parameters()):
-            curr_k = F.conv2d(delta, w, padding=self.conf.G_kernel_size - 1) if ind == 0 else F.conv2d(curr_k, w)
+            curr_k = (
+                F.conv2d(delta, w, padding=self.conf.G_kernel_size - 1)
+                if ind == 0
+                else F.conv2d(curr_k, w)
+            )
         self.curr_k = curr_k.squeeze().flip([0, 1])
 
     def train(self, g_input, d_input, input_image, stat_file):
@@ -104,15 +125,21 @@ class KernelGAN:
         # Calculate K which is equivalent to G
         self.calc_curr_k()
         # Calculate constraints
-        self.loss_bicubic = self.bicubic_loss.forward(g_input=self.g_input, g_output=g_pred)
+        self.loss_bicubic = self.bicubic_loss.forward(
+            g_input=self.g_input, g_output=g_pred
+        )
         loss_boundaries = self.boundaries_loss.forward(kernel=self.curr_k)
         loss_sum2one = self.sum2one_loss.forward(kernel=self.curr_k)
         loss_centralized = self.centralized_loss.forward(kernel=self.curr_k)
         loss_sparse = self.sparse_loss.forward(kernel=self.curr_k)
         # Apply constraints co-efficients
-        return self.loss_bicubic * self.lambda_bicubic + loss_sum2one * self.lambda_sum2one + \
-               loss_boundaries * self.lambda_boundaries + loss_centralized * self.lambda_centralized + \
-               loss_sparse * self.lambda_sparse
+        return (
+            self.loss_bicubic * self.lambda_bicubic
+            + loss_sum2one * self.lambda_sum2one
+            + loss_boundaries * self.lambda_boundaries
+            + loss_centralized * self.lambda_centralized
+            + loss_sparse * self.lambda_sparse
+        )
 
     def train_d(self):
         # Zeroize gradients
@@ -122,7 +149,9 @@ class KernelGAN:
         # Discriminator forward pass over fake example (generated by generator)
         # Note that generator result is detached so that gradients are not propagating back through generator
         g_output = self.G.forward(self.g_input)
-        d_pred_fake = self.D.forward((g_output + torch.randn_like(g_output) / 255.).detach())
+        d_pred_fake = self.D.forward(
+            (g_output + torch.randn_like(g_output) / 255.0).detach()
+        )
         # Calculate discriminator loss
         loss_d_fake = self.criterionGAN(d_pred_fake, is_d_input_real=False)
         loss_d_real = self.criterionGAN(d_pred_real, is_d_input_real=True)
@@ -135,7 +164,7 @@ class KernelGAN:
     def finish(self):
         final_kernel = post_process_k(self.curr_k, n=self.conf.n_filtering)
         save_final_kernel(final_kernel, self.conf)
-        print('KernelGAN estimation complete!')
+        print("KernelGAN estimation complete!")
         return final_kernel
 
     def stat_calculator_save(self, image, image_2, image_4):
@@ -147,11 +176,11 @@ class KernelGAN:
         stat_image["output_4x_mean"] = float(np.mean(image_4))
         stat_image["output_4x_std"] = float(np.std(image_4))
 
-        with open(self.conf.output_dir_path +"stats.json", "w") as sfile:
+        with open(self.conf.output_dir_path + "stats.json", "w") as sfile:
             json.dump(stat_image, sfile)
 
     def downscale(self, im, kernel, scale_factor, output_shape=None):
-        '''downscale function'''
+        """downscale function"""
         if output_shape is None:
             output_shape = np.array(im.shape[:-1]) // np.array(scale_factor)
             print(output_shape)
@@ -159,25 +188,35 @@ class KernelGAN:
         out_im = np.zeros_like(im)
         for channel in range(im.shape[-1]):
             out_im[:, :, channel] = filters.correlate(im[:, :, channel], kernel)
-        width = np.round(np.linspace(0, im.shape[0] - scale_factor, output_shape[0])).astype(int)[:, None]
-        height = np.round(np.linspace(0, im.shape[1]-scale_factor, output_shape[1])).astype(int)
+        width = np.round(
+            np.linspace(0, im.shape[0] - scale_factor, output_shape[0])
+        ).astype(int)[:, None]
+        height = np.round(
+            np.linspace(0, im.shape[1] - scale_factor, output_shape[1])
+        ).astype(int)
         # Then subsample and return
         return out_im[width, height, :]
 
     def draw_images(self, kernel_image, input_image, output_image, type):
-        self.figure_save(input_image, 'input'+type)
-        self.figure_save(kernel_image, 'kernel'+type)
-        self.figure_save(output_image, 'output'+type)
+        self.figure_save(input_image, "input" + type)
+        self.figure_save(kernel_image, "kernel" + type)
+        self.figure_save(output_image, "output" + type)
 
     def figure_save(self, image, type):
         figure = plt.figure()
-        if(len(image.shape)>2):
+        if len(image.shape) > 2:
             image = image[:, :, 0]
         m = np.mean(image)
         s = np.std(image)
-        plt.imsave(self.conf.output_dir_path +"/" + self.conf.img_name + type+'.png', image, cmap="gray", vmin = self.stat["min"], vmax = m+3*s)
-        #figure.savefig(self.conf.output_dir_path +"/" + self.conf.img_name + type+'.png')
+        plt.imsave(
+            self.conf.output_dir_path + "/" + self.conf.img_name + type + ".png",
+            image,
+            cmap="gray",
+            vmin=self.stat["min"],
+            vmax=m + 3 * s,
+        )
+        # figure.savefig(self.conf.output_dir_path +"/" + self.conf.img_name + type+'.png')
 
     def re_normalize(self, image):
-        image = (image*self.stat['std'])+self.stat['mean']
+        image = (image * self.stat["std"]) + self.stat["mean"]
         return image

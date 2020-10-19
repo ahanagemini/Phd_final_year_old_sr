@@ -25,7 +25,8 @@ from pathlib import Path
 import json
 from configs import Config
 
-def image_stat_processing(input_directory, output_directory, samples):
+
+def image_stat_processing(conf):
     """
 
     Parameters
@@ -38,8 +39,10 @@ def image_stat_processing(input_directory, output_directory, samples):
     -------
 
     """
+    conf.real_image = True
+    output_directory = Path(conf.output_dir_path)
     image_path_dict = {}
-    for image_path in input_directory.rglob("*.npz"):
+    for image_path in Path(conf.input_dir_path).rglob("*.npz"):
         image_parent = image_path.parent
         if image_parent not in image_path_dict.keys():
             image_path_dict[image_parent] = []
@@ -52,7 +55,11 @@ def image_stat_processing(input_directory, output_directory, samples):
         for image_file in image_path_dict[image_parent]:
             image_name = os.path.splitext(image_file.name)[0]
             image = loader(image_file)
-            kernel = train(conf, image, stats)
+            conf.image = image
+            conf.stats = stats
+            print(image)
+            print(stats)
+            kernel = train(conf)
             sample_list = []
             for _ in range(samples):
                 out_image = imresize(im=image, scale_factor=0.95, kernel=kernel)
@@ -75,6 +82,7 @@ if __name__ == "__main__":
     print(type(conf))
     conf.x = 1000
     from pprint import pprint
+
     pprint(conf)
     print("samples = ", conf.n_resize)
-    #image_stat_processing(conf)
+    image_stat_processing(conf)
