@@ -24,7 +24,7 @@ import os
 from pathlib import Path
 from docopt import docopt
 import json
-
+from configs import Config
 
 def image_stat_processing(input_directory, output_directory, samples):
     """
@@ -53,7 +53,7 @@ def image_stat_processing(input_directory, output_directory, samples):
         for image_file in image_path_dict[image_parent]:
             image_name = os.path.splitext(image_file.name)[0]
             image = loader(image_file)
-            kernel = train(image, stats)
+            kernel = train(conf, image, stats)
             sample_list = []
             for _ in range(samples):
                 out_image = imresize(im=image, scale_factor=0.95, kernel=kernel)
@@ -82,13 +82,9 @@ def process(p_args):
     -------
 
     """
-    input_directory = Path(p_args["--input-directory"])
-    output_directory = Path(p_args["--output-directory"])
-    samples = int(p_args["--samples"])
     image_stat_processing(input_directory, output_directory, samples)
 
 
 if __name__ == "__main__":
-    arguments = docopt(__doc__)
-    print(arguments)
-    process(arguments)
+    conf = Config().parse()
+    #image_stat_processing(conf)

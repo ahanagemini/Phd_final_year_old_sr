@@ -48,7 +48,9 @@ class Config:
 
     def parse(self, args=None):
         """Parse the configuration"""
+        print("Parsing now...")
         self.conf = self.parser.parse_args(args=args)
+        print("And here...")
         self.set_gpu_device()
         self.clean_file_name()
         self.set_output_directory()

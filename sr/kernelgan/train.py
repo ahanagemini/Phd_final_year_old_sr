@@ -1,13 +1,11 @@
 import tqdm
 
-from .configs import Config
 from .data import DataGenerator
 from .kernelGAN import KernelGAN
 from .learner import Learner
 
 
-def train(image, stats, X4=False):
-    conf = Config().parse()
+def train(conf, image, stats, X4=False):
     gan = KernelGAN(conf, X4)
     learner = Learner()
     data = DataGenerator(conf, image, stats, gan)
