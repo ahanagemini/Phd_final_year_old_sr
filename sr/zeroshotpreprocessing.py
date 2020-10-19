@@ -45,7 +45,7 @@ def image_stat_processing(input_directory, output_directory, samples):
         image_path_dict[image_parent].append(image)
 
     for _, image_parent in enumerate(image_path_dict):
-        stats = json.load(image_parent / "stats.json", "w")
+        stats = json.load(open(str(image_parent / "stats.json")))
         if not os.path.isdir(output_directory):
             os.makedirs(str(output_directory / image_parent))
         for image_file in image_path_dict[image_parent]:

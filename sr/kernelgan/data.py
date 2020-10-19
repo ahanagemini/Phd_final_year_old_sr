@@ -2,9 +2,9 @@ import numpy as np
 from torch.utils.data import Dataset
 import torch
 
-from kernalgan.imresize import imresize
+from kernelgan.imresize import imresize
 import json
-from kernalgan.util import read_image, create_gradient_map, im2tensor, create_probability_map, nn_interpolation, swap_axis
+from kernelgan.util import read_image, create_gradient_map, im2tensor, create_probability_map, nn_interpolation, swap_axis
 
 
 class DataGenerator(Dataset):

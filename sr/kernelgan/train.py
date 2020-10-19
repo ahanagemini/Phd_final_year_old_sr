@@ -1,9 +1,9 @@
 import tqdm
 
-from kernalgan.configs import Config
-from kernalgan.data import DataGenerator
-from kernalgan.kernelGAN import KernelGAN
-from kernalgan.learner import Learner
+from kernelgan.configs import Config
+from kernelgan.data import DataGenerator
+from kernelgan.kernelGAN import KernelGAN
+from kernelgan.learner import Learner
 
 
 def train(image, stats, X4=False):

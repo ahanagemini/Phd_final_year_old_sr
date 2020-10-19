@@ -1,11 +1,11 @@
 import json
 
 import torch
-import kernalgan.loss
-import kernalgan.networks
+import kernelgan.loss
+import kernelgan.networks
 import torch.nn.functional as F
 from torchsummary import summary
-from kernalgan.util import save_final_kernel,  post_process_k, read_image
+from kernelgan.util import save_final_kernel,  post_process_k, read_image
 from scipy.ndimage import filters
 import numpy as np
 import matplotlib.pyplot as plt

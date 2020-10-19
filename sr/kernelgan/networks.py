@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from kernalgan.util import swap_axis
+from kernelgan.util import swap_axis
 
 
 class Generator(nn.Module):
