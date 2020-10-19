@@ -5,12 +5,15 @@
 
 This will calulate the kernel using KernelGAN and using this kernel will calculate patches and all these data will be
 saved in the output directory
+
 Arguments:
-  input-directory: input files
-  output-directory: output location
-  samples: no. of scales generated for the input using a reduction factor of 5%
+  --input-directory=input_path   : input files
+  --output-directory=output_path : output location
+  --samples=samples              : no. of scales generated for the input using a reduction factor of 5%
+
 Options:
   -h --help -h
+
 """
 
 from cutter import loader
@@ -87,4 +90,5 @@ def process(p_args):
 
 if __name__ == "__main__":
     arguments = docopt(__doc__)
+    print(arguments)
     process(arguments)
