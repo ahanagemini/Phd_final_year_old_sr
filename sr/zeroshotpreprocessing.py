@@ -22,7 +22,6 @@ from kernelgan import train
 import numpy as np
 import os
 from pathlib import Path
-from docopt import docopt
 import json
 from configs import Config
 
@@ -69,20 +68,6 @@ def image_stat_processing(input_directory, output_directory, samples):
             )
         with open(str(output_directory / image_parent / "stats.json"), "w") as sfile:
             json.dump(stats, sfile)
-
-
-def process(p_args):
-    """
-
-    Parameters
-    ----------
-    param arguments: this contains arguments taken from terminal
-
-    Returns
-    -------
-
-    """
-    image_stat_processing(input_directory, output_directory, samples)
 
 
 if __name__ == "__main__":

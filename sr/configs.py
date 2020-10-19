@@ -12,6 +12,7 @@ class Config:
         # Paths
         self.parser.add_argument('--img_name', default='image1', help='image name for saving purposes')
         self.parser.add_argument('--input_image_path', default=os.path.dirname(__file__) + '/training_data/input.png', help='path to one specific image file')
+        self.parser.add_argument('--input_dir_path', default=os.path.dirname(__file__) + '/input', help='all inputs are in this path')
         self.parser.add_argument('--output_dir_path', default=os.path.dirname(__file__) + '/results', help='results path')
         self.parser.add_argument('--stat_image_path', default=os.path.dirname(__file__) + '/training_data/stats.json', help='path to the stat file of image')
 
