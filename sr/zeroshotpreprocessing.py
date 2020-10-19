@@ -84,7 +84,7 @@ def process(p_args):
     """
     input_directory = Path(p_args["--input-directory"])
     output_directory = Path(p_args["--output-directory"])
-    samples = Path(p_args["--samples"])
+    samples = int(p_args["--samples"])
     image_stat_processing(input_directory, output_directory, samples)
 
 
