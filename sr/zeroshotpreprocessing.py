@@ -24,6 +24,7 @@ import os
 from pathlib import Path
 import json
 from configs import Config
+from numpy import newaxis
 
 
 def image_stat_processing(conf):
@@ -55,21 +56,24 @@ def image_stat_processing(conf):
         for image_file in image_path_dict[image_parent]:
             image_name = os.path.splitext(image_file.name)[0]
             image = loader(image_file)
+            image = image.reshape( (image.shape[0], image.shape[1], 1) )
             conf.image = image.reshape( (image.shape[0], image.shape[1], 1) )
             conf.stats = stats
             print(image, "Sum = ", sum(image))
             print(stats)
             kernel = train(conf)
             sample_list = []
-            for _ in range(samples):
+
+            for _ in range(conf.n_resize):
                 out_image = imresize(im=image, scale_factor=0.95, kernel=kernel)
                 sample_list.append(out_image)
                 image = out_image
             for i, image_patch in enumerate(sample_list):
                 np.savez_compressed(
-                    str(output_directory / image_parent / image_name + str(i)),
+                    str(output_directory / image_parent.name / image_name) + str(i),
                     image_patch,
                 )
+            print(str(output_directory) +"\t" +str(image_parent))
             np.savez_compressed(
                 str(output_directory / image_parent / "kernel"), image_patch
             )

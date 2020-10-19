@@ -80,7 +80,7 @@ class KernelGAN:
             self.D.parameters(), lr=conf.d_lr, betas=(conf.beta1, 0.999)
         )
 
-        print("*" * 60 + '\nSTARTED KernelGAN on: "%s"...' % conf.input_image_path)
+        print("Started Kernel Gan")
 
     # noinspection PyUnboundLocalVariable
     def calc_curr_k(self):
