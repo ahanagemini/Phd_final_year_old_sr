@@ -1,1 +1,1 @@
-from kernelgal import train
+from kernelgan import train
