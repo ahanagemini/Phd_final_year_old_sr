@@ -8,7 +8,7 @@ saved in the output directory
 Arguments:
   input-directory: input files
   output-directory: output location
-  samples: no. samples required with scale factor of 5%
+  samples: no. of scales generated for the input using a reduction factor of 5%
 Options:
   -h --help -h
 """
