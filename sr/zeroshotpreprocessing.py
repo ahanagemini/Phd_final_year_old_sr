@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-
 """Usage:   zeroshotpreprocessing.py --input-directory=input_path --output-directory=output_path --samples=samples
             zeroshotpreprocessing.py --help | -help | -h
 

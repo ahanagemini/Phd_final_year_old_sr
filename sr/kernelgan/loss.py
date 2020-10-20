@@ -23,7 +23,11 @@ class GANLoss(nn.Module):
         # Determine label map according to whether current input to discriminator is real or fake
         label_tensor = self.label_tensor_real if is_d_input_real else self.label_tensor_fake
         # Compute the loss
-        return self.loss(d_last_layer, label_tensor)
+        #Works
+        #print("GANLoss sizes :", d_last_layer.shape, label_tensor.shape)
+        #GANLoss sizes : torch.Size([1, 1, 20, 20]) torch.Size([1, 1, 20, 20])
+        lossval = self.loss(d_last_layer, label_tensor)
+        return lossval
 
 
 class DownScaleLoss(nn.Module):
@@ -57,6 +61,9 @@ class SumOfWeightsLoss(nn.Module):
         self.loss = nn.L1Loss()
 
     def forward(self, kernel):
+        #TODO
+        # torch.Size([1]) torch.Size([])
+        #print("Sum of weights loss sizes : ", torch.ones(1).to(kernel.device).shape, torch.sum(kernel).shape)
         return self.loss(torch.ones(1).to(kernel.device), torch.sum(kernel))
 
 
@@ -73,8 +80,12 @@ class CentralizedLoss(nn.Module):
     def forward(self, kernel):
         """Return the loss over the distance of center of mass from kernel center """
         r_sum, c_sum = torch.sum(kernel, dim=1).reshape(1, -1), torch.sum(kernel, dim=0).reshape(1, -1)
-        return self.loss(torch.stack((torch.matmul(r_sum, self.indices) / torch.sum(kernel),
-                                      torch.matmul(c_sum, self.indices) / torch.sum(kernel))), self.center)
+        com = torch.stack((torch.matmul(r_sum, self.indices) / torch.sum(kernel),
+                                      torch.matmul(c_sum, self.indices) / torch.sum(kernel)))
+        # TODO
+        # torch.Size([2, 1]) torch.Size([2])
+        # print("Centralized loss shapes : ", com.shape, self.center.shape)
+        return self.loss(com, self.center)
 
 
 class BoundariesLoss(nn.Module):
@@ -87,6 +98,10 @@ class BoundariesLoss(nn.Module):
         self.loss = nn.L1Loss()
 
     def forward(self, kernel):
+        #TODO
+        # torch.Size([1, 1, 13, 13]) torch.Size([13])
+        #print("Boundaries Loss sizes : ", (kernel * self.mask).shape, self.zero_label.shape)
+        #print("Sum Boundaries loss zero_label:", sum(self.zero_label)) --> Looks 0.tensor(0., device='cuda:0')
         return self.loss(kernel * self.mask, self.zero_label)
 
 
@@ -98,4 +113,7 @@ class SparsityLoss(nn.Module):
         self.loss = nn.L1Loss()
 
     def forward(self, kernel):
+        # Works
+        # Sparsity loss = torch.Size([13, 13]) torch.Size([13, 13])
+        # print("Sparsity loss =", torch.abs(kernel).shape, torch.zeros_like(kernel).shape)
         return self.loss(torch.abs(kernel) ** self.power, torch.zeros_like(kernel))
