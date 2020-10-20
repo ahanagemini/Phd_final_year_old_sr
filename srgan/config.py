@@ -14,7 +14,7 @@ config.TRAIN.num_patches = 1
 config.TRAIN.n_epoch_init = 300
     # config.TRAIN.lr_decay_init = 0.1
     # config.TRAIN.decay_every_init = int(config.TRAIN.n_epoch_init / 2)
-config.TRAIN.img_path = f'/home/ahana/research/DWICutter/train/dwi'
+config.TRAIN.img_path = f'/home/ahana/DWICutter/train/dwi'
 
 ## adversarial learning (SRGAN)
 config.TRAIN.n_epoch = 2000
@@ -22,17 +22,17 @@ config.TRAIN.lr_decay = 0.1
 config.TRAIN.decay_every = int(config.TRAIN.n_epoch / 2)
 
 ## train set location
-config.TRAIN.hr_img_path = f'/home/ahana/research/DWICutter/train/dwi/HR'
-config.TRAIN.lr_img_path = f'/home/ahana/research/DWICutter/train/dwi/LR'
+config.TRAIN.hr_img_path = f'/home/ahana/DWICutter/train/dwi/HR'
+config.TRAIN.lr_img_path = f'/home/ahana/DWICutter/train/dwi/LR'
 
 config.VALID = edict()
 ## test set location
-config.VALID.hr_img_path = f'/home/ahana/research/DWICutter/valid/dwi/HR'
-config.VALID.lr_img_path = f'/home/ahana/research/DWICutter/valid/dwi/LR'
+config.VALID.hr_img_path = f'/home/ahana/DWICutter/valid/dwi/HR'
+config.VALID.lr_img_path = f'/home/ahana/DWICutter/valid/dwi/LR'
 
 config.TEST = edict()
-config.TEST.hr_img_path = f'/home/ahana/research/DWICutter/test/dwi/HR'
-config.TEST.lr_img_path = f'/home/ahana/research/DWICutter/test/dwi/LR'
+config.TEST.hr_img_path = f'/home/ahana/DWICutter/test/dwi/HR'
+config.TEST.lr_img_path = f'/home/ahana/DWICutter/test/dwi/LR'
 
 def log_config(filename, cfg):
     with open(filename, 'w') as f:

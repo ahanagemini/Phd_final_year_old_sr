@@ -31,8 +31,10 @@ checkpoint_dir = "models"
 tl.files.exists_or_mkdir(checkpoint_dir)
 f = open(config.TRAIN.lr_img_path + '/stats.json')
 stats = json.load(f)
-max_val = float(stats["max"])
-
+max_lr_val = float(stats["max"])
+f = open(config.TRAIN.hr_img_path + '/stats.json')
+stats = json.load(f)
+max_hr_val = float(stats["max"])
 def get_train_data():
     # load dataset
     train_hr_img_list = sorted(tl.files.load_file_list(path=config.TRAIN.hr_img_path, regx='.*.npz', printable=False))#[0:20]
@@ -46,6 +48,7 @@ def get_train_data():
     def generator_train():
         for index, hr in enumerate(train_hr_imgs):
             lr = train_lr_imgs[index]
+            hr = tf.cast(hr, tf.float64)
             hr = tf.expand_dims(hr, 2)
             lr = tf.expand_dims(lr, 2)
             for i in range(num_patches):
@@ -53,7 +56,7 @@ def get_train_data():
                 yield img
     def _map_fn_train(img):
         patch = tf.image.random_crop(img, [64, 64, 2])
-        patch = patch / (max_val / 2.)
+        patch = patch / (max_lr_val / 2.)
         patch = patch - 1.
         patch = tf.image.random_flip_left_right(patch)
         hr_patch = tf.slice(patch, [0, 0, 0], [64, 64, 1])
@@ -68,8 +71,6 @@ def get_train_data():
 
 def train():
     G = get_G((batch_size, 64, 64, 1))
-    f = open(config.TRAIN.lr_img_path + '/stats.json')
-    stats = json.load(f)
 
     lr_v = tf.Variable(lr_init)
     g_optimizer_init = tf.optimizers.Adam(lr_v, beta_1=beta1)
@@ -77,12 +78,12 @@ def train():
     G.train()
 
     train_ds, num_train_imgs = get_train_data()
-    valid_hr_img_list = sorted(tl.files.load_file_list(path=config.TEST.hr_img_path, regx='.*.npz', printable=False))
-    valid_lr_img_list = sorted(tl.files.load_file_list(path=config.TEST.lr_img_path, regx='.*.npz', printable=False))
+    valid_hr_img_list = sorted(tl.files.load_file_list(path=config.VALID.hr_img_path, regx='.*.npz', printable=False))
+    valid_lr_img_list = sorted(tl.files.load_file_list(path=config.VALID.lr_img_path, regx='.*.npz', printable=False))
 
-    valid_lr_imgs = tl.vis.read_images(valid_lr_img_list, path=config.TEST.lr_img_path, n_threads=32)
-    valid_hr_imgs = tl.vis.read_images(valid_hr_img_list, path=config.TEST.hr_img_path, n_threads=32)
-    best_psnr = 0.0
+    valid_lr_imgs = tl.vis.read_images(valid_lr_img_list, path=config.VALID.lr_img_path, n_threads=32)
+    valid_hr_imgs = tl.vis.read_images(valid_hr_img_list, path=config.VALID.hr_img_path, n_threads=32)
+    best_loss = float('inf')
     ## initialize learning (G)
     n_step_epoch = round((num_patches * num_train_imgs) // batch_size)
     for epoch in range(n_epoch_init):
@@ -102,59 +103,64 @@ def train():
                 step_time = time.time()
         if (epoch != 0) and (epoch % 10 == 0):
             G.save_weights(os.path.join(checkpoint_dir, f'srresnet_{epoch}.h5'))
-        psnr = evaluate(valid_hr_img_list, valid_lr_img_list, G)
-        if psnr > best_psnr:
-            best_psnr = psnr
+        loss = evaluate(valid_hr_imgs, valid_lr_imgs, G)
+        if loss < best_loss:
+            best_loss = loss
             G.save_weights(os.path.join(checkpoint_dir, f'srresnet_best.h5'))
 
     G.save_weights(os.path.join(checkpoint_dir, f'srresnet_final.h5'))
 
-def evaluate(test_hr_img_list=None, test_lr_img_list=None, G=None, save_img=False):
-    if test_hr_img_list is None:
+def evaluate(test_hr_imgs=None, test_lr_imgs=None, G=None, save_img=False):
+    if test_hr_imgs is None:
         test_hr_img_list = sorted(tl.files.load_file_list(path=config.TEST.hr_img_path, regx='.*.npz', printable=False))
         test_lr_img_list = sorted(tl.files.load_file_list(path=config.TEST.lr_img_path, regx='.*.npz', printable=False))
 
-    test_lr_imgs = tl.vis.read_images(test_lr_img_list, path=config.TEST.lr_img_path, n_threads=32)
-    test_hr_imgs = tl.vis.read_images(test_hr_img_list, path=config.TEST.hr_img_path, n_threads=32)
+        test_lr_imgs = tl.vis.read_images(test_lr_img_list, path=config.TEST.lr_img_path, n_threads=32)
+        test_hr_imgs = tl.vis.read_images(test_hr_img_list, path=config.TEST.hr_img_path, n_threads=32)
 
     if G is None:
         G = get_G([1, None, None, 1])
-        G.load_weights(os.path.join(checkpoint_dir, 'srresnet_final.h5'))
+        G.load_weights(os.path.join(checkpoint_dir, 'srresnet_best.h5'))
     G.eval()
     tot_psnr = 0.0
     tot_ssim = 0.0
+    tot_L1 = 0.0
+    print(max_lr_val, max_hr_val)
     for i in range(len(test_lr_imgs)):
         test_lr_img = test_lr_imgs[i]
         test_hr_img = test_hr_imgs[i]
         test_lr_img = tf.expand_dims(test_lr_img, 2)
         test_hr_img = tf.expand_dims(test_hr_img, 2)
-        tl.vis.save_image(np.clip(test_lr_img, 0, max_val).astype(np.uint16), os.path.join(save_dir, f'test_{i}_lr.tiff'))
+        tl.vis.save_image(np.clip(test_lr_img, 0, max_hr_val).astype(np.uint16), os.path.join(save_dir, f'test_{i}_lr.tiff'))
         size = [test_lr_img.shape[0], test_lr_img.shape[1]]
         test_lr_img = np.asarray(test_lr_img, dtype=np.float32)
-        test_lr_img = (test_lr_img / (max_val /2.)) - 1
+        test_lr_img = (test_lr_img / (max_lr_val /2.)) - 1
         test_lr_img = test_lr_img[np.newaxis,:,:,:]
         out = G(test_lr_img).numpy()
         # print("LR size: %s /  generated HR size: %s" % (test_lr_img.shape, out.shape))  # LR size: (339, 510, 3) /  gen HR size: (1, 1356, 2040, 3)
         # print("[*] save images")
         sr_img = out[0] + 1
-        sr_img = sr_img * (max_val / 2.)
-        sr_img = np.clip(sr_img, 0, max_val)
+        sr_img = sr_img * (max_lr_val / 2.)
+        sr_img = np.clip(sr_img, 0, max_hr_val)
         sr_img = sr_img.astype(np.uint16)
         size = sr_img.shape[1]
         if save_img:
             tl.vis.save_image(sr_img, os.path.join(save_dir, f'test_{i}_sr.tiff'))
             tl.vis.save_image(test_hr_img, os.path.join(save_dir, f'test_{i}_hr.tiff'))
+        L1 = np.mean(np.abs(test_hr_img.numpy() - sr_img))
         psnr = metrics.peak_signal_noise_ratio(test_hr_img.numpy().reshape(size, -1).astype(np.float32),
-                                               sr_img.reshape(size, -1).astype(np.float32), data_range=max_val)
+                                               sr_img.reshape(size, -1).astype(np.float32), data_range=max_hr_val)
         ssim = metrics.structural_similarity(test_hr_img.numpy().reshape(size, -1).astype(np.float32),
                                              sr_img.reshape(size, -1).astype(np.float32),
-                                             gaussian_weights=True, data_range=max_val)
+                                             gaussian_weights=True, data_range=max_hr_val)
         tot_psnr = tot_psnr + psnr
         tot_ssim = tot_ssim + ssim
-        
+        tot_L1 = tot_L1 + L1
+
     print("\nAvg PSNR: {:.6f}".format(tot_psnr / len(test_lr_imgs)))
     print("\nAvg SSIM: {:.6f}".format(tot_ssim / len(test_lr_imgs)))
-    return tot_psnr
+    print("\nAvg L1: {:.6f}".format(tot_L1 / len(test_lr_imgs)))
+    return tot_L1
 
 if __name__ == '__main__':
     import argparse
@@ -170,7 +176,7 @@ if __name__ == '__main__':
         train()
         evaluate(save_img=True)
     elif tl.global_flag['mode'] == 'evaluate':
-        evaluate()
+        evaluate(save_img=True)
     else:
         raise Exception("Unknow --mode")
 
