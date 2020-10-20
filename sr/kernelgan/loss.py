@@ -50,6 +50,9 @@ class DownScaleLoss(nn.Module):
     def forward(self, g_input, g_output):
         downscaled = resize_tensor_w_kernel(im_t=g_input, k=self.bicubic_kernel, sf=self.scale_factor)
         # Shave the downscaled to fit g_output
+        # Works!
+        #print("Downscale loss = ", g_output.shape, shave_a2b(downscaled, g_output).shape)
+        # Downscale loss =  torch.Size([1, 1, 26, 26]) torch.Size([1, 1, 26, 26])
         return self.loss(g_output, shave_a2b(downscaled, g_output))
 
 
@@ -64,7 +67,9 @@ class SumOfWeightsLoss(nn.Module):
         #TODO
         # torch.Size([1]) torch.Size([])
         #print("Sum of weights loss sizes : ", torch.ones(1).to(kernel.device).shape, torch.sum(kernel).shape)
-        return self.loss(torch.ones(1).to(kernel.device), torch.sum(kernel))
+        #print("Sum2one left", torch.ones(1).to(kernel.device),torch.ones(1).to(kernel.device).shape )
+        #print("Sum2one rt. ", torch.sum(kernel).view(1), torch.sum(kernel).view(1).shape)
+        return self.loss(torch.ones(1).to(kernel.device), torch.sum(kernel).view(1))
 
 
 class CentralizedLoss(nn.Module):
@@ -84,8 +89,9 @@ class CentralizedLoss(nn.Module):
                                       torch.matmul(c_sum, self.indices) / torch.sum(kernel)))
         # TODO
         # torch.Size([2, 1]) torch.Size([2])
-        # print("Centralized loss shapes : ", com.shape, self.center.shape)
-        return self.loss(com, self.center)
+        # print("Centralized loss com/center : ", com.view(2), self.center)
+        # print("Centralized loss shapes : ", com.view(2).shape, self.center.shape)
+        return self.loss(com.view(2), self.center)
 
 
 class BoundariesLoss(nn.Module):
