@@ -81,7 +81,7 @@ def create_gradient_map(im, window=5, percent=.97):
     # Calculate gradients
     output = rgb2gray(im)
     x = np.zeros(output.shape[0:2], np.float32)
-    print("Gradient func: Image, x, output", im.shape, x.shape, output.shape)
+    #print("Gradient func: Image, x, output", im.shape, x.shape, output.shape)
     x[:,:] = output[:,:,0]
     gx, gy = np.gradient(x)
     # Calculate gradient magnitude

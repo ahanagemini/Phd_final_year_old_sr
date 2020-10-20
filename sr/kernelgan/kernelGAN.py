@@ -34,8 +34,10 @@ class KernelGAN:
 
         # Define the GAN
         self.G = Generator(conf).cuda()
+        print("Generator Summary...")
         summary(self.G, (1, 256, 256), batch_size=1, device="cuda")
         self.D = Discriminator(conf).cuda()
+        print("Discriminator Summary...")
         summary(self.D, (1, 256, 256), batch_size=1, device="cuda")
 
         # Calculate D's input & output shape according to the shaving done by the networks
