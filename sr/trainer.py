@@ -129,7 +129,7 @@ def training(training_generator, validation_generator, device, log_dir,
     elif architecture == "edsr_16_256":
         model = EDSR(n_resblocks=16, n_feats=256, scale=1, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_32_256":
-        model = EDSR(n_resblocks=32, n_feats=256, scale=1)
+        model = EDSR(n_resblocks=32, n_feats=256, scale=1, aspp=aspp, dilation=dilation, act=act)
     model.to(device)
     summary(model, (1, 256, 256), batch_size=1, device="cuda")
     max_epochs = num_epochs
