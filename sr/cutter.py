@@ -69,7 +69,8 @@ def loader(ifile):
         image = np.load(ifile)
     elif fileExt in niftiPaths:
         img = nib.load(ifile)
-        image = img.get_data()
+        image = img.get_fdata()
+        #image = image.astype(np.float64)
 
     return image
 

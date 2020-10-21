@@ -13,6 +13,7 @@ from torchvision.transforms import Compose
 import scipy.ndimage
 import numpy as np
 from cutter import loader
+from skimage.transform import resize
 
 class PairedDataset(Dataset):
     """Dataset class for loading large amount of image arrays data"""
@@ -95,6 +96,67 @@ class PairedDataset(Dataset):
             sample = transforms(sample)
         return sample
 
+class AEDataset(Dataset):
+    """Dataset class for loading large amount of image arrays data"""
+
+    def __init__(self, root_dir, lognorm=False, test=False):
+        """
+        Args:
+            root_dir (string): Directory with all the images.
+            lognorm: True if we ar eusing log normalization
+            test: True only for test dataset
+            hr: Input is hr image, lr is computed, then True
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+        self.root_dir = Path(root_dir).expanduser().resolve().absolute()
+        self.datalist = list(self.root_dir.rglob("*.npz"))
+        self.lognorm = lognorm
+        self.test = test
+        self.statlist = []
+        for fname in self.datalist:
+            file_path = Path(fname)
+            stat_file = json.load(open(str(file_path.parent / "stats.json")))
+            self.statlist.append(stat_file)
+        print("Total number of data elements found = ", len(self.datalist))
+
+    def __len__(self):
+        return len(self.datalist)
+
+    def __getitem__(self, idx):
+        img_name = Path(self.datalist[idx])
+        filename = os.path.basename(img_name)
+        filename = filename.split('.')[0]
+        stats = self.statlist[idx]
+        image = loader(img_name)
+        #image = image.astype(np.int16)
+        # image = scipy.ndimage.zoom(image, 0.25)
+        image = resize(image, (64, 64), order=3, preserve_range=True)
+        image_unorm = image.copy()
+        if self.lognorm:
+            image_sign = np.sign(image)
+            image = image_sign * np.log(np.abs(image) + 1.0)
+            stats = {}
+            stats["mean"] = np.mean(image)
+            stats["std"] = np.std(image)
+
+        if stats["std"] <= 0.001:
+            stats["std"] = 1
+        # AE will be used for dimension reduction, so we want reconstruction,
+        # LR or dimension reduced HR is both input and target
+        # For training and validation normalization input and target
+        # For testing, normalize only the input
+        image = Normalize()(image, stats)
+        if self.test:
+            sample = {"lr": image, "hr": image_unorm, "lr_un": image_unorm,
+                      "stats": stats, "file": filename}
+        else:
+            sample = {"lr": image, "hr": image, "lr_un": image_unorm,
+                      "stats": stats, "file": filename}
+        transforms = Compose([Reshape(), ToFloatTensor()])
+        sample = transforms(sample)
+        return sample
+
 
 class SrDataset(Dataset):
     """Dataset class for loading large amount of image arrays data"""
@@ -157,6 +219,7 @@ class SrDataset(Dataset):
             for i, trans in enumerate([transforms]):
                 sample = trans(sample)
         else:
+            lr_unorm = lr_image.copy()
             if self.lognorm:
                 stats = {}
                 image_sign = np.sign(lr_image)
@@ -165,7 +228,6 @@ class SrDataset(Dataset):
                 stats["std"] = np.std(lr_image)
             if stats["std"] <= 0.001:
                 stats["std"] = 1
-            lr_unorm = lr_image.copy()
             lr_image = Normalize()(lr_image, stats)
             sample = {"lr": lr_image, "lr_un": lr_unorm, "hr": hr_image, "stats": stats, "file": filename}
             transforms = Compose(

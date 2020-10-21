@@ -35,25 +35,26 @@ from torchsummary import summary
 from docopt import docopt
 
 import numpy as np
-import tifffile
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from unet import UNET
 from edsr import EDSR
+from autoencoder import AE
 from dataset import SrDataset, PairedDataset
+from dataset import AEDataset
 from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR
 from logger import Logger
 
 BATCH_SIZE = {"unet": 16, "axial": 16, "edsr_16_64": 8, "edsr_8_256": 16,
-        "edsr_16_256": 8, "edsr_32_256": 8}
-LR = {"unet": 0.00005, "axial": 0.0005, "edsr_16_64": 0.0005,
-        "edsr_8_256": 0.0002,  "edsr_16_256": 0.0001, "edsr_32_256": 0.0001}
+              "edsr_16_256": 8, "edsr_32_256": 16, "AE": 16}
+LR = {"unet": 0.00005, "axial": 0.0005, "edsr_16_64": 0.0005, "AE": 0.0001, 
+      "edsr_8_256": 0.0002, "edsr_16_256": 0.0001, "edsr_32_256": 0.0001}
 
 def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
 
-def create_dataset(path, lognorm=False):
+def create_dataset(path, architecture, lognorm=False):
     """
 
     Parameters
@@ -66,8 +67,9 @@ def create_dataset(path, lognorm=False):
     Loaded dataset
 
     """
-
-    if set(os.listdir(path)) == set(["LR", "HR"]):
+    if architecture == "AE":
+        return AEDataset(path, lognorm=lognorm)
+    elif set(os.listdir(path)) == set(["LR", "HR"]):
         return PairedDataset(path, lognorm=lognorm)
     else:
         return SrDataset(path, lognorm=lognorm)
@@ -122,6 +124,8 @@ def training(training_generator, validation_generator, device, log_dir,
         model = UNET(in_channels=1, out_channels=1, init_features=32)
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
+    elif architecture == "AE":
+        model = AE(num_channels=1)
     elif architecture == "edsr_16_64":
         model = EDSR(n_resblocks=16, n_feats=64, scale=1, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_8_256":
@@ -137,13 +141,13 @@ def training(training_generator, validation_generator, device, log_dir,
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     # learning rate scheduler
-    if architecture == "edsr":
+    if architecture == "edsr_16_64":
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
     best_valid_loss = float("inf")
     logger = Logger(str(log_dir))
     step = 0
-    totiter = sum(1 for x in training_generator)
-    valiter = sum(1 for x in validation_generator)
+    totiter = len(training_generator)
+    valiter = len(validation_generator)
     # TODO: Remove after debugging is done
     if debug_pics:
         input_save_path = Path("input_pics").resolve()
@@ -180,15 +184,18 @@ def training(training_generator, validation_generator, device, log_dir,
 
                     save_plots = np.hstack([x_rescale.reshape(x_rescale.shape[1], -1), y_rescale.reshape(y_rescale.shape[1], -1)])
                     save_plots = np.clip(save_plots, stat["min"][i].numpy(), stat["max"][i].numpy())
-                    vmax = stat["mean"][i].numpy() + 3 * stat["std"][i].numpy()
-                    vmin = stat["min"][i].numpy()
+                    #vmax = stat["max"][i].numpy()
+                    #vmin = stat["min"][i].numpy()
                     filename = os.path.join(f"{input_save_path}/{filename}.tiff")
-                    plt.imsave(filename, save_plots, vmin=vmin, vmax=vmax, cmap='gray')
+                    plt.imsave(filename, save_plots, cmap='gray')
             
             optimizer.zero_grad()
             with torch.autograd.set_detect_anomaly(True):
                 with torch.set_grad_enabled(True):
-                    y_pred = model(x_train)
+                    if architecture == "AE":
+                        encoded, y_pred = model(x_train)
+                    else:
+                        y_pred = model(x_train)
                     loss_train = criterion(y_pred, y_train)
                     train_loss = train_loss + (
                         (1 / (batch_idx + 1)) * (loss_train.data - train_loss)
@@ -205,7 +212,7 @@ def training(training_generator, validation_generator, device, log_dir,
         torch.cuda.empty_cache()
 
         # Main validation loop for this epoch
-        if architecture == "edsr":
+        if architecture == "edsr_16_64":
             scheduler.factor = 1 + (epoch / max_epochs) ** 0.9
         with torch.no_grad():
             loss_valid_list = []
@@ -216,14 +223,17 @@ def training(training_generator, validation_generator, device, log_dir,
                 y_valid = data["hr"]
 
                 x_valid, y_valid = x_valid.to(device), y_valid.to(device)
-                y_pred = model(x_valid)
+                if architecture == "AE":
+                    encoded, y_pred = model(x_valid)
+                else:
+                    y_pred = model(x_valid)
                 loss_valid = criterion(y_pred, y_valid)
                 loss_valid_list.append(loss_valid.item())
                 valid_loss = valid_loss + (
                     (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
                 )
         
-        if architecture == "edsr":
+        if architecture == "edsr_16_64":
             # calling scheduler based on valid loss
             scheduler.step(valid_loss)
             # print(optimizer.param_groups[0]['lr'])
@@ -296,10 +306,10 @@ def process(arguments):
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    training_set = create_dataset(train_path, lognorm=lognorm)
+    training_set = create_dataset(train_path, architecture, lognorm=lognorm)
     training_generator = torch.utils.data.DataLoader(training_set, **parameters_train)
 
-    validation_set = create_dataset(valid_path, lognorm=lognorm)
+    validation_set = create_dataset(valid_path, architecture, lognorm=lognorm)
     validation_generator = torch.utils.data.DataLoader(validation_set, **parameters_val)
     training(training_generator, validation_generator, device, log_dir,
              architecture, num_epochs, debug_pics, aspp, dilation, act)

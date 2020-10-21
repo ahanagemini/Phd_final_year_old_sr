@@ -24,9 +24,12 @@ import os
 from pathlib import Path
 import shutil
 import torch
+import csv
 
 import tifffile
 from dataset import SrDataset, PairedDataset
+from dataset import AEDataset
+
 from docopt import docopt
 
 import numpy as np
@@ -36,6 +39,7 @@ from skimage import metrics
 from unet import UNET
 from axial_bicubic import AxialNet
 from edsr import EDSR
+from autoencoder import AE
 from tqdm import tqdm
 
 from PIL import Image, ImageFont, ImageDraw
@@ -67,7 +71,7 @@ def writetext(imgfile, e_sr=None, e_lr=None):
     img.save("/tmp/test.png")
     os.system("mv /tmp/test.png " + imgfile)
 
-def create_dataset(path, lognorm=False, test=True, hr=True):
+def create_dataset(path, architecture, lognorm=False, test=True, hr=True):
     """
 
     Parameters
@@ -80,8 +84,9 @@ def create_dataset(path, lognorm=False, test=True, hr=True):
     Loaded dataset
 
     """
-
-    if set(os.listdir(path)) == set(["LR", "HR"]):
+    if architecture == "AE":
+        return AEDataset(path, lognorm=lognorm, test=test)
+    elif set(os.listdir(path)) == set(["LR", "HR"]):
         return PairedDataset(path, lognorm=lognorm, test=test)
     else:
         return SrDataset(path, lognorm=lognorm, test=test, hr=hr)
@@ -100,11 +105,14 @@ def evaluate(args):
     parameters = {"batch_size": 1, "shuffle": False, "num_workers": 6}
     use_cuda = torch.cuda.is_available()
     lognorm = args["--lognorm"]
+    architecture = args["--architecture"] 
     active_learning = args["--active"]
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    test_set = create_dataset(args["--input"], lognorm=args["--lognorm"], test=True, hr=args["hr"])
+    test_set = create_dataset(args["--input"], architecture,
+                              lognorm=args["--lognorm"],
+                              test=True, hr=args["hr"])
     test_generator = torch.utils.data.DataLoader(test_set, **parameters)
     dilation = args["--dilation"]
     aspp = args["--aspp"]
@@ -114,6 +122,8 @@ def evaluate(args):
         model = UNET(in_channels=1, out_channels=1, init_features=32)
     elif args["--architecture"] == 'axial':
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
+    elif architecture == "AE":
+        model = AE(num_channels=1)
     elif  args["--architecture"] == 'edsr_16_64':
         model = EDSR(n_resblocks=16, n_feats=64, scale=1,
                      dilation=dilation, aspp=aspp, act=act)
@@ -132,19 +142,26 @@ def evaluate(args):
     lr_tot_psnr = 0.0
     lr_tot_ssim = 0.0
     lr_l1_tot = 0.0
+    lr_ssim = 1.0
+    lr_psnr = [float('inf')]
+    lr_l1 = 0.0
     model.load_state_dict(torch.load(args["--model"]))
     active_list = []
     length = sum(1 for x in test_generator)
     with torch.no_grad():
-        for batch_idx, data in tqdm(enumerate(test_generator), total = length):
+        for batch_idx, data in tqdm(enumerate(test_generator), total=length):
             model.eval()
             # unet.train(False)
+            # For AE architecture lr and hr are hte same image of 64*64
             x_test = data["lr"]
             y_test = data["hr"]
             stat_test = data["stats"]
             x_test = x_test.to(device)
             y_test = y_test.numpy()
-            y_pred = model(x_test)
+            if architecture == "AE":
+                encoded, y_pred = model(x_test)
+            else:
+                y_pred = model(x_test)
 
             # Inverse of the nomalizations used. Applied on SR data
             stat_test["std"] = stat_test["std"].numpy()
@@ -164,13 +181,7 @@ def evaluate(args):
                     sr_hr = np.hstack([y_pred.reshape(-1, y_pred.shape[-1]),
                                        y_test.reshape(-1, y_pred.shape[-1])])
 
-            # Inverse normalize the LR image
-            #x_test = x_test.cpu().numpy()
-            #x_test = (x_test * stat_test["std"]) + stat_test["mean"]
             x_test = data["lr_un"].cpu().numpy()
-            if lognorm:
-                image_sign = np.sign(x_test)
-                x_test = image_sign * (np.exp(np.abs(x_test)) - 1.0)
 
             # Create and save image consisting of error map, HR, SR, LR
             if not active_learning:
@@ -193,24 +204,30 @@ def evaluate(args):
                 filename = os.path.join(args["--output"], f"{batch_idx}.png")
                 m = np.mean(save_plots)
                 s = np.std(save_plots)
-                plt.imsave(filename, save_plots, cmap="gray", vmin = stat_test["min"], vmax = m+3*s )
+                plt.imsave(filename, save_plots, cmap="gray", vmin = stat_test["min"], vmax = m+3*s)
             if not args["hr"]:
                 writetext(os.path.abspath(filename))
             if args["hr"]:
                 test_loss = test_loss + loss_test
-                lr_l1 = np.mean(np.abs(y_test - x_test))
+                # For AE architecture, the lr and hr are same, so not comparing
+                if architecture != "AE":
+                    lr_l1 = np.mean(np.abs(y_test - x_test))
                 sr_l1 = np.mean(np.abs(y_test - y_pred))
                 x_test = x_test.reshape(x_test.shape[3], -1)
                 y_test = y_test.reshape(y_test.shape[3], -1)
                 y_pred = y_pred.reshape(y_pred.shape[3], -1)
                 data_range = stat_test["max"].numpy()
-                lr_psnr = metrics.peak_signal_noise_ratio(y_test, x_test,
-                                                          data_range=data_range)
+                # For AE architecture, the lr and hr are same, so not comparing
+                if architecture != "AE":
+                    lr_psnr = metrics.peak_signal_noise_ratio(y_test, x_test,
+                                                              data_range=data_range)
                 sr_psnr = metrics.peak_signal_noise_ratio(y_test, y_pred,
                                                           data_range=data_range)
-                lr_ssim = metrics.structural_similarity(y_test, x_test,
-                                                        gaussian_weights=True,
-                                                        data_range=data_range)
+                # For AE architecture, the lr and hr are same, so not comparing
+                if architecture != "AE":
+                    lr_ssim = metrics.structural_similarity(y_test, x_test,
+                                                            gaussian_weights=True,
+                                                            data_range=data_range)
                 sr_ssim = metrics.structural_similarity(y_test, y_pred,
                                                         gaussian_weights=True,
                                                         data_range=data_range)
@@ -221,27 +238,42 @@ def evaluate(args):
                 lr_l1_tot = lr_l1_tot + lr_l1
                 srerror = (sr_l1, sr_psnr[0], sr_ssim)
                 lrerror = (lr_l1, lr_psnr[0], lr_ssim)
-                if not active_learning:
+                # For AE architecture, images are too small for writing on
+                if not active_learning and not architecture == "AE":
                     writetext(os.path.abspath(filename), srerror, lrerror)
                 if sr_l1 > lr_l1:
                     messed_images = messed_images + 1
-                if active_learning:
+                # Fro non AE architecture, save hte utility values of image
+                if active_learning and not architecture == "AE":
                     active_list.append([data["file"][0], sr_l1, sr_psnr[0],
                                         sr_ssim, lr_l1, lr_psnr[0], lr_ssim])
+                # For AE architecture save the latent variable values for image
+                if active_learning and architecture == "AE":
+                    data_list = []
+                    data_list.append(data["file"][0])
+                    data_list.extend(encoded.cpu().numpy().flatten().tolist())
+                    active_list.append(data_list)
 
         if args["hr"]:
             print("\nTest Loss: {:.6f}".format(test_loss / len(test_generator)))
             print("\nTest PSNR: {:.6f}".format(test_psnr / len(test_generator)))
             print("\nTest SSIM: {:.6f}".format(test_ssim / len(test_generator)))
-            print("\nLR PSNR: {:.6f}".format(lr_tot_psnr / len(test_generator)))
-            print("\nLR SSIM: {:.6f}".format(lr_tot_ssim / len(test_generator)))
-            print("\nLR Loss: {:.6f}".format(lr_l1_tot / len(test_generator)))
-            print(f"NUmber of images where SR L1 is worse than LR: {messed_images}")
-            if active_learning:
+            if architecture != "AE":
+                print("\nLR PSNR: {:.6f}".format(lr_tot_psnr / len(test_generator)))
+                print("\nLR SSIM: {:.6f}".format(lr_tot_ssim / len(test_generator)))
+                print("\nLR Loss: {:.6f}".format(lr_l1_tot / len(test_generator)))
+                print(f"NUmber of images where SR L1 is worse than LR: {messed_images}")
+            if active_learning and not architecture == "AE":
                 df = pd.DataFrame(active_list, columns=['filename', 'SR_L1', 'SR_PSNR',
-                                                   'SR_SSIM', 'LR_L1', 'LR_PSNR', 'LR_SSIM'])
+                                                        'SR_SSIM', 'LR_L1', 'LR_PSNR', 'LR_SSIM'])
                 active_file = str(args["--input"]).split('/')[-1]
-                df.to_csv(f"active_metrics/{active_file}.csv")
+                df.to_csv(f"active_utility_metrics/{active_file}.csv")
+            if active_learning and architecture == "AE":
+                active_file = str(args["--input"]).split('/')[-1]
+                with open(f"active_diversity_metrics/{active_file}.csv", 'w') as f:
+                    # using csv.writer method from CSV package
+                    write = csv.writer(f)
+                    write.writerows(active_list)
 
 if __name__ == "__main__":
     args = docopt(__doc__)
