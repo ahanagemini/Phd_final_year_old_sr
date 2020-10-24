@@ -165,7 +165,7 @@ class KernelGAN:
 
     def finish(self):
         final_kernel = post_process_k(self.curr_k, n=self.conf.n_filtering)
-        save_final_kernel(final_kernel, self.conf)
+        #save_final_kernel(final_kernel, self.conf)
         print("KernelGAN estimation complete!")
         return final_kernel
 

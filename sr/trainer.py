@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --num_epochs=epochs --architecture=arch --act=act [--lognorm] [--debug_input_pics] [--aspp] [--dilation]
+"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --num_epochs=epochs --architecture=arch --act=act --kernel_factor=factor [--lognorm] [--debug_input_pics] [--aspp] [--dilation]
             trainer.py --help | -help | -h
 
 Train the requested model.
@@ -11,6 +11,7 @@ Arguments:
   num_epochs    number of epochs
   architecture  the architecture to train unet or axial
   act activations can be relu or leakyrelu FOR EDSR ONLY
+  kernel_factor use if using kernel, for 0.25 use --X4. for 0.5 use --X2 for 0.125 use --X8
   --lognorm     if we are using log normalization
   --debug_input_pics  If we want to save input pics for debugging
   --aspp        use ASPP in EDSR
@@ -19,8 +20,8 @@ Options:
   -h --help -h
 """
 
-# Example run : 
-#  python3.8 ./trainer.py --train=../earth_data/train/f3 --valid=../earth_data/valid/f3 --log_dir=logs --num_epochs=100 --architecture=edsr_16_64 --act=relu 
+# Example run :
+#  python3.8 ./trainer.py --train=../earth_data/train/f3 --valid=../earth_data/valid/f3 --log_dir=logs --num_epochs=100 --architecture=edsr_16_64 --act=relu
 
 from pathlib import Path
 import os
@@ -48,21 +49,37 @@ from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR
 from logger import Logger
 
-BATCH_SIZE = {"unet": 16, "axial": 16, "edsr_16_64": 8, "edsr_8_256": 16,
-        "edsr_16_256": 8, "edsr_32_256": 8}
-LR = {"unet": 0.00005, "axial": 0.0005, "edsr_16_64": 0.0005,
-        "edsr_8_256": 0.0001,  "edsr_16_256": 0.0001, "edsr_32_256": 0.0001}
+BATCH_SIZE = {
+    "unet": 16,
+    "axial": 16,
+    "edsr_16_64": 8,
+    "edsr_8_256": 16,
+    "edsr_16_256": 8,
+    "edsr_32_256": 8,
+}
+LR = {
+    "unet": 0.00005,
+    "axial": 0.0005,
+    "edsr_16_64": 0.0005,
+    "edsr_8_256": 0.0001,
+    "edsr_16_256": 0.0001,
+    "edsr_32_256": 0.0001,
+}
+
 
 def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
 
-def create_dataset(path, lognorm=False):
+
+def create_dataset(path, lognorm=False, kernel=False, kernel_factor="--X4"):
     """
 
     Parameters
     ----------
     path: path to data directory
     lognorm: Is log normalization used?
+    kernel: Whether to use kernel or not default false
+    kernel_factor: if using kernel then how much to factor the image default --X4 (0.25)
 
     Returns
     -------
@@ -71,9 +88,12 @@ def create_dataset(path, lognorm=False):
     """
 
     if set(os.listdir(path)) == set(["LR", "HR"]):
-        return PairedDataset(path, lognorm=lognorm)
+        print("running PairedDataset")
+        return PairedDataset(path, lognorm=lognorm, kernel=kernel, kernel_factor=kernel_factor)
     else:
+        print("Running SrDataset")
         return SrDataset(path, lognorm=lognorm)
+
 
 def model_save(train_model, train_model_path):
     """
@@ -94,8 +114,18 @@ def model_save(train_model, train_model_path):
     torch.save(train_model.state_dict(), model_path)
 
 
-def training(training_generator, validation_generator, device, log_dir,
-             architecture, num_epochs, debug_pics, aspp, dilation, act):
+def training(
+    training_generator,
+    validation_generator,
+    device,
+    log_dir,
+    architecture,
+    num_epochs,
+    debug_pics,
+    aspp,
+    dilation,
+    act,
+):
     """
 
     Parameters
@@ -114,8 +144,8 @@ def training(training_generator, validation_generator, device, log_dir,
     -------
 
     """
-    timestamp = f'{datetime.datetime.now().date()}-{datetime.datetime.now().time()}' 
-    save_model_path = (Path(__file__).parent/ "saved_models").resolve()
+    timestamp = f"{datetime.datetime.now().date()}-{datetime.datetime.now().time()}"
+    save_model_path = (Path(__file__).parent / "saved_models").resolve()
     if not save_model_path.is_dir():
         os.makedirs(save_model_path)
     save_model_path = str(save_model_path)
@@ -126,15 +156,21 @@ def training(training_generator, validation_generator, device, log_dir,
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif architecture == "edsr_16_64":
-        model = EDSR(n_resblocks=16, n_feats=64, scale=1, aspp=aspp, dilation=dilation, act=act)
+        model = EDSR(
+            n_resblocks=16, n_feats=64, scale=4, aspp=aspp, dilation=dilation, act=act
+        )
     elif architecture == "edsr_8_256":
-        model = EDSR(n_resblocks=8, n_feats=256, scale=1, aspp=aspp, dilation=dilation, act=act)
+        model = EDSR(
+            n_resblocks=8, n_feats=256, scale=4, aspp=aspp, dilation=dilation, act=act
+        )
     elif architecture == "edsr_16_256":
-        model = EDSR(n_resblocks=16, n_feats=256, scale=1, aspp=aspp, dilation=dilation, act=act)
+        model = EDSR(
+            n_resblocks=16, n_feats=256, scale=4, aspp=aspp, dilation=dilation, act=act
+        )
     elif architecture == "edsr_32_256":
-        model = EDSR(n_resblocks=32, n_feats=256, scale=1)
+        model = EDSR(n_resblocks=32, n_feats=256, scale=4)
     model.to(device)
-    summary(model, (1, 256, 256), batch_size=1, device="cuda")
+    summary(model, (1, 32, 32), batch_size=1, device="cuda")
     max_epochs = num_epochs
     criterion = torch.nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -178,16 +214,27 @@ def training(training_generator, validation_generator, device, log_dir,
                 y_np = y_train.cpu().numpy()
                 for i in range(x_np.shape[0]):
                     filename = data["file"][i]
-                    x_rescale = x_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
-                    y_rescale = y_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
+                    x_rescale = (
+                        x_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
+                    )
+                    y_rescale = (
+                        y_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
+                    )
 
-                    save_plots = np.hstack([x_rescale.reshape(x_rescale.shape[1], -1), y_rescale.reshape(y_rescale.shape[1], -1)])
-                    save_plots = np.clip(save_plots, stat["min"][i].numpy(), stat["max"][i].numpy())
+                    save_plots = np.hstack(
+                        [
+                            x_rescale.reshape(x_rescale.shape[1], -1),
+                            y_rescale.reshape(y_rescale.shape[1], -1),
+                        ]
+                    )
+                    save_plots = np.clip(
+                        save_plots, stat["min"][i].numpy(), stat["max"][i].numpy()
+                    )
                     vmax = stat["mean"][i].numpy() + 3 * stat["std"][i].numpy()
                     vmin = stat["min"][i].numpy()
                     filename = os.path.join(f"{input_save_path}/{filename}.tiff")
-                    plt.imsave(filename, save_plots, vmin=vmin, vmax=vmax, cmap='gray')
-            
+                    plt.imsave(filename, save_plots, vmin=vmin, vmax=vmax, cmap="gray")
+
             optimizer.zero_grad()
             with torch.autograd.set_detect_anomaly(True):
                 with torch.set_grad_enabled(True):
@@ -199,7 +246,7 @@ def training(training_generator, validation_generator, device, log_dir,
                     loss_train_list.append(loss_train.item())
                     loss_train.backward()
                     optimizer.step()
-        
+
         # training log summary after every 10 epochs
         log_loss_summary(logger, loss_train_list, step, prefix="train_")
         loss_train_list = []
@@ -225,7 +272,7 @@ def training(training_generator, validation_generator, device, log_dir,
                 valid_loss = valid_loss + (
                     (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
                 )
-        
+
         if architecture == "edsr":
             # calling scheduler based on valid loss
             scheduler.step(valid_loss)
@@ -255,8 +302,7 @@ def training(training_generator, validation_generator, device, log_dir,
 
         if step % 10 == 0:
             model_save(
-                model,
-                f"{save_model_path}/{architecture}/{timestamp}_model_{step}.pt",
+                model, f"{save_model_path}/{architecture}/{timestamp}_model_{step}.pt",
             )
         model_save(model, f"{save_model_path}/{architecture}/{timestamp}_model.pt")
         torch.cuda.empty_cache()
@@ -278,12 +324,13 @@ def process(arguments):
     valid_path = Path(arguments["--valid"])
     log_dir = Path(arguments["--log_dir"])
     architecture = arguments["--architecture"]
-    num_epochs = int(arguments["--num_epochs"]) 
+    num_epochs = int(arguments["--num_epochs"])
     lognorm = arguments["--lognorm"]
     debug_pics = arguments["--debug_input_pics"]
     aspp = arguments["--aspp"]
     dilation = arguments["--dilation"]
     act = arguments["--act"]
+    kernel_factor = arguments["--kernel_factor"]
 
     parameters = {
         "batch_size": BATCH_SIZE[architecture],
@@ -295,13 +342,30 @@ def process(arguments):
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    training_set = create_dataset(train_path, lognorm=lognorm)
-    training_generator = torch.utils.data.DataLoader(training_set, **parameters)
 
-    validation_set = create_dataset(valid_path, lognorm=lognorm)
+    kernel_factor_list = ["--X2", "--X4", "--X8"]
+    if kernel_factor in kernel_factor_list:
+        training_set = create_dataset(train_path, lognorm=lognorm, kernel=True, kernel_factor=kernel_factor)
+        validation_set = create_dataset(valid_path, lognorm=lognorm, kernel=True, kernel_factor=kernel_factor)
+    else:
+        training_set = create_dataset(train_path, lognorm=lognorm)
+        validation_set = create_dataset(valid_path, lognorm=lognorm)
+
+    training_generator = torch.utils.data.DataLoader(training_set, **parameters)
     validation_generator = torch.utils.data.DataLoader(validation_set, **parameters)
-    training(training_generator, validation_generator, device, log_dir,
-             architecture, num_epochs, debug_pics, aspp, dilation, act)
+
+    training(
+        training_generator,
+        validation_generator,
+        device,
+        log_dir,
+        architecture,
+        num_epochs,
+        debug_pics,
+        aspp,
+        dilation,
+        act,
+    )
 
 
 if __name__ == "__main__":

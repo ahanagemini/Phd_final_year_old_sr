@@ -25,6 +25,20 @@ These directories must be disjoint for test/train/validate. So if patient1 is in
 
 In these directories there must exist a .json file and multiple .npz files containing 256 x 256 x float data.
 
+Running the zeroshotpreprocessing
+=======
+
+# data directory structure
+
+A directory with image npz files. the output of this folder will be OutputDirectory-> Train/Valid -> LR and HR -> image
+npz files. In both lr and hr there will be a stats.json file but in lr there will be a kernel file as well. The kernel
+file in training will be used to downscale a image based on scale factor. The default scale factor is 4x. 
+
+# Usage:
+'''
+python zeroshotpreprocessing.py --input-directory=input_path --output-directory=output_path --n_resize=no_sample 
+'''
+
 Running the trainer
 ========
 
@@ -33,7 +47,8 @@ Running the trainer
 The command for performing training:
 
 ```
-python ./trainer.py --train=TRAIN_PATH --valid=VALID_PATH --log_dir=logs/ --architecture=edsr
+ python trainer.py --train="/home/venkat/Documents/PiyushKumarProject/KernelResult/train" --valid="/home/venkat/Documents/PiyushKumarProject/KernelResult/valid" --log_dir="/home/venkat//Documents/PiyushKumarProject/Logger" --num_epochs=10 --architecture="edsr_8_256" --act="leakyrelu" --kernel_factor="--X4"
+
 ```
 The TRAIN_PATH and VALID_PATH contain *.npz files and a stats.json file
 Possible architectures are edsr, unet and axial

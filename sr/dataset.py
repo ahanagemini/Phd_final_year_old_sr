@@ -6,6 +6,8 @@ import json
 import random
 import os
 
+from kernelgan import imresize
+
 # from matplotlib import pyplot as plt
 import torch
 from torch.utils.data import Dataset
@@ -14,10 +16,13 @@ import scipy.ndimage
 import numpy as np
 from cutter import loader
 
+
 class PairedDataset(Dataset):
     """Dataset class for loading large amount of image arrays data"""
 
-    def __init__(self, root_dir, lognorm=False, test=False):
+    def __init__(
+        self, root_dir,  kernel_factor="--X4", lognorm=False, test=False, kernel=False
+    ):
         """
         Args:
             root_dir (string): Directory with all the images.
@@ -26,6 +31,7 @@ class PairedDataset(Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
+        kernel_factor_idx = {"--X4": 0.25, "--X2": 0.5, "--X8": 0.125}
         self.root_dir = Path(root_dir).expanduser().resolve().absolute()
         self.lr_dir = self.root_dir / "LR"
         self.hr_dir = self.root_dir / "HR"
@@ -33,7 +39,9 @@ class PairedDataset(Dataset):
         self.hrlist = sorted(list(self.hr_dir.rglob("*.npz")))
         self.lognorm = lognorm
         self.test = test
+        self.kernellist = []
         self.hrstatlist = []
+        self.kernel_factor = kernel_factor_idx[kernel_factor]
         for fname in self.hrlist:
             file_path = Path(fname)
             stat_file = json.load(open(str(file_path.parent / "stats.json")))
@@ -43,8 +51,12 @@ class PairedDataset(Dataset):
             file_path = Path(fname)
             stat_file = json.load(open(str(file_path.parent / "stats.json")))
             self.lrstatlist.append(stat_file)
+            if kernel:
+                kernel_file = file_path.parent / "kernel.npy"
+                self.kernellist.append(kernel_file)
 
         print("Total number of data elements found = ", len(self.hrlist))
+        print(f"Total number of kernels found{len(self.kernellist)}")
 
     def __len__(self):
         return len(self.hrlist)
@@ -53,12 +65,20 @@ class PairedDataset(Dataset):
         hrimg_name = Path(self.hrlist[idx])
         lrimg_name = Path(self.lrlist[idx])
         filename = os.path.basename(hrimg_name)
-        filename = filename.split('.')[0]
+        filename = filename.split(".")[0]
         stats_hr = self.hrstatlist[idx]
         stats_lr = self.lrstatlist[idx]
-        hr_image =  loader(hrimg_name)
+        hr_image = loader(hrimg_name)
+        lr_image = loader(lrimg_name)
+        if self.kernellist:
+            kernel_file = self.kernellist[idx]
+            kernel = loader(kernel_file)
+            lr_image = np.reshape(lr_image, (lr_image.shape[0], lr_image.shape[1], 1))
+            lr_image = imresize(
+                im=lr_image, scale_factor=self.kernel_factor, kernel=kernel
+            )
+            lr_image = lr_image[:, :, 0]
 
-        lr_image =  loader(lrimg_name)
         lr_unorm = lr_image.copy()
         if self.lognorm:
             stats_lr = {}
@@ -80,18 +100,29 @@ class PairedDataset(Dataset):
         if not self.test:
             hr_image = Normalize()(hr_image, stats_hr)
         lr_image = Normalize()(lr_image, stats_lr)
-        sample = {"lr": lr_image, "lr_un": lr_unorm, "hr": hr_image, "stats": stats_hr, "file": filename}
+        sample = {
+            "lr": lr_image,
+            "lr_un": lr_unorm,
+            "hr": hr_image,
+            "stats": stats_hr,
+            "file": filename,
+        }
         if not self.test:
             transforms = Compose(
-                [Rotate(), Transpose(), HorizontalFlip(), VerticalFlip(),
-                    Pertube(1.00e-6), Reshape(), ToFloatTensor()]
+                [
+                    Rotate(),
+                    Transpose(),
+                    HorizontalFlip(),
+                    VerticalFlip(),
+                    Pertube(1.00e-6),
+                    Reshape(),
+                    ToFloatTensor(),
+                ]
             )
             for i, trans in enumerate([transforms]):
                 sample = trans(sample)
         if self.test:
-            transforms = Compose(
-                [Pertube(1.00e-6), Reshape(), ToFloatTensor()]
-            )
+            transforms = Compose([Pertube(1.00e-6), Reshape(), ToFloatTensor()])
             sample = transforms(sample)
         return sample
 
@@ -127,7 +158,7 @@ class SrDataset(Dataset):
     def __getitem__(self, idx):
         img_name = Path(self.datalist[idx])
         filename = os.path.basename(img_name)
-        filename = filename.split('.')[0]
+        filename = filename.split(".")[0]
         stats = self.statlist[idx]
         if self.hr:
             hr_image = loader(img_name)
@@ -142,17 +173,30 @@ class SrDataset(Dataset):
             if stats["std"] <= 0.001:
                 stats["std"] = 1
             hr_image = Normalize()(hr_image, stats)
-        
+
         if self.hr:
             lr_image = scipy.ndimage.zoom(scipy.ndimage.zoom(hr_image, 0.25), 4.0)
         else:
-            lr_image =  loader(img_name)
+            lr_image = loader(img_name)
             hr_image = np.zeros_like(lr_image)
         if not self.test:
-            sample = {"lr": lr_image, "lr_un": lr_image, "hr": hr_image, "stats": stats, "file": filename}
+            sample = {
+                "lr": lr_image,
+                "lr_un": lr_image,
+                "hr": hr_image,
+                "stats": stats,
+                "file": filename,
+            }
             transforms = Compose(
-                [Rotate(), Transpose(), HorizontalFlip(), VerticalFlip(),
-                    Pertube(1.00e-6), Reshape(), ToFloatTensor()]
+                [
+                    Rotate(),
+                    Transpose(),
+                    HorizontalFlip(),
+                    VerticalFlip(),
+                    Pertube(1.00e-6),
+                    Reshape(),
+                    ToFloatTensor(),
+                ]
             )
             for i, trans in enumerate([transforms]):
                 sample = trans(sample)
@@ -167,35 +211,16 @@ class SrDataset(Dataset):
                 stats["std"] = 1
             lr_unorm = lr_image.copy()
             lr_image = Normalize()(lr_image, stats)
-            sample = {"lr": lr_image, "lr_un": lr_unorm, "hr": hr_image, "stats": stats, "file": filename}
-            transforms = Compose(
-                [Pertube(1.00e-6), Reshape(), ToFloatTensor()]
-            )
+            sample = {
+                "lr": lr_image,
+                "lr_un": lr_unorm,
+                "hr": hr_image,
+                "stats": stats,
+                "file": filename,
+            }
+            transforms = Compose([Pertube(1.00e-6), Reshape(), ToFloatTensor()])
             sample = transforms(sample)
         return sample
-
-
-"""
-if __name__ == "__main__":
-    face_dataset = SrDataset(root_dir='../data')
-
-    fig = plt.figure()
-
-    for i in range(len(face_dataset)):
-        sample = face_dataset[i]
-
-        print(i, sample['hr'].shape, sample['stats'])
-
-        ax = plt.subplot(1, 4, i + 1)
-        plt.tight_layout()
-        ax.set_title('Sample #{}'.format(i))
-        ax.axis('off')
-        plt.imshow(sample['lr'])
-
-        if i == 3:
-            plt.show()
-            break
-"""
 
 
 class Rotate:
@@ -258,6 +283,7 @@ class Transpose:
 
         return sample
 
+
 class VerticalFlip:
     """VerticalFlip class to probailistically return vertical flip of the matrix"""
 
@@ -278,6 +304,7 @@ class VerticalFlip:
 
         return sample
 
+
 class HorizontalFlip:
     """HorizontalFlip class to probailistically return horizontal flip of the matrix"""
 
@@ -297,6 +324,7 @@ class HorizontalFlip:
             sample["lr"] = np.fliplr(sample["lr"])
 
         return sample
+
 
 class Pertube:
     """ Pertube class transforms image array by adding very small values to the array """
@@ -323,7 +351,7 @@ class Pertube:
 
         data = sample["stats"]
         sample["hr"] = sample["hr"] + 0.0
-        #sample["lr"] = sample["lr"] + (data["std"] / 100.0) * np.random.rand(*(sample["lr"].shape))
+        # sample["lr"] = sample["lr"] + (data["std"] / 100.0) * np.random.rand(*(sample["lr"].shape))
         sample["lr"] = sample["lr"] + 0.0
         return sample
 
@@ -342,10 +370,22 @@ class Reshape:
         -------
         sample: dictionary containing reshaped lr and reshaped hr
         """
-        width = sample["hr"].shape[-1]
-        sample["hr"] = np.reshape(sample["hr"], (1, -1, width))
-        sample["lr"] = np.reshape(sample["lr"], (1, -1, width))
-        sample["lr_un"] = np.reshape(sample["lr_un"], (1, -1, width))
+
+        # setting hr width and height
+        hr_width = sample["hr"].shape[-1]
+        hr_height = sample["hr"].shape[0]
+
+        # setting lr width and height
+        lr_width = sample["lr"].shape[-1]
+        lr_height = sample["lr"].shape[0]
+
+        # seeting lr uniform width and height
+        lr_un_width = sample["lr_un"].shape[-1]
+        lr_un_height = sample["lr_un"].shape[0]
+
+        sample["hr"] = np.reshape(sample["hr"], (1, hr_height, hr_width))
+        sample["lr"] = np.reshape(sample["lr"], (1, lr_height, lr_width))
+        sample["lr_un"] = np.reshape(sample["lr_un"], (1, lr_un_height, lr_un_width))
         return sample
 
 
