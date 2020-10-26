@@ -36,6 +36,7 @@ sample_dict = {"--X2": 0.5, "--X4": 0.25, "--X8": 0.125}
 
 
 def stat_calculator(input_path):
+    print("creating stats")
     total_sum = 0.0
     total_square_sum = 0.0
     total_count = 0.0

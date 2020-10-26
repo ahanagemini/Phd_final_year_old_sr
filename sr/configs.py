@@ -47,7 +47,7 @@ class Config:
                                  help="valid files path")
         self.parser.add_argument('--log_dir', default=os.path.dirname(__file__) + '/logger',
                                  help="the log files will be stored in this directory")
-        self.parser.add_argument('--architecture', default="edsr_8_256", help="give the model to be train")
+        self.parser.add_argument('--architecture', default="edsr_16_64", help="give the model to be train")
         self.parser.add_argument('--num_epochs', type=int, default=100, help="the total number of epochs")
         self.parser.add_argument('--lognorm', type=bool, default=False, help="check whether lognorm is required or not")
         self.parser.add_argument('--debug_pics', type=bool, default=False, help="check if debug pics are required")
