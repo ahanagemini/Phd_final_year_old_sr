@@ -92,6 +92,8 @@ def image_stat_processing(conf):
     if not os.path.isfile(str(input_directory / "stats.son")):
         """ calculate stats"""
         stats = stat_calculator(input_directory)
+        with open(str(input_directory / "stats.json"), "w") as sfile:
+            json.dump(stats, sfile)
 
     else:
         stats = json.load(open(str(input_directory / "stats.json")))
