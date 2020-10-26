@@ -56,7 +56,8 @@ class PairedDataset(Dataset):
                 self.kernellist.append(kernel_file)
 
         print("Total number of data elements found = ", len(self.hrlist))
-        print(f"Total number of kernels found{len(self.kernellist)}")
+        print(f"Total number of stat files found = {len(self.hrstatlist)}")
+        print(f"Total number of kernels found = {len(self.kernellist)}")
 
     def __len__(self):
         return len(self.hrlist)

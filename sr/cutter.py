@@ -178,10 +178,8 @@ def process(L, stats_paths, train_size, val_size, patch_size, no_test_patch):
     total_sum = 0.0
     total_square_sum = 0.0
     total_count = 0.0
-    total_mean = 0.0
-    total_variance = 0.0
-    min = 0
-    max = 0
+    image_min = 0
+    image_max = 0
     train_len = int(train_size * len(L))
     test_start = int(train_size * len(L)) + int(val_size * len(L))
     for i, (ifile, ofile) in enumerate(L):
@@ -208,11 +206,11 @@ def process(L, stats_paths, train_size, val_size, patch_size, no_test_patch):
             # maximum and minimum
             matrix_max = np.max(matrix_vector)
             matrix_min = np.min(matrix_vector)
-            if max < matrix_max:
-                max = matrix_max
+            if image_max < matrix_max:
+                image_max = matrix_max
 
-            if min > matrix_min:
-                min = matrix_min
+            if image_min > matrix_min:
+                image_min = matrix_min
         # Keep track of key at which test set starts 
         if i == test_start:
             test_start_key = key
@@ -233,8 +231,8 @@ def process(L, stats_paths, train_size, val_size, patch_size, no_test_patch):
     stats["mean"] = total_mean
     stats["variance"] = total_variance
     stats["std"] = np.sqrt(total_variance)
-    stats["max"] = float(max)
-    stats["min"] = float(min)
+    stats["max"] = float(image_max)
+    stats["min"] = float(image_min)
     width, height = patch_size, patch_size
     print("start file creation")
     for i in range(len(key_matrix_map)):

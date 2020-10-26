@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --num_epochs=epochs --architecture=arch --act=act --kernel_factor=factor [--lognorm] [--debug_input_pics] [--aspp] [--dilation]
+"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --num_epochs=epochs --architecture=arch --act=act --kernel_factor=factor --model_save=model[--lognorm] [--debug_input_pics] [--aspp] [--dilation]
             trainer.py --help | -help | -h
 
 Train the requested model.
@@ -12,6 +12,7 @@ Arguments:
   architecture  the architecture to train unet or axial
   act activations can be relu or leakyrelu FOR EDSR ONLY
   kernel_factor use if using kernel, for 0.25 use --X4. for 0.5 use --X2 for 0.125 use --X8
+  model_save    The path where model will be saved while training
   --lognorm     if we are using log normalization
   --debug_input_pics  If we want to save input pics for debugging
   --aspp        use ASPP in EDSR
@@ -125,6 +126,7 @@ def training(
     aspp,
     dilation,
     act,
+    model_save_path
 ):
     """
 
@@ -140,12 +142,13 @@ def training(
     aspp: True if EDSR is going to use aspp
     dilation True if EDSR is going to use dilation
     act: activation function to be used
+    model_save: location where model will be saved
     Returns
     -------
 
     """
     timestamp = f"{datetime.datetime.now().date()}-{datetime.datetime.now().time()}"
-    save_model_path = (Path(__file__).parent / "saved_models").resolve()
+    save_model_path = Path(model_save_path)
     if not save_model_path.is_dir():
         os.makedirs(save_model_path)
     save_model_path = str(save_model_path)
@@ -308,7 +311,8 @@ def training(
         torch.cuda.empty_cache()
 
 
-def process(arguments):
+def process(train_path, valid_path, log_dir, architecture, num_epochs, lognorm, debug_pics, aspp,
+            dilation, act, model_save_path, kernel_factor=""):
     """
 
     Parameters
@@ -319,18 +323,7 @@ def process(arguments):
     -------
 
     """
-    print("Processing arguments...")
-    train_path = Path(arguments["--train"])
-    valid_path = Path(arguments["--valid"])
-    log_dir = Path(arguments["--log_dir"])
-    architecture = arguments["--architecture"]
-    num_epochs = int(arguments["--num_epochs"])
-    lognorm = arguments["--lognorm"]
-    debug_pics = arguments["--debug_input_pics"]
-    aspp = arguments["--aspp"]
-    dilation = arguments["--dilation"]
-    act = arguments["--act"]
-    kernel_factor = arguments["--kernel_factor"]
+
 
     parameters = {
         "batch_size": BATCH_SIZE[architecture],
@@ -345,6 +338,7 @@ def process(arguments):
 
     kernel_factor_list = ["--X2", "--X4", "--X8"]
     if kernel_factor in kernel_factor_list:
+        print("Entering kernel Dataset")
         training_set = create_dataset(train_path, lognorm=lognorm, kernel=True, kernel_factor=kernel_factor)
         validation_set = create_dataset(valid_path, lognorm=lognorm, kernel=True, kernel_factor=kernel_factor)
     else:
@@ -365,9 +359,25 @@ def process(arguments):
         aspp,
         dilation,
         act,
+        model_save_path
     )
 
 
 if __name__ == "__main__":
     arguments = docopt(__doc__)
-    process(arguments)
+
+    print("Processing arguments...")
+    train_path = Path(arguments["--train"])
+    valid_path = Path(arguments["--valid"])
+    log_dir = Path(arguments["--log_dir"])
+    architecture = arguments["--architecture"]
+    num_epochs = int(arguments["--num_epochs"])
+    lognorm = arguments["--lognorm"]
+    debug_pics = arguments["--debug_input_pics"]
+    aspp = arguments["--aspp"]
+    dilation = arguments["--dilation"]
+    act = arguments["--act"]
+    kernel_factor = arguments['--kernel_factor']
+    model_save_path = Path(arguments['--model_save'])
+
+    process(train_path, valid_path, log_dir, architecture, num_epochs, lognorm, debug_pics, aspp, dilation, act, model_save_path, kernel_factor)

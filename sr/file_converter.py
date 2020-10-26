@@ -63,7 +63,7 @@ def process(infile, outfile):
         elif file_ext in image_paths:
             image = Image.open(files)
         image = image.convert(mode="L")
-        output_file = outfile / file_folder_name
+        output_file = outfile
         if not output_file.is_dir():
             os.makedirs(output_file)
         np.savez_compressed(output_file / file_name, np.array(image))
