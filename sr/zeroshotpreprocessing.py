@@ -89,13 +89,14 @@ def image_stat_processing(conf):
     conf.real_image = True
     output_directory = Path(conf.cutting_output_dir_path)
     input_directory = Path(conf.input_dir_path)
-    if not os.path.isfile(str(input_directory / "stats.son")):
+    if not os.path.isfile(str(input_directory / "stats.json")):
         """ calculate stats"""
         stats = stat_calculator(input_directory)
         with open(str(input_directory / "stats.json"), "w") as sfile:
             json.dump(stats, sfile)
 
     else:
+        print("loading available stats")
         stats = json.load(open(str(input_directory / "stats.json")))
 
     """
@@ -194,6 +195,7 @@ def image_stat_processing(conf):
         "--save_slice": conf.save_slice,
         "--aspp": conf.aspp,
         "--dilation": conf.dilation,
+        "kernel": True,
         "hr": True,
     }
     evaluate(args)
