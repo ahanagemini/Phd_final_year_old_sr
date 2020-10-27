@@ -36,7 +36,8 @@ file in training will be used to downscale a image based on scale factor. The de
 
 # Usage:
 '''
-python zeroshotpreprocessing.py --input-directory=input_path --output-directory=output_path --n_resize=no_sample 
+python3 zeroshotpreprocessing.py --input_dir_path="/home/venkat/Documents/PiyushKumarProject/Data/newsrtest/slices" --output_dir_path="/home/venkat/Documents/PiyushKumarProject/KernelResult" --n_resize=10 --kernel_factor='--X4' --num_epochs=100 --architecture="edsr_16_64"
+
 '''
 
 Running the trainer
