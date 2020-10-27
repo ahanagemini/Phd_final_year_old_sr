@@ -35,10 +35,10 @@ npz files. In both lr and hr there will be a stats.json file but in lr there wil
 file in training will be used to downscale a image based on scale factor. The default scale factor is 4x. 
 
 # Usage:
-'''
-python3 zeroshotpreprocessing.py --input_dir_path="/home/venkat/Documents/PiyushKumarProject/Data/newsrtest/slices" --output_dir_path="/home/venkat/Documents/PiyushKumarProject/KernelResult" --n_resize=10 --kernel_factor='--X4' --num_epochs=100 --architecture="edsr_16_64"
 
-'''
+```
+python3 zeroshotpreprocessing.py --input_dir_path="/home/venkat/Documents/PiyushKumarProject/Data/newsrtest/slices" --output_dir_path="/home/venkat/Documents/PiyushKumarProject/KernelResult" --n_resize=10 --kernel_factor='--X4' --num_epochs=100 --architecture="edsr_16_64"
+```
 
 Running the trainer
 ========
