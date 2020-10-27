@@ -35,6 +35,8 @@ class PairedDataset(Dataset):
         self.root_dir = Path(root_dir).expanduser().resolve().absolute()
         self.lr_dir = self.root_dir / "LR"
         self.hr_dir = self.root_dir / "HR"
+        # Todo : Write a function to find all corresponding images correctly
+        # After that randomly shuffle those pairs
         self.lrlist = sorted(list(self.lr_dir.rglob("*.npz")))
         self.hrlist = sorted(list(self.hr_dir.rglob("*.npz")))
         self.lognorm = lognorm
