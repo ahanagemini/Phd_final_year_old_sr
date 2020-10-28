@@ -1,7 +1,9 @@
-#!/usr/bin/env python3
-"""Usage:   zeroshotpreprocessing.py --input-directory=input_path --output-directory=output_path
+#!/usr/bin/env python3.8
+"""Usage:   zeroshotpreprocessing.py --input_dir_path=input_path --output=output_path
             --n_resize=no_sample --scale_factor=scale_factor
             zeroshotpreprocessing.py --help | -help | -h
+
+python3.8 zeroshotpreprocessing.py --input_dir_path=/home/piyush/Dropbox\ \(Intelligent\ Robotics\)/FSU/Research/Sumanth/newsrtest/slices --output=./output --n_resize=10 --kernel_factor='--X4' --num_epochs=100 --architecture="edsr_16_64"
 
 The main usage of zeroshotprepocessing:
  1.) Calculate a kernel for each image from a set of images.
@@ -20,17 +22,19 @@ Options:
   -h --help -h
 
 """
+import os
+import sys
+import json
+import random
+from pathlib import Path
+import numpy as np
 from cutter import loader, matrix_cutter
 from kernelgan import imresize
 from kernelgan import train
-import numpy as np
-import os
-from pathlib import Path
-import json
 from configs import Config
 from trainer import process
 from tester import evaluate
-import random
+
 
 sample_dict = {"--X2": 0.5, "--X4": 0.25, "--X8": 0.125}
 
@@ -201,7 +205,8 @@ def image_stat_processing(conf):
     evaluate(args)
     print("finished testing exiting")
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
+    if len(sys.argv) == 1 or "--input_dir_path" not in str(sys.argv) or "--output" not in str(sys.argv):
+        sys.argv.append('-h')
     conf = Config().parse()
     image_stat_processing(conf)
