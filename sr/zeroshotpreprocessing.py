@@ -30,7 +30,7 @@ from pathlib import Path
 import numpy as np
 from cutter import loader, matrix_cutter
 from kernelgan import imresize
-from kernelgan import train
+from kernelgan import train as kernelgan_train
 from configs import Config
 from trainer import process
 from tester import evaluate
@@ -78,6 +78,21 @@ def stat_calculator(input_path):
 
     return stats
 
+def assert_stats(input_directory):
+    """
+    Returns stats. If stats.json is not present, computes it.
+    """
+    input_directory = Path(conf.input_dir_path)
+    if not os.path.isfile(str(input_directory / "stats.json")):
+        """ calculate stats"""
+        stats = stat_calculator(input_directory)
+        with open(str(input_directory / "stats.json"), "w") as sfile:
+            json.dump(stats, sfile)
+
+    else:
+        print("loading available stats")
+        stats = json.load(open(str(input_directory / "stats.json")))
+    return stats
 
 def image_stat_processing(conf):
     """
@@ -93,16 +108,8 @@ def image_stat_processing(conf):
     conf.real_image = True
     output_directory = Path(conf.cutting_output_dir_path)
     input_directory = Path(conf.input_dir_path)
-    if not os.path.isfile(str(input_directory / "stats.json")):
-        """ calculate stats"""
-        stats = stat_calculator(input_directory)
-        with open(str(input_directory / "stats.json"), "w") as sfile:
-            json.dump(stats, sfile)
-
-    else:
-        print("loading available stats")
-        stats = json.load(open(str(input_directory / "stats.json")))
-
+    stats = assert_stats(input_directory)
+    
     """
     This loop will read all npz files in a directory
     """
@@ -114,21 +121,23 @@ def image_stat_processing(conf):
         image_name = os.path.splitext(image_path.name)[0]
         image = loader(image_path)
 
-        # reshape the images
+        # Run kernelgan, compute kernel, then reshape the images
         image = image.reshape((image.shape[0], image.shape[1], 1))
+        print("Image shape:", image.shape)
         conf.image = image
         conf.stats = stats
-        kernel = train(conf)
+        kernel = kernelgan_train(conf)
         sample_list = [image]
+        print("Image shape:", image.shape)
 
-        print("The image is being rescaled by given n times")
-        for _ in range(conf.n_resize):
-            out_image = imresize(im=image, scale_factor=0.95, kernel=kernel)
+        print(f"The image is being rescaled by given {conf.n_resize} times")
+        scale_factor = 0.95
+        for i in range(conf.n_resize):
+            scale = scale_factor ** (i+1)
+            out_image = imresize(im=image, scale_factor=scale, kernel=kernel)
             sample_list.append(out_image)
-            image = out_image
-
+            
         print("process of cutting and saving images has started")
-
         # looping over the n samples
         for i, sample in enumerate(sample_list):
             sample = sample[:, :, 0]
@@ -158,7 +167,7 @@ def image_stat_processing(conf):
 
             # saving the cut images
             for k, j, mat in images_cut:
-                fname = image_name + "_" + str(i) + "_" + str(k) + "_" + str(j)
+                fname = image_name + "_" + format(i,"05d") + "_" + format(k,"05d") + "_" + format(j,"05d")
                 np.savez_compressed(lr_opath / fname, mat)
                 np.savez_compressed(hr_opath / fname, mat)
         print("process has finished")
