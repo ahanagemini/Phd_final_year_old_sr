@@ -21,7 +21,7 @@ class PairedDataset(Dataset):
     """Dataset class for loading large amount of image arrays data"""
 
     def __init__(
-        self, root_dir,  kernel_factor="--X4", lognorm=False, test=False, kernel=False
+        self, root_dir, lognorm=False, test=False
     ):
         """
         Args:
@@ -31,57 +31,43 @@ class PairedDataset(Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        kernel_factor_idx = {"--X4": 0.25, "--X2": 0.5, "--X8": 0.125}
         self.root_dir = Path(root_dir).expanduser().resolve().absolute()
         self.lr_dir = self.root_dir / "LR"
         self.hr_dir = self.root_dir / "HR"
+        self.lr_hr_tuple = []
+        self.lr_hr_stat_tuple = []
         # Todo : Write a function to find all corresponding images correctly
         # After that randomly shuffle those pairs
-        self.lrlist = sorted(list(self.lr_dir.rglob("*.npz")))
-        self.hrlist = sorted(list(self.hr_dir.rglob("*.npz")))
+        for image_file_name in self.lr_dir.rglob("*.npz"):
+            image_name = image_file_name.name
+            image_parent_name = os.path.splitext(image_file_name.parent.name)[0]
+            lr_image = image_file_name
+            hr_image = self.hr_dir / image_parent_name / image_name
+            self.lr_hr_tuple.append((lr_image, hr_image))
+        np.random.shuffle(self.lr_hr_tuple)
         self.lognorm = lognorm
         self.test = test
-        self.kernellist = []
-        self.hrstatlist = []
-        self.kernel_factor = kernel_factor_idx[kernel_factor]
-        for fname in self.hrlist:
-            file_path = Path(fname)
-            stat_file = json.load(open(str(file_path.parent / "stats.json")))
-            self.hrstatlist.append(stat_file)
-        self.lrstatlist = []
-        for fname in self.lrlist:
-            file_path = Path(fname)
-            stat_file = json.load(open(str(file_path.parent / "stats.json")))
-            self.lrstatlist.append(stat_file)
-            if kernel:
-                kernel_file = file_path.parent / "kernel.npy"
-                self.kernellist.append(kernel_file)
+        for ftuple in self.lr_hr_tuple:
+            lr_image, hr_image = ftuple
+            lstat = json.load(open(str(lr_image.parent / "stats.json")))
+            hstat = json.load(open(str(hr_image.parent / "stats.json")))
+            self.lr_hr_stat_tuple.append((lstat, hstat))
 
-        print("Total number of data elements found = ", len(self.hrlist))
-        print(f"Total number of stat files found = {len(self.hrstatlist)}")
-        print(f"Total number of kernels found = {len(self.kernellist)}")
+        print("Total number of data elements found = ", len(self.lr_hr_tuple))
+        print(f"Total number of stat files found = {len(self.lr_hr_stat_tuple)}")
 
     def __len__(self):
-        return len(self.hrlist)
+        return len(self.lr_hr_tuple)
 
     def __getitem__(self, idx):
-        hrimg_name = Path(self.hrlist[idx])
-        lrimg_name = Path(self.lrlist[idx])
+        lrimg_name, hrimg_name = self.lr_hr_tuple[idx]
+        lrimg_name = Path(lrimg_name)
+        hrimg_name = Path(hrimg_name)
         filename = os.path.basename(hrimg_name)
         filename = filename.split(".")[0]
-        stats_hr = self.hrstatlist[idx]
-        stats_lr = self.lrstatlist[idx]
+        stats_lr, stats_hr = self.lr_hr_stat_tuple[idx]
         hr_image = loader(hrimg_name)
         lr_image = loader(lrimg_name)
-        if self.kernellist:
-            kernel_file = self.kernellist[idx]
-            kernel = loader(kernel_file)
-            lr_image = np.reshape(lr_image, (lr_image.shape[0], lr_image.shape[1], 1))
-            lr_image = imresize(
-                im=lr_image, scale_factor=self.kernel_factor, kernel=kernel
-            )
-            lr_image = lr_image[:, :, 0]
-
         lr_unorm = lr_image.copy()
         if self.lognorm:
             stats_lr = {}

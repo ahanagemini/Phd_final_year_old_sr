@@ -67,6 +67,9 @@ def stat_calculator(input_path):
 
         if image_min > matrix_min:
             image_min = matrix_min
+    if total_count == 0:
+        print("no elements loaded creating stats failed")
+        return
     total_mean = total_sum / total_count
     total_variance = (total_square_sum / total_count) - (total_sum / total_count) ** 2
     stats = {}
@@ -82,10 +85,11 @@ def assert_stats(input_directory):
     """
     Returns stats. If stats.json is not present, computes it.
     """
-    input_directory = Path(conf.input_dir_path)
+    #input_directory = Path(conf.input_dir_path)
     if not os.path.isfile(str(input_directory / "stats.json")):
         """ calculate stats"""
         stats = stat_calculator(input_directory)
+
         with open(str(input_directory / "stats.json"), "w") as sfile:
             json.dump(stats, sfile)
 
@@ -154,22 +158,23 @@ def image_stat_processing(conf):
                 os.makedirs(str(hr_opath))
             if not os.path.isdir(lr_opath):
                 os.makedirs(str(lr_opath))
-                # saving kernel
-                np.save(str(lr_opath / "kernel.npy"), kernel)
 
-                # saving stat file in lr
-                with open(str(lr_opath / "stats.json"), "w") as sfile:
-                    json.dump(stats, sfile)
+            # saving stat file in lr
+            with open(str(lr_opath / "stats.json"), "w") as sfile:
+                json.dump(stats, sfile)
 
-                # saving stat file in hr
-                with open(str(hr_opath / "stats.json"), "w") as sfile:
-                    json.dump(stats, sfile)
+            # saving stat file in hr
+            with open(str(hr_opath / "stats.json"), "w") as sfile:
+                json.dump(stats, sfile)
 
             # saving the cut images
             for k, j, mat in images_cut:
                 fname = image_name + "_" + format(i,"05d") + "_" + format(k,"05d") + "_" + format(j,"05d")
-                np.savez_compressed(lr_opath / fname, mat)
                 np.savez_compressed(hr_opath / fname, mat)
+                mat = np.reshape(mat, (mat.shape[0], mat.shape[1], 1))
+                mat = imresize(im=mat, scale_factor=conf.scale_factor, kernel=kernel)
+                mat = mat[:, :, 0]
+                np.savez_compressed(lr_opath / fname, mat)
         print("process has finished")
 
     train_path = Path(output_directory / "train")
@@ -189,7 +194,6 @@ def image_stat_processing(conf):
         conf.dilation,
         conf.act,
         conf.model_save,
-        conf.kernel_factor,
     )
     print("training is complete")
 

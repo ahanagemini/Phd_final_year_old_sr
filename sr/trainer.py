@@ -72,7 +72,7 @@ def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
 
 
-def create_dataset(path, lognorm=False, kernel=False, kernel_factor="--X4"):
+def create_dataset(path, lognorm=False):
     """
 
     Parameters
@@ -90,7 +90,7 @@ def create_dataset(path, lognorm=False, kernel=False, kernel_factor="--X4"):
 
     if set(os.listdir(path)) == set(["LR", "HR"]):
         print("running PairedDataset")
-        return PairedDataset(path, lognorm=lognorm, kernel=kernel, kernel_factor=kernel_factor)
+        return PairedDataset(path, lognorm=lognorm)
     else:
         print("Running SrDataset")
         return SrDataset(path, lognorm=lognorm)
@@ -184,11 +184,9 @@ def training(
     best_valid_loss = float("inf")
     logger = Logger(str(log_dir))
     step = 0
-    totiter = sum(1 for x in training_generator)
-    valiter = sum(1 for x in validation_generator)
     # TODO: Remove after debugging is done
     if debug_pics:
-        input_save_path = Path("input_pics").resolve()
+        input_save_path = Path(os.path.dirname(__file__) + r"/input_pics")
         if input_save_path.is_dir():
             shutil.rmtree(input_save_path)
         os.makedirs(input_save_path)
@@ -199,7 +197,7 @@ def training(
         loss_train_list = []
         step += 1
         # Main training loop for this epoch
-        for batch_idx, data in tqdm(enumerate(training_generator), total=totiter):
+        for batch_idx, data in enumerate(tqdm(training_generator)):
             model.train(True)
             x_train = data["lr"]
             y_train = data["hr"]
@@ -224,9 +222,15 @@ def training(
                         y_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
                     )
 
+                    # image padded to make sure lr and hr are same size
+                    x_rescale_pad = x_rescale.reshape(x_rescale.shape[1], -1)
+                    image_width, image_height = x_rescale_pad.shape
+                    image_width = (image_width // 2) * 3
+                    image_height = (image_height // 2) * 3
+                    x_rescale_pad = np.pad(x_rescale_pad, [image_width, image_height])
                     save_plots = np.hstack(
                         [
-                            x_rescale.reshape(x_rescale.shape[1], -1),
+                            x_rescale_pad,
                             y_rescale.reshape(y_rescale.shape[1], -1),
                         ]
                     )
@@ -262,7 +266,7 @@ def training(
             scheduler.factor = 1 + (epoch / max_epochs) ** 0.9
         with torch.no_grad():
             loss_valid_list = []
-            for batch_idx, data in tqdm(enumerate(validation_generator), total=valiter):
+            for batch_idx, data in enumerate(tqdm(validation_generator)):
                 # unet.eval()
                 model.train(False)
                 x_valid = data["lr"]
@@ -312,7 +316,7 @@ def training(
 
 
 def process(train_path, valid_path, log_dir, architecture, num_epochs, lognorm, debug_pics, aspp,
-            dilation, act, model_save_path, kernel_factor=""):
+            dilation, act, model_save_path):
     """
 
     Parameters
@@ -336,14 +340,8 @@ def process(train_path, valid_path, log_dir, architecture, num_epochs, lognorm, 
     torch.backends.cudnn.benchmark = True
 
 
-    kernel_factor_list = ["--X2", "--X4", "--X8"]
-    if kernel_factor in kernel_factor_list:
-        print("Entering kernel Dataset")
-        training_set = create_dataset(train_path, lognorm=lognorm, kernel=True, kernel_factor=kernel_factor)
-        validation_set = create_dataset(valid_path, lognorm=lognorm, kernel=True, kernel_factor=kernel_factor)
-    else:
-        training_set = create_dataset(train_path, lognorm=lognorm)
-        validation_set = create_dataset(valid_path, lognorm=lognorm)
+    training_set = create_dataset(train_path, lognorm=lognorm)
+    validation_set = create_dataset(valid_path, lognorm=lognorm)
 
     training_generator = torch.utils.data.DataLoader(training_set, **parameters)
     validation_generator = torch.utils.data.DataLoader(validation_set, **parameters)

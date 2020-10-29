@@ -22,7 +22,7 @@ class Config:
 
         # Sizes
         self.parser.add_argument('--input_crop_size', type=int, default=64, help='Generators crop size')
-        self.parser.add_argument('--scale_factor', type=float, default=0.5, help='The downscaling scale factor')
+        self.parser.add_argument('--scale_factor', type=float, default=0.25, help='The downscaling scale factor')
         self.parser.add_argument('--X4', action='store_true', help='The wanted SR scale factor')
 
         # Network architecture
@@ -54,8 +54,6 @@ class Config:
         self.parser.add_argument('--aspp', type=bool, default=False, help="check if edsr needs aspp")
         self.parser.add_argument('--dilation', type=bool, default=False, help="check if edsr needs dilation")
         self.parser.add_argument('--act', default="leakyrelu", help="activation type relu or leakyrelu for edsr")
-        self.parser.add_argument('--kernel_factor', default="--X4",
-                                 help="the type of downscaling in training X2, X4, X8")
         self.parser.add_argument('--model_save', default=os.path.dirname(__file__)+"/saved_models",
                                  help= "the path where model will be saved")
 
