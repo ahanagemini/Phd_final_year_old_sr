@@ -133,9 +133,8 @@ def evaluate(args):
     lr_tot_ssim = 0.0
     model.load_state_dict(torch.load(args["--model"]))
     active_list = []
-    length = sum(1 for x in test_generator)
     with torch.no_grad():
-        for batch_idx, data in tqdm(enumerate(test_generator), total = length):
+        for batch_idx, data in enumerate(tqdm(test_generator)):
             model.eval()
             # unet.train(False)
             x_test = data["lr"]

@@ -200,6 +200,7 @@ def image_stat_processing(conf):
     # EDSR Loading model
     print("started testing")
     best_model_save = Path(conf.model_save)
+    best_model_save = best_model_save / conf.architecture
     best_model = sorted(list(best_model_save.rglob("*best_model.pt")))[-1]
     args = {
         "--input": conf.input_dir_path,
