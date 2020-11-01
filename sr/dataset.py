@@ -70,17 +70,11 @@ class PairedDataset(Dataset):
         lr_image = loader(lrimg_name)
         lr_unorm = lr_image.copy()
         if self.lognorm:
-            stats_lr = {}
             image_sign = np.sign(lr_image)
             lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
-            stats_lr["mean"] = np.mean(lr_image)
-            stats_lr["std"] = np.std(lr_image)
             if not self.test:
-                stats_hr = {}
                 image_sign = np.sign(hr_image)
                 hr_image = image_sign * np.log(np.abs(hr_image) + 1.0)
-                stats_hr["mean"] = np.mean(hr_image)
-                stats_hr["std"] = np.std(hr_image)
         if stats_lr["std"] <= 0.001:
             stats_lr["std"] = 1
         if stats_hr["std"] <= 0.001:
@@ -155,10 +149,6 @@ class SrDataset(Dataset):
             if self.lognorm:
                 image_sign = np.sign(hr_image)
                 hr_image = image_sign * np.log(np.abs(hr_image) + 1.0)
-                stats = {}
-                stats["mean"] = np.mean(hr_image)
-                stats["std"] = np.std(hr_image)
-
             if stats["std"] <= 0.001:
                 stats["std"] = 1
             hr_image = Normalize()(hr_image, stats)
@@ -191,11 +181,8 @@ class SrDataset(Dataset):
                 sample = trans(sample)
         else:
             if self.lognorm:
-                stats = {}
                 image_sign = np.sign(lr_image)
                 lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
-                stats["mean"] = np.mean(lr_image)
-                stats["std"] = np.std(lr_image)
             if stats["std"] <= 0.001:
                 stats["std"] = 1
             lr_unorm = lr_image.copy()
@@ -361,15 +348,15 @@ class Reshape:
         """
 
         # setting hr width and height
-        hr_width = sample["hr"].shape[-1]
+        hr_width = sample["hr"].shape[1]
         hr_height = sample["hr"].shape[0]
 
         # setting lr width and height
-        lr_width = sample["lr"].shape[-1]
+        lr_width = sample["lr"].shape[1]
         lr_height = sample["lr"].shape[0]
 
         # seeting lr uniform width and height
-        lr_un_width = sample["lr_un"].shape[-1]
+        lr_un_width = sample["lr_un"].shape[1]
         lr_un_height = sample["lr_un"].shape[0]
 
         sample["hr"] = np.reshape(sample["hr"], (1, hr_height, hr_width))

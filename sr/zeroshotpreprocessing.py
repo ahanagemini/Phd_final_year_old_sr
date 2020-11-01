@@ -26,6 +26,7 @@ import os
 import sys
 import json
 import random
+import shutil
 from pathlib import Path
 import numpy as np
 from cutter import loader, matrix_cutter
@@ -111,6 +112,10 @@ def image_stat_processing(conf):
     """
     conf.real_image = True
     output_directory = Path(conf.cutting_output_dir_path)
+
+    # deletting if cutting out existed already to avoid overlaps
+    if os.path.isdir(output_directory):
+        shutil.rmtree(output_directory)
     input_directory = Path(conf.input_dir_path)
     stats = assert_stats(input_directory)
     
@@ -142,14 +147,18 @@ def image_stat_processing(conf):
             sample_list.append(out_image)
             
         print("process of cutting and saving images has started")
+        sample_count = len(sample_list)
+        np.random.shuffle(sample_list)
         # looping over the n samples
         for i, sample in enumerate(sample_list):
             sample = sample[:, :, 0]
             images_cut = matrix_cutter(sample)
 
             # this is done to create training sets and validation sets for training edsr
-            if random.randint(0, 10) > 7:
+            if i > int(0.7 * sample_count) and i < int(0.9*sample_count):
                 data_type = "valid"
+            elif i >= int(0.9 * sample_count):
+                data_type = "test"
             else:
                 data_type = "train"
             hr_opath = output_directory / data_type / "HR" / image_name
@@ -179,6 +188,7 @@ def image_stat_processing(conf):
 
     train_path = Path(output_directory / "train")
     valid_path = Path(output_directory / "valid")
+    test_path = Path(output_directory / "test")
 
     # EDSR Training
     print("started EDSR Training")
@@ -193,7 +203,7 @@ def image_stat_processing(conf):
         conf.aspp,
         conf.dilation,
         conf.act,
-        conf.model_save,
+        conf.model_save,kernel=True
     )
     print("training is complete")
 
@@ -203,7 +213,7 @@ def image_stat_processing(conf):
     best_model_save = best_model_save / conf.architecture
     best_model = sorted(list(best_model_save.rglob("*best_model.pt")))[-1]
     args = {
-        "--input": conf.input_dir_path,
+        "--input": test_path,
         "--output": conf.output_dir_path,
         "--architecture": conf.architecture,
         "--model": best_model,

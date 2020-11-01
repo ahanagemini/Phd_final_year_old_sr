@@ -30,6 +30,7 @@ import sys
 import shutil
 from time import time
 import datetime
+import scipy.ndimage
 
 import torch
 import torch.optim as optim
@@ -126,7 +127,8 @@ def training(
     aspp,
     dilation,
     act,
-    model_save_path
+    model_save_path,
+        kernel
 ):
     """
 
@@ -224,10 +226,10 @@ def training(
 
                     # image padded to make sure lr and hr are same size
                     x_rescale_pad = x_rescale.reshape(x_rescale.shape[1], -1)
+
                     image_width, image_height = x_rescale_pad.shape
-                    image_width = (image_width // 2) * 3
-                    image_height = (image_height // 2) * 3
-                    x_rescale_pad = np.pad(x_rescale_pad, [image_width, image_height])
+                    if kernel:
+                        x_rescale_pad = scipy.ndimage.zoom(x_rescale_pad, 4.0)
                     save_plots = np.hstack(
                         [
                             x_rescale_pad,
@@ -316,7 +318,7 @@ def training(
 
 
 def process(train_path, valid_path, log_dir, architecture, num_epochs, lognorm, debug_pics, aspp,
-            dilation, act, model_save_path):
+            dilation, act, model_save_path, kernel = False):
     """
 
     Parameters
@@ -357,7 +359,8 @@ def process(train_path, valid_path, log_dir, architecture, num_epochs, lognorm, 
         aspp,
         dilation,
         act,
-        model_save_path
+        model_save_path,
+        kernel
     )
 
 

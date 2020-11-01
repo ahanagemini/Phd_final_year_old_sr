@@ -37,6 +37,7 @@ from unet import UNET
 from axial_bicubic import AxialNet
 from edsr import EDSR
 from tqdm import tqdm
+import scipy.ndimage
 
 from PIL import Image, ImageFont, ImageDraw
 
@@ -44,7 +45,7 @@ def writetext(imgfile, e_sr=None, e_lr=None):
     img = Image.open(imgfile)
     width, height = img.size
     draw = ImageDraw.Draw(img)
-    font = ImageFont.truetype('/home/venkat/Documents/PiyushKumarProject/sr/font/dancing.ttf', 50)
+    font = ImageFont.truetype('/home/venkat/Documents/PiyushKumarProject/sr/font/dancing.ttf', 15)
     if e_sr is None:
          draw.text((width/2, 0), "LR", font=font, fill=(0, 0, 255))
          draw.text((0, 0), "SR", font=font, fill=(0, 0, 255))
@@ -148,17 +149,8 @@ def evaluate(args):
             stat_test["std"] = stat_test["std"].numpy()
             stat_test["mean"] = stat_test["mean"].numpy()
             y_pred = y_pred.cpu().numpy()
-            print(f"{y_pred.shape} before renormalize")
             y_pred = (y_pred * stat_test["std"]) + stat_test["mean"]
             y_pred =  np.clip(y_pred, stat_test["min"].numpy(), stat_test["max"].numpy())
-            print(f"{y_pred.shape} after renormalize")
-
-            if args["kernel"]:
-                print(f"the shape of y_pred is {y_pred.shape}")
-                y_pred = y_pred.reshape(-1, y_pred.shape[-1])
-                filename = os.path.join(args["--output"], f"{batch_idx}.png")
-                plt.imsave(filename, y_pred, cmap="gray")
-                continue
             if lognorm:
                 image_sign = np.sign(y_pred)
                 y_pred = image_sign * (np.exp(np.abs(y_pred)) - 1.0)
@@ -179,12 +171,16 @@ def evaluate(args):
                 image_sign = np.sign(x_test)
                 x_test = image_sign * (np.exp(np.abs(x_test)) - 1.0)
 
+            if args["kernel"]:
+                x_test = x_test.reshape(-1, x_test.shape[-1])
+                x_test = scipy.ndimage.zoom(x_test, 4.0)
+
             # Create and save image consisting of error map, HR, SR, LR
             if not active_learning:
                 if args["hr"]:
                     error = np.abs(y_pred - y_test).reshape(-1, y_pred.shape[-1])
                     error = error * (stat_test["max"].numpy() / np.max(error))
-                    lr_error = np.hstack([error, x_test.reshape(-1, y_pred.shape[-1])])
+                    lr_error = np.hstack([error, x_test])
                     save_plots = np.vstack([sr_hr, lr_error])
                 else:
                     save_plots = np.hstack(
@@ -198,7 +194,6 @@ def evaluate(args):
                     outFilepath = str(args["--output"]) + "/slices/" + data["file"][0] + ".tiff"
                     tifffile.imsave(outFilepath, save_img)
                 filename = os.path.join(args["--output"], f"{batch_idx}.png")
-                pred_file_name = os.path.join(args["--output"], f"{batch_idx}pred.png")
                 m = np.mean(save_plots)
                 s = np.std(save_plots)
                 plt.imsave(filename, save_plots, cmap="gray", vmin = stat_test["min"], vmax = m+3*s )
@@ -209,7 +204,7 @@ def evaluate(args):
                 test_loss = test_loss + loss_test
                 lr_l1 = np.mean(np.abs(y_test - x_test))
                 sr_l1 = np.mean(np.abs(y_test - y_pred))
-                x_test = x_test.reshape(x_test.shape[3], -1)
+                x_test = x_test.reshape(x_test.shape[1], -1)
                 y_test = y_test.reshape(y_test.shape[3], -1)
                 y_pred = y_pred.reshape(y_pred.shape[3], -1)
                 data_range = stat_test["max"].numpy()
@@ -236,10 +231,6 @@ def evaluate(args):
                 if active_learning:
                     active_list.append([data["file"][0], sr_l1, sr_psnr[0],
                                         sr_ssim, lr_l1, lr_psnr[0], lr_ssim])
-
-        if args["kernel"]:
-            print("all the images are saved")
-            return
 
         if args["hr"]:
             print("\nTest Loss: {:.6f}".format(test_loss / len(test_generator)))
