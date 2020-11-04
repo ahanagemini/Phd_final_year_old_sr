@@ -259,8 +259,8 @@ def process(L, stats_paths, train_size, val_size, patch_size, no_test_patch):
 
     print("Done")
     del (
-        max,
-        min,
+        image_max,
+        image_min,
         matrices,
         file_names_map,
         key_matrix_map,

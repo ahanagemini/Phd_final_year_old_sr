@@ -13,12 +13,12 @@ class Config:
 
         # Paths
         self.parser.add_argument('--img_name', default='image1', help='image name for saving purposes')
-        self.parser.add_argument('--input_dir_path', default=os.path.dirname(__file__) + '/input',
+        self.parser.add_argument('--input_dir_path', default=os.path.dirname(__file__) + r'/input',
                                  help='all inputs are in this path')
-        self.parser.add_argument('--cutting_output_dir_path', default=os.path.dirname(__file__) + '/cutter_out',
+        self.parser.add_argument('--cutting_output_dir_path', default=os.path.dirname(__file__) + r'/cutter_out',
                                  help="here cut images will be stored")
-        self.parser.add_argument('--output_dir_path', default=os.path.dirname(__file__) + '/results', help='results path')
-        self.parser.add_argument('--stat_image_path', default=os.path.dirname(__file__) + '/training_data/stats.json', help='path to the stat file of image')
+        self.parser.add_argument('--output_dir_path', default=os.path.dirname(__file__) + r'/results', help='results path')
+        self.parser.add_argument('--stat_image_path', default=os.path.dirname(__file__) + r'/training_data/stats.json', help='path to the stat file of image')
 
         # Sizes
         self.parser.add_argument('--input_crop_size', type=int, default=64, help='Generators crop size')
@@ -45,7 +45,7 @@ class Config:
                                  help="train files path")
         self.parser.add_argument('--valid', default=os.path.dirname(__file__) + r"/results/valid",
                                  help="valid files path")
-        self.parser.add_argument('--log_dir', default=os.path.dirname(__file__) + '/logger',
+        self.parser.add_argument('--log_dir', default=os.path.dirname(__file__) + r'/logger',
                                  help="the log files will be stored in this directory")
         self.parser.add_argument('--architecture', default="edsr_16_64", help="give the model to be train")
         self.parser.add_argument('--num_epochs', type=int, default=100, help="the total number of epochs")
@@ -54,7 +54,7 @@ class Config:
         self.parser.add_argument('--aspp', type=bool, default=False, help="check if edsr needs aspp")
         self.parser.add_argument('--dilation', type=bool, default=False, help="check if edsr needs dilation")
         self.parser.add_argument('--act', default="leakyrelu", help="activation type relu or leakyrelu for edsr")
-        self.parser.add_argument('--model_save', default=os.path.dirname(__file__)+"/saved_models",
+        self.parser.add_argument('--model_save', default=os.path.dirname(__file__)+"r/saved_models",
                                  help= "the path where model will be saved")
 
         # Tester.py Parameters
