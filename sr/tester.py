@@ -45,7 +45,8 @@ def writetext(imgfile, e_sr=None, e_lr=None):
     img = Image.open(imgfile)
     width, height = img.size
     draw = ImageDraw.Draw(img)
-    font = ImageFont.truetype('/home/venkat/Documents/PiyushKumarProject/sr/font/dancing.ttf', 15)
+    font_path = os.path.realpath('./font/dancing.ttf')
+    font = ImageFont.truetype(font_path, 15)
     if e_sr is None:
          draw.text((width/2, 0), "LR", font=font, fill=(0, 0, 255))
          draw.text((0, 0), "SR", font=font, fill=(0, 0, 255))
@@ -124,6 +125,8 @@ def evaluate(args):
     elif  args["--architecture"] == 'edsr_16_256':
         model = EDSR(n_resblocks=16, n_feats=256, scale=4,
                      dilation=dilation, aspp=aspp, act=act)
+    elif args["--architecture"] == 'edsr_32_256':
+        model = EDSR(n_resblocks=32, n_feats=256, scale=4)
 
     model.to(device)
     test_loss = 0
