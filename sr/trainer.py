@@ -174,6 +174,7 @@ def training(
         )
     elif architecture == "edsr_32_256":
         model = EDSR(n_resblocks=32, n_feats=256, scale=4)
+
     model.to(device)
     summary(model, (1, 64, 64), batch_size=1, device="cuda")
     max_epochs = num_epochs

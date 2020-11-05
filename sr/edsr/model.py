@@ -57,6 +57,7 @@ class EDSR(nn.Module):
 
         m_tail = [
             common.Upsampler(conv, scale, tail_feats, act=False),
+            common.ResBlock(conv, tail_feats, kernel_size, act=act),
             conv(tail_feats, 1, kernel_size)
         ]
 
