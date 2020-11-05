@@ -1,8 +1,11 @@
 import sys
 import pandas as pd
 import numpy as np
+import statistics
+import random
+import scipy.io as io
 
-utility_scaler = 0
+utility_scaler = 1 
 tolerance = 0.000001
 monotonic_tolerance = 0.0000000001
 MAX_ITER = 50
@@ -16,7 +19,7 @@ def read_utility(utility_file):
     
     utility = pd.read_csv(utility_file)
     sorted_utility = utility.sort_values(by='filename')
-    return sorted_utility['SR_L1'].to_list()
+    return sorted_utility['SR_L1'].to_list(), sorted_utility['filename'].to_list()
 
 def read_diversity(diversity_file):
     '''
@@ -30,7 +33,7 @@ def read_diversity(diversity_file):
     diversity_values = sorted_diversity.drop('filename' , axis='columns')
     return diversity_values.to_numpy()
 
-def compute_diversity(diversity_values, utility_values):
+def compute_diversity(diversity_values, utility_values, files):
     '''
     Function to read the encodded diversity values and compute distance between all point pairs
     Includes also creating diversity matrix with distances and the utility
@@ -47,9 +50,26 @@ def compute_diversity(diversity_values, utility_values):
             d_u_matrix[i][j] = temp
             d_u_matrix[j][i] = temp
 
+    #ind = random.sample(range(0, d_u_matrix.shape[0] - 1), 30)
+    #for i in ind:
+    #    indices = np.argpartition(d_u_matrix[i], -4)[-4:]
+    #    indices_l = np.argpartition(d_u_matrix[i], 5)[:5]
+    #    print(files[i], end=' ')
+    #    for x in indices:
+    #        print(files[x], end=' ')
+    #    for y in indices_l:
+    #        if y != i:
+    #            print(files[y], end=' ')
+    #    print('  ')
+    maxim = np.max(d_u_matrix)
+    # maxim = 5 * np.std(d_u_matrix)
+    d_u_matrix = d_u_matrix / maxim
+    # maxim = 5 * statistics.stdev(utility_values)
+    maxim = np.max(utility_values)
     for i in range(len(utility_values)):
-        d_u_matrix[i][i] = utility_scaler * utility_values[i]
-        
+        d_u_matrix[i][i] = utility_scaler * (utility_values[i]/ maxim)
+    
+    # io.savemat("W.mat", {"W": d_u_matrix})
     return d_u_matrix
 
 def iter_trunc_pow(d_u_matrix, k):
@@ -60,22 +80,30 @@ def iter_trunc_pow(d_u_matrix, k):
         k: number of points to select
     Returns: Indeces of k selected points
     '''
-    lambda1 = 0.0001
 
     # Selecting the initial solution
     sum_matrix = np.sum(d_u_matrix, axis=1)
     ind = np.argpartition(sum_matrix, -k)[-k:]
     x = np.zeros((d_u_matrix.shape[0],1))
-    x[list(ind)] = 1
-
+    #ind = random.sample(range(0, d_u_matrix.shape[0] - 1), k)
+    x[np.array(ind)] = 1
     # power step
+    # d_u_matrix = np.matmul(np.transpose(d_u_matrix), d_u_matrix)
+    # d_u_matrix = np.array([[1, 2, 3, 4, 5, 6], [2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6], [2, 3, 4, 5, 6, 7], [1, 2, 3, 4, 5, 6], [2, 3, 4, 5, 6, 7]])
+    # x = np.array([0, 1, 1, 0, 1, 0])
+    # x = x.reshape(6, 1)
+    # k = 3
+
+    # print(x.shape)
     s = np.matmul(d_u_matrix, x)
     g = np.multiply(s, 2)
     f = np.matmul(np.transpose(x), s)
+    print(f)
     # truncate step
-    ind = np.argpartition(g, -k, axis=0)[-k:]
+    ind = np.argsort(g, axis=0, kind='stable')[-k:]
+    # ind = np.argpartition(g, -k, axis=0)[-k:]
     x_t = np.zeros((d_u_matrix.shape[0],1))
-    x_t[list(ind)] = 1
+    x_t[np.array(ind)] = 1
     f_old = f
     for i in range(MAX_ITER): 
     
@@ -84,29 +112,29 @@ def iter_trunc_pow(d_u_matrix, k):
         f = f_t
         # print(f"Iteration {i}: Function value: {f}")
         # If there is any non-monotonicity, handle it byt adding lambda * I
+        lambda1 = 0.0001
         while(f < f_old - monotonic_tolerance):
             print(f"Fixing monotonicity for f_old: {f_old}, f: {f} lambda {lambda1}")
             g_t = np.add(g, np.multiply(x, 2 * lambda1))
-            ind = np.argpartition(g_t, -k, axis=0)[-k:]
+            # ind = np.argpartition(g_t, -k, axis=0)[-k:]
+            ind = np.argsort(g_t, axis=0, kind='stable')[-k:]
             x_t = np.zeros((d_u_matrix.shape[0],1))
-            x_t[list(ind)] = 1
+            x_t[np.array(ind)] = 1
             s_t = np.matmul(d_u_matrix, x_t)
             f_t = np.matmul(np.transpose(x_t), s_t)
             f = f_t
-            print(np.all(x==x_t))
-            lambda1 = lambda1 * 2
+            lambda1 = lambda1 * 10
         # check if already converged and break
         print(f"Iteration {i}: Function value: {f}")
         if abs(f - f_old) < tolerance:
-            print(abs(f - f_old))
             break
-        
+     
         x = x_t
         g = np.multiply(s_t, 2)
-        ind = np.argpartition(g, -k, axis=0)[-k:]
-        x_t = np.zeros((d_u_matrix.shape[0],1))
-        x_t[list(ind)] = 1
-
+        # ind = np.argpartition(g, -k, axis=0)[-k:]
+        ind = np.argsort(g, axis=0, kind='stable')[-k:]
+        x_t = np.zeros((d_u_matrix.shape[0], 1))
+        x_t[np.array(ind)] = 1
         f_old = f
 
     return np.where(x==1)
@@ -117,11 +145,15 @@ def iter_trunc_pow(d_u_matrix, k):
 
 if __name__ == "__main__":
     utility_file = sys.argv[1]
-    utility_values = read_utility(utility_file)
+    utility_values, files = read_utility(utility_file)
     diversity_file = sys.argv[2]
     percentage = float(sys.argv[3])
+    # utility_values = utility_values[:100]
     diversity_values = read_diversity(diversity_file)
-    d_u_matrix = compute_diversity(list(diversity_values), utility_values)
+    # diversity_values = diversity_values[:100]
+    # files = files[:100]
+    d_u_matrix = compute_diversity(list(diversity_values), utility_values, files)
     k = int((percentage / 100) * len(utility_values))
     ans = iter_trunc_pow(d_u_matrix, k)
+    print(ans[0])
 
