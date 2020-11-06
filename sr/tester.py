@@ -45,7 +45,7 @@ def writetext(imgfile, e_sr=None, e_lr=None):
     img = Image.open(imgfile)
     width, height = img.size
     draw = ImageDraw.Draw(img)
-    font_path = os.path.realpath('./font/dancing.ttf')
+    font_path = os.path.abspath(os.path.expanduser('./font/dancing.ttf'))
     font = ImageFont.truetype(font_path, 15)
     if e_sr is None:
          draw.text((width/2, 0), "LR", font=font, fill=(0, 0, 255))

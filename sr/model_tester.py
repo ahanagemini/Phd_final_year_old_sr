@@ -19,8 +19,6 @@ def process(conf):
         print("deleting existing path")
         shutil.rmtree(output_directory)
     input_directory = Path(conf.input_dir_path)
-    stats = assert_stats(input_directory)
-
     parent_folders = os.scandir(input_directory)
 
     print("started image pair creation")
@@ -28,6 +26,8 @@ def process(conf):
         parent = Path(parent)
         ldir_train = output_directory / "test" / "LR" / parent.name
         hdir_train = output_directory / "test" / "HR" / parent.name
+
+        stats = assert_stats(parent)
 
         if not os.path.isdir(ldir_train):
             print("creating lr directory")
@@ -55,6 +55,10 @@ def process(conf):
         best_model_save = Path(conf.model_save)
         best_model_save = best_model_save / conf.architecture
         best_model = sorted(list(best_model_save.rglob("*best_model.pt")))[-1]
+        print(best_model)
+
+        if not os.path.isdir(conf.output_dir_path):
+            os.makedirs(conf.output_dir_path)
         args = {
             "--input": test_path,
             "--output": conf.output_dir_path,
