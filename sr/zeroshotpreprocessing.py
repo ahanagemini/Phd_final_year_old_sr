@@ -125,13 +125,14 @@ def get_kernel_non_kernel_directories(directories):
     for directory in directories:
         directory = Path(directory)
         temp_directory = list(directory.rglob("*.npz"))
-        if len(temp_directory) <= 9:
-            directories_dict["kernel"].append(temp_directory)
+        print(len(temp_directory))
+        if len(temp_directory) <= 15:
+            stats = assert_stats(directory)
+            directories_dict["kernel"].append((temp_directory, stats))
         else:
-            stats = assert_stats(Path(directory))
-            directories_dict["scipy"].append(temp_directory)
-
-    return directories_dict, stats
+            stats = assert_stats(directory)
+            directories_dict["scipy"].append((temp_directory, stats))
+    return directories_dict
 
 
 def predict_kernel(image_matrix, image_name, output_directory, stats):
@@ -171,7 +172,7 @@ def predict_kernel(image_matrix, image_name, output_directory, stats):
         np.savez_compressed(hr_opath / fname, imat)
 
 
-def perform_kernelgan(kernel_directories, stats, conf):
+def perform_kernelgan(kernel_directories, conf):
     """
 
     Parameters
@@ -186,11 +187,8 @@ def perform_kernelgan(kernel_directories, stats, conf):
 
     print("kernelgan process has started")
     output_directory = Path(conf.cutting_output_dir_path)
+    for kernel_directory, stats in kernel_directories:
 
-    for kernel_directory in kernel_directories:
-
-        # checking for stat file
-        stats["mean"] = 0
         for image_path in tqdm(kernel_directory):
 
             """
@@ -271,7 +269,7 @@ def perform_kernelgan(kernel_directories, stats, conf):
     print("kernelgan process has finished")
 
 
-def perform_scipy_ndimage_zoom(scipy_directories, stats, conf):
+def perform_scipy_ndimage_zoom(scipy_directories, conf):
     """
 
     Parameters
@@ -286,11 +284,7 @@ def perform_scipy_ndimage_zoom(scipy_directories, stats, conf):
     print("scipy zoom process has begun")
 
     output_directory = Path(conf.cutting_output_dir_path)
-    for scipy_directory in scipy_directories:
-
-        # checking for stat file
-        stats["mean"] = 0
-
+    for scipy_directory, stats in scipy_directories:
         scipy_len = len(scipy_directory)
         for i, image_path in enumerate(tqdm(scipy_directory)):
             directory_name = image_path.parent.name
@@ -360,10 +354,10 @@ def image_stat_processing(conf):
     directories = os.scandir(input_directory)
 
     # gets a dictionary containing directories that need kernelgan and directories that need scipy.ndimage.zoom
-    directories_dict, stats = get_kernel_non_kernel_directories(directories)
+    directories_dict= get_kernel_non_kernel_directories(directories)
 
-    perform_kernelgan(directories_dict["kernel"], stats, conf)
-    perform_scipy_ndimage_zoom(directories_dict["scipy"], stats, conf)
+    perform_kernelgan(directories_dict["kernel"], conf)
+    perform_scipy_ndimage_zoom(directories_dict["scipy"], conf)
 
     train_path = output_directory / "train"
     valid_path = output_directory / "valid"
