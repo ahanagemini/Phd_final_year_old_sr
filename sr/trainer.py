@@ -52,7 +52,7 @@ from losses import SSIM, L1loss, PSNR
 from logger import Logger
 
 BATCH_SIZE = {
-    "unet": 16,
+    "unet": 8,
     "axial": 16,
     "edsr_16_64": 8,
     "edsr_8_256": 16,
@@ -128,7 +128,7 @@ def training(
     dilation,
     act,
     model_save_path,
-        kernel
+    kernel,
 ):
     """
 
@@ -157,7 +157,7 @@ def training(
     # parameters
     lr = LR[architecture]
     if architecture == "unet":
-        model = UNET(in_channels=1, out_channels=1, init_features=32)
+        model = UNET(in_channels=1, out_channels=1, init_features=64, depth=4)
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif architecture == "edsr_16_64":
@@ -232,10 +232,7 @@ def training(
                     if kernel:
                         x_rescale_pad = scipy.ndimage.zoom(x_rescale_pad, 4.0)
                     save_plots = np.hstack(
-                        [
-                            x_rescale_pad,
-                            y_rescale.reshape(y_rescale.shape[1], -1),
-                        ]
+                        [x_rescale_pad, y_rescale.reshape(y_rescale.shape[1], -1),]
                     )
                     save_plots = np.clip(
                         save_plots, stat["min"][i].numpy(), stat["max"][i].numpy()
@@ -318,8 +315,20 @@ def training(
         torch.cuda.empty_cache()
 
 
-def process(train_path, valid_path, log_dir, architecture, num_epochs, lognorm, debug_pics, aspp,
-            dilation, act, model_save_path, kernel = False):
+def process(
+    train_path,
+    valid_path,
+    log_dir,
+    architecture,
+    num_epochs,
+    lognorm,
+    debug_pics,
+    aspp,
+    dilation,
+    act,
+    model_save_path,
+    kernel=False,
+):
     """
 
     Parameters
@@ -331,7 +340,6 @@ def process(train_path, valid_path, log_dir, architecture, num_epochs, lognorm, 
 
     """
 
-
     parameters = {
         "batch_size": BATCH_SIZE[architecture],
         "shuffle": True,
@@ -341,7 +349,6 @@ def process(train_path, valid_path, log_dir, architecture, num_epochs, lognorm, 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
-
 
     training_set = create_dataset(train_path, lognorm=lognorm)
     validation_set = create_dataset(valid_path, lognorm=lognorm)
@@ -361,7 +368,7 @@ def process(train_path, valid_path, log_dir, architecture, num_epochs, lognorm, 
         dilation,
         act,
         model_save_path,
-        kernel
+        kernel,
     )
 
 
@@ -379,7 +386,20 @@ if __name__ == "__main__":
     aspp = arguments["--aspp"]
     dilation = arguments["--dilation"]
     act = arguments["--act"]
-    kernel_factor = arguments['--kernel_factor']
-    model_save_path = Path(arguments['--model_save'])
+    kernel_factor = arguments["--kernel_factor"]
+    model_save_path = Path(arguments["--model_save"])
 
-    process(train_path, valid_path, log_dir, architecture, num_epochs, lognorm, debug_pics, aspp, dilation, act, model_save_path, kernel_factor)
+    process(
+        train_path,
+        valid_path,
+        log_dir,
+        architecture,
+        num_epochs,
+        lognorm,
+        debug_pics,
+        aspp,
+        dilation,
+        act,
+        model_save_path,
+        kernel_factor,
+    )

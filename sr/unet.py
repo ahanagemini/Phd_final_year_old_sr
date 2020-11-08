@@ -36,7 +36,7 @@ class Resnet(nn.Module):
                 out_channels=out_channels,
                 kernel=kernel,
                 stride=stride,
-                conv_section_type="relu",
+                conv_section_type="resnet",
             )
         )
         self.identity = nn.Sequential(
@@ -140,7 +140,7 @@ class Conv(nn.Module):
             self.section.append(nn.LeakyReLU())
             self.section.append(nn.BatchNorm2d(num_features=out_channels))
 
-        elif conv_section_type == "relu":
+        elif conv_section_type == "resnet":
             self.section.append(
                 nn.Conv2d(
                     in_channels=in_channels,
@@ -214,26 +214,26 @@ class Upsampling(nn.Module):
             self.up_sample = self.up = nn.Sequential(
                 # nn.Upsample(mode="bilinear", scale_factor=2),
                 nn.Upsample(mode="bicubic", scale_factor=2, align_corners=True),
-                nn.Conv2d(
+                Resnet(
                     in_channels=in_channels,
                     out_channels=out_channels,
-                    kernel_size=3,
+                    kernel=3,
                     stride=1,
                     padding=1,
                 ),
             )
         self.up_conv = nn.Sequential(
-            nn.Conv2d(
+            Resnet(
                 in_channels=in_channels,
                 out_channels=out_channels,
-                kernel_size=3,
+                kernel=3,
                 stride=1,
-                padding=1
+                padding=1,
             ),
-            nn.Conv2d(
+            Resnet(
                 in_channels=out_channels,
                 out_channels=out_channels,
-                kernel_size=3,
+                kernel=3,
                 stride=1,
                 padding=1,
             ),
@@ -264,7 +264,7 @@ class Upsampling(nn.Module):
 class UNET(nn.Module):
     """Unet Structure"""
 
-    def __init__(self, in_channels, out_channels, init_features=32, depth=6, k=1):
+    def __init__(self, in_channels, out_channels, init_features=32, depth=4, k=1):
         super(UNET, self).__init__()
         self.downsample = nn.ModuleList()
         self.initial_channels = in_channels
@@ -274,17 +274,29 @@ class UNET(nn.Module):
         # resnet
         self.resnet_blocks_left = []
         for i in range(k):
-            self.resnet_blocks_left.append(Resnet(
-            in_channels=self.initial_channels, out_channels=self.resnet_out_channels
-        ))
+            self.resnet_blocks_left.append(
+                Resnet(
+                    in_channels=self.initial_channels,
+                    out_channels=self.resnet_out_channels,
+                )
+            )
         self.resnet_left = nn.Sequential(*self.resnet_blocks_left)
         self.initial_channels = self.resnet_out_channels
         for i in range(depth):
             self.downsample.append(
-                Conv(
-                    in_channels=self.initial_channels,
-                    out_channels=init_features * (2 ** i),
-                    conv_section_type="conv",
+                nn.Sequential(
+                    Resnet(
+                        in_channels=self.initial_channels,
+                        out_channels=init_features * (2 ** i),
+                    ),
+                    Resnet(
+                        in_channels=init_features * (2 ** i),
+                        out_channels=init_features * (2 ** i),
+                    ),
+                    Resnet(
+                        in_channels=init_features * (2 ** i),
+                        out_channels=init_features * (2 ** i),
+                    ),
                 )
             )
             self.initial_channels = init_features * (2 ** i)
@@ -300,18 +312,33 @@ class UNET(nn.Module):
             self.initial_channels = init_features * (2 ** i)
         self.resnet_blocks_right = []
         for i in range(k):
-            self.resnet_blocks_right.append(Resnet(
-                in_channels=self.initial_channels,
-                out_channels=self.initial_channels
-                ))
+            self.resnet_blocks_right.append(
+                Resnet(
+                    in_channels=self.initial_channels,
+                    out_channels=self.initial_channels,
+                )
+            )
         self.resnet_right = nn.Sequential(*self.resnet_blocks_right)
+        self.final_upsample = nn.Upsample(
+            mode="bicubic", scale_factor=4, align_corners=True
+        )
+        self.final_conv = Conv(
+            in_channels=self.initial_channels,
+            out_channels=self.initial_channels,
+            kernel=3,
+            stride=1,
+            padding=1,
+            conv_section_type="conv",
+        )
         self.out_conv = nn.Conv2d(
-            in_channels=self.initial_channels, out_channels=out_channels,
-            kernel_size=3, padding=1
+            in_channels=self.initial_channels,
+            out_channels=out_channels,
+            kernel_size=3,
+            padding=1,
         )
 
     def downsampling(self, x):
-        '''
+        """
 
         Parameters
         ----------
@@ -326,7 +353,7 @@ class UNET(nn.Module):
 
         x: output after downsample
         skips: List of skips
-        '''
+        """
         skips = []
         for i, down in enumerate(self.downsample):
             x = down(x)
@@ -336,7 +363,7 @@ class UNET(nn.Module):
         return x, skips
 
     def upsampling(self, x, skips):
-        '''
+        """
 
         Parameters
         -----------
@@ -351,12 +378,10 @@ class UNET(nn.Module):
         Returns
         -----------
         x: output after upsample
-        '''
+        """
         for i, up in enumerate(self.upsample):
             x = up(x, skips[-i - 1])
         return x
-
-
 
     def forward(self, x):
         """
@@ -376,9 +401,9 @@ class UNET(nn.Module):
         """
         # downsample
         x = self.resnet_left(x)
-        dummy = torch.tensor(0.0, dtype=torch.float32, requires_grad=True)
         x, skips = self.downsampling(x)
         x = self.upsampling(x, skips)
+        x = self.final_upsample(x)
+        x = self.final_conv(x)
         x = self.resnet_right(x)
-
         return self.out_conv(x)

@@ -76,7 +76,6 @@ def stat_calculator(input_path):
     total_variance = (total_square_sum / total_count) - (total_sum / total_count) ** 2
     stats = {}
     stats["mean"] = total_mean
-    stats["variance"] = total_variance
     stats["std"] = np.sqrt(total_variance)
     stats["max"] = float(image_max)
     stats["min"] = float(image_min)
@@ -125,7 +124,6 @@ def get_kernel_non_kernel_directories(directories):
     for directory in directories:
         directory = Path(directory)
         temp_directory = list(directory.rglob("*.npz"))
-        print(len(temp_directory))
         if len(temp_directory) <= 15:
             stats = assert_stats(directory)
             directories_dict["kernel"].append((temp_directory, stats))
