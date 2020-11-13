@@ -10,13 +10,15 @@ Arguments:
 Options:
   -h --help -h
 """
-
+import time
 import statistics
 import random
 from docopt import docopt
 from pathlib import Path
 import pandas as pd
 import numpy as np
+from frechetdist import frdist
+from scipy.spatial.distance import directed_hausdorff
 
 utility_scaler = 1
 tolerance = 0.000001
@@ -41,7 +43,7 @@ def read_diversity(diversity_file):
     '''
 
     diversity = pd.read_csv(diversity_file, header=None,
-                            names=['filename'] + [str(i) for i in range(0, 32)])
+                            names=['filename'] + [str(i) for i in range(0, 128)])
     sorted_diversity = diversity.sort_values(by='filename')
     diversity_values = sorted_diversity.drop('filename', axis='columns')
     return diversity_values.to_numpy()
@@ -56,15 +58,16 @@ def compute_diversity(diversity_values, utility_values, files):
         utility_values: list of utility values
     Returns: the distance-and-utility matrix
     '''
-
     d_u_matrix = np.zeros((len(utility_values), len(utility_values)))
+    start = time.time()
     for i in range(len(utility_values)):
         for j in range(i + 1, len(utility_values)):
-            temp = np.sqrt(np.sum(np.square(np.subtract(diversity_values[i],
-                                                        diversity_values[j]))))
+            u = np.array(diversity_values[4*i: 4*(i+1)])
+            v = np.array(diversity_values[4*j: 4*(j+1)])
+            temp = max(directed_hausdorff(u, v)[0], directed_hausdorff(v, u)[0])
             d_u_matrix[i][j] = temp
             d_u_matrix[j][i] = temp
-
+    print(f"Distance computation time {time.time() - start}")
     maxim = np.max(d_u_matrix)
     # maxim = 5 * np.std(d_u_matrix)
     d_u_matrix = d_u_matrix / maxim
