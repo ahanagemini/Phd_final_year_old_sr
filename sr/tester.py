@@ -117,16 +117,16 @@ def evaluate(args):
     elif args["--architecture"] == 'axial':
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif  args["--architecture"] == 'edsr_16_64':
-        model = EDSR(n_resblocks=16, n_feats=64, scale=4,
+        model = EDSR(n_resblocks=16, n_feats=64,
                      dilation=dilation, aspp=aspp, act=act)
     elif  args["--architecture"] == 'edsr_8_256':
-        model = EDSR(n_resblocks=8, n_feats=256, scale=4,
+        model = EDSR(n_resblocks=8, n_feats=256,
                      dilation=dilation, aspp=aspp, act=act)
     elif  args["--architecture"] == 'edsr_16_256':
-        model = EDSR(n_resblocks=16, n_feats=256, scale=4,
+        model = EDSR(n_resblocks=16, n_feats=256,
                      dilation=dilation, aspp=aspp, act=act)
     elif args["--architecture"] == 'edsr_32_256':
-        model = EDSR(n_resblocks=32, n_feats=256, scale=4)
+        model = EDSR(n_resblocks=32, n_feats=256)
 
     model.to(device)
     test_loss = 0
