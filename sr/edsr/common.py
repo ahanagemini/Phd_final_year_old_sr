@@ -8,7 +8,7 @@ import torch.nn.functional as F
 def default_conv(in_channels, out_channels, kernel_size, bias=True, dilation=1):
     return nn.Conv2d(
         in_channels, out_channels, kernel_size,
-        padding=dilation, bias=bias, dilation=dilation)
+        padding=kernel_size//2, bias=bias, dilation=dilation)
 
 
 class MeanShift(nn.Conv2d):

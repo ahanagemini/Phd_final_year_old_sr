@@ -44,7 +44,7 @@ import numpy as np
 import tifffile
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from unet import UNET
+from models import UNET
 from edsr import EDSR
 from dataset import SrDataset, PairedDataset
 from axial_bicubic import AxialNet
@@ -162,18 +162,18 @@ def training(
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif architecture == "edsr_16_64":
         model = EDSR(
-            n_resblocks=16, n_feats=64, scale=4, aspp=aspp, dilation=dilation, act=act
+            n_resblocks=16, n_feats=64, aspp=aspp, dilation=dilation, act=act
         )
     elif architecture == "edsr_8_256":
         model = EDSR(
-            n_resblocks=8, n_feats=256, scale=4, aspp=aspp, dilation=dilation, act=act
+            n_resblocks=8, n_feats=256, aspp=aspp, dilation=dilation, act=act
         )
     elif architecture == "edsr_16_256":
         model = EDSR(
-            n_resblocks=16, n_feats=256, scale=4, aspp=aspp, dilation=dilation, act=act
+            n_resblocks=16, n_feats=256, aspp=aspp, dilation=dilation, act=act
         )
     elif architecture == "edsr_32_256":
-        model = EDSR(n_resblocks=32, n_feats=256, scale=4)
+        model = EDSR(n_resblocks=32, n_feats=256)
 
     model.to(device)
     summary(model, (1, 64, 64), batch_size=1, device="cuda")

@@ -1,1 +1,1 @@
-from .model import EDSR
+from .newmodel import EDSR

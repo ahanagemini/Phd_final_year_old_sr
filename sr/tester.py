@@ -33,7 +33,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from skimage import metrics
-from unet import UNET
+from models import UNET
 from axial_bicubic import AxialNet
 from edsr import EDSR
 from tqdm import tqdm
