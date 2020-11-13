@@ -44,7 +44,7 @@ import numpy as np
 import tifffile
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from models import UNET
+from unet import UNET
 from edsr import EDSR
 from dataset import SrDataset, PairedDataset
 from axial_bicubic import AxialNet
