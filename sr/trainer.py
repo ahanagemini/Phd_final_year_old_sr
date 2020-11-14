@@ -153,8 +153,6 @@ def training(
     save_model_path = Path(model_save_path)
     if not save_model_path.is_dir():
         os.makedirs(save_model_path)
-    else:
-        os.makedirs(str(save_model_path)+"L")
     save_model_path = str(save_model_path)
     # parameters
     lr = LR[architecture]
