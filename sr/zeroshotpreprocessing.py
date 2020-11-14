@@ -211,6 +211,9 @@ def perform_kernelgan(kernel_directories, conf):
                 out_image = imresize(im=image, scale_factor=scale, kernel=kernel)
                 sample_list.append(out_image)
 
+                height, width = out_image.shape[0], out_image.shape[1]
+                assert (height >= 256 and width >=256)
+
             print("process of cutting and saving images has started")
             sample_count = len(sample_list)
             np.random.shuffle(sample_list)

@@ -51,7 +51,8 @@ class PyramidAttention(nn.Module):
         for i in range(len(self.scale)):
             ref = input
             if self.scale[i] != 1:
-                ref = F.interpolate(input, scale_factor=self.scale[i], mode="bicubic")
+                ref = F.interpolate(input, scale_factor=self.scale[i], mode="bicubic",
+                                    align_corners=True, recompute_scale_factor=True)
                # print("Ref shape = ", type(ref))
             # feature transformation function f
             base = self.conv_assembly(ref)

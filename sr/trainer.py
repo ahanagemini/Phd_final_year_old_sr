@@ -44,15 +44,15 @@ import numpy as np
 import tifffile
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from unet import UNET
-from edsr import EDSR
+from models import UNET
+from models import EDSR
 from dataset import SrDataset, PairedDataset
 from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR
 from logger import Logger
 
 BATCH_SIZE = {
-    "unet": 8,
+    "unet": 4,
     "axial": 16,
     "edsr_16_64": 8,
     "edsr_8_256": 16,
@@ -153,6 +153,8 @@ def training(
     save_model_path = Path(model_save_path)
     if not save_model_path.is_dir():
         os.makedirs(save_model_path)
+    else:
+        os.makedirs(str(save_model_path)+"L")
     save_model_path = str(save_model_path)
     # parameters
     lr = LR[architecture]

@@ -2,9 +2,63 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
-
+from .attention import PyramidAttention
 import numpy as np
 
+class Final_Upsample(nn.Module):
+    """This class performs the final upsampling to produce a higher resolution image"""
+
+    def __init__(self,in_channels, out_channels, kernel=3, stride=1,
+                 padding=1, upsample_debt=2, mode="bicubic", scale_factor=2, align_corners=True):
+        """
+
+        Parameters
+        ----------
+        in_channels:int
+        Number of channels in the input image
+
+        out_channels:int
+        Filters (output channels produced by conv)
+
+        kernel:int
+        Filter size
+
+        stride: int
+        Stride of the convolution
+
+        padding: int
+        Zero-padding added to both sides of the input
+
+        upsample_debt: int
+        Length of the number of upsamples that need to be done
+
+        mode: String
+        The type of interpolation required during upsampling
+
+        scale_factor: int
+        The upsampling scale
+
+        align_corners: bool
+        """
+        super(Final_Upsample, self).__init__()
+        self.section = nn.ModuleList()
+        self.section.append(Resnet(in_channels=in_channels, out_channels=4*out_channels,
+                                   kernel=kernel, stride=stride, padding=padding))
+        self.section.append(nn.PixelShuffle(2))
+        self.upsample_conv = nn.Sequential(*self.section)
+        self.upsample_debt = upsample_debt
+
+    def forward(self, x):
+        """
+        Parameters
+        ----------
+        x
+        Returns
+        -------
+        """
+        for i in range(self.upsample_debt):
+            x = self.upsample_conv(x)
+        return x
 
 class Resnet(nn.Module):
     """This is resnet class"""
@@ -212,8 +266,6 @@ class Upsampling(nn.Module):
             )
         elif sample_type == "upsamp":
             self.up_sample = self.up = nn.Sequential(
-                # nn.Upsample(mode="bilinear", scale_factor=2),
-                nn.Upsample(mode="bicubic", scale_factor=2, align_corners=True),
                 Resnet(
                     in_channels=in_channels,
                     out_channels=out_channels,
@@ -221,6 +273,9 @@ class Upsampling(nn.Module):
                     stride=1,
                     padding=1,
                 ),
+                nn.Conv2d(in_channels=out_channels, out_channels=4 * out_channels,
+                          kernel_size=3, stride=1, padding=1),
+                nn.PixelShuffle(2),
             )
         self.up_conv = nn.Sequential(
             Resnet(
@@ -283,23 +338,45 @@ class UNET(nn.Module):
         self.resnet_left = nn.Sequential(*self.resnet_blocks_left)
         self.initial_channels = self.resnet_out_channels
         for i in range(depth):
-            self.downsample.append(
-                nn.Sequential(
-                    Resnet(
-                        in_channels=self.initial_channels,
-                        out_channels=init_features * (2 ** i),
-                    ),
-                    Resnet(
-                        in_channels=init_features * (2 ** i),
-                        out_channels=init_features * (2 ** i),
-                    ),
-                    Resnet(
-                        in_channels=init_features * (2 ** i),
-                        out_channels=init_features * (2 ** i),
-                    ),
+            if i == depth - 1:
+                print(f"init_features is {init_features*(2**i)}")
+                self.downsample.append(
+                    nn.Sequential(
+                        Resnet(
+                            in_channels=self.initial_channels,
+                            out_channels=init_features * (2 ** i),
+                        ),
+                        PyramidAttention(channel=init_features * (2 ** i),
+                                         reduction=8, res_scale=0.1
+                                         ),
+
+                        Resnet(
+                            in_channels=init_features * (2 ** i),
+                            out_channels=init_features * (2 ** i),
+                        ),
+                        Resnet(
+                            in_channels=init_features * (2 ** i),
+                            out_channels=init_features * (2 ** i),
+                        ))
                 )
-            )
+            else:
+                self.downsample.append(
+                    nn.Sequential(
+                        Resnet(
+                            in_channels=self.initial_channels,
+                            out_channels=init_features * (2 ** i),
+                        ),
+                    Resnet(
+                        in_channels=init_features * (2 ** i),
+                        out_channels=init_features * (2 ** i),
+                    ),
+                    Resnet(
+                        in_channels=init_features * (2 ** i),
+                        out_channels=init_features * (2 ** i),
+                    ))
+                )
             self.initial_channels = init_features * (2 ** i)
+
         self.upsample = nn.ModuleList()
         for i in reversed(range(depth - 1)):
             self.upsample.append(
@@ -319,17 +396,10 @@ class UNET(nn.Module):
                 )
             )
         self.resnet_right = nn.Sequential(*self.resnet_blocks_right)
-        self.final_upsample = nn.Upsample(
-            mode="bicubic", scale_factor=4, align_corners=True
-        )
-        self.final_conv = Conv(
-            in_channels=self.initial_channels,
-            out_channels=self.initial_channels,
-            kernel=3,
-            stride=1,
-            padding=1,
-            conv_section_type="conv",
-        )
+        self.final_upsample = Final_Upsample(in_channels=self.initial_channels, out_channels=self.initial_channels,
+                                             kernel=3, stride=1, padding=1, upsample_debt=2, mode="bicubic",
+                                             scale_factor=2, align_corners=True)
+
         self.out_conv = nn.Conv2d(
             in_channels=self.initial_channels,
             out_channels=out_channels,
@@ -404,6 +474,5 @@ class UNET(nn.Module):
         x, skips = self.downsampling(x)
         x = self.upsampling(x, skips)
         x = self.final_upsample(x)
-        x = self.final_conv(x)
         x = self.resnet_right(x)
         return self.out_conv(x)
