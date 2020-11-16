@@ -209,17 +209,35 @@ def training(
     current_epoch = 0
     # check if there is a .pt file of model after an epoch
     if os.path.isfile(current_model):
-        checkpoint = torch.load(current_model)
-        model.load_state_dict(checkpoint['model'])
-        current_epoch = checkpoint['epoch']
-        optimizer.load_state_dict(checkpoint['optimizer'])
+        if architecture == "edsr":
+            checkpoint = torch.load(current_model)
+            model.load_state_dict(checkpoint['model'])
+            current_epoch = checkpoint['epoch']
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            scheduler.load_state_dict(checkpoint['scheduler'])
+
+        else:
+            checkpoint = torch.load(current_model)
+            model.load_state_dict(checkpoint['model'])
+            current_epoch = checkpoint['epoch']
+            optimizer.load_state_dict(checkpoint['optimizer'])
+
+
 
     # check if there is a .pt file of best model if epoch .pt file is missing
     elif os.path.isfile(best_model):
-        checkpoint = torch.load(best_model)
-        model.load_state_dict(checkpoint['model'])
-        current_epoch = checkpoint['epoch']
-        optimizer.load_state_dict(checkpoint['optimizer'])
+        if architecture == "edsr":
+            checkpoint = torch.load(current_model)
+            model.load_state_dict(checkpoint['model'])
+            current_epoch = checkpoint['epoch']
+            optimizer.load_state_dict(checkpoint['optimizer'])
+            scheduler.load_state_dict(checkpoint['scheduler'])
+
+        else:
+            checkpoint = torch.load(current_model)
+            model.load_state_dict(checkpoint['model'])
+            current_epoch = checkpoint['epoch']
+            optimizer.load_state_dict(checkpoint['optimizer'])
 
 
 
