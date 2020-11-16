@@ -131,7 +131,9 @@ def evaluate(args):
     test_ssim = 0.0
     lr_tot_psnr = 0.0
     lr_tot_ssim = 0.0
-    model.load_state_dict(torch.load(args["--model"]))
+
+    checkpoint = torch.load(args["--model"])
+    model.load_state_dict(checkpoint['model'])
     active_list = []
     length = sum(1 for x in test_generator)
     with torch.no_grad():

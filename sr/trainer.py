@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --num_epochs=epochs --architecture=arch --act=act --kernel_factor=factor --model_save=model[--lognorm] [--debug_input_pics] [--aspp] [--dilation]
+"""Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --num_epochs=epochs --architecture=arch --act=act --kernel_factor=factor --model_save=model[--lognorm] [--debug_input_pics] [--aspp] [--dilation] [--resume]
             trainer.py --help | -help | -h
 
 Train the requested model.
@@ -17,6 +17,7 @@ Arguments:
   --debug_input_pics  If we want to save input pics for debugging
   --aspp        use ASPP in EDSR
   --dilation    use dilation at the beginning in edsr
+  --resume      set this if you want resume a model
 Options:
   -h --help -h
 """
@@ -97,12 +98,12 @@ def create_dataset(path, lognorm=False):
         return SrDataset(path, lognorm=lognorm)
 
 
-def model_save(train_model, train_model_path):
+def model_save(save_params, train_model_path):
     """
 
     Parameters
     ----------
-    train_model: model state dictionary
+    save_params: dictionary containing all params to be saved
     train_model_path: model path
 
     Returns
@@ -113,8 +114,7 @@ def model_save(train_model, train_model_path):
     model_folder = model_path.parent
     if not model_folder.is_dir():
         os.makedirs(model_folder)
-    torch.save(train_model.state_dict(), model_path)
-
+    torch.save(save_params, model_path)
 
 def training(
     training_generator,
@@ -128,7 +128,7 @@ def training(
     dilation,
     act,
     model_save_path,
-    kernel,
+    kernel
 ):
     """
 
@@ -151,9 +151,12 @@ def training(
     """
     timestamp = f"{datetime.datetime.now().date()}-{datetime.datetime.now().time()}"
     save_model_path = Path(model_save_path)
-    if not save_model_path.is_dir():
-        os.makedirs(save_model_path)
-    save_model_path = str(save_model_path)
+    current_save_model_path = save_model_path / "current"
+    best_save_model_path = save_model_path / "best"
+    if not current_save_model_path.is_dir():
+        os.makedirs(current_save_model_path)
+    if not best_save_model_path.is_dir():
+        os.makedirs(best_save_model_path)
     # parameters
     lr = LR[architecture]
     if architecture == "unet":
@@ -175,25 +178,64 @@ def training(
     elif architecture == "edsr_32_256":
         model = EDSR(n_resblocks=32, n_feats=256)
 
+
+
+
     model.to(device)
     summary(model, (1, 64, 64), batch_size=1, device="cuda")
     max_epochs = num_epochs
     criterion = torch.nn.L1Loss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
+    current_model_list = list(current_save_model_path.rglob('*.pt'))
+    current_model_list = sorted(current_model_list)
+    best_model_list = list(best_save_model_path.rglob("*best_model.pt"))
+    best_model_list = sorted(best_model_list)
 
     # learning rate scheduler
     if architecture == "edsr":
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=1)
+
+    if not current_model_list:
+        current_model = ""
+    else:
+        current_model = current_model_list[-1]
+
+    if not best_model_list:
+        best_model = ""
+    else:
+        best_model = best_model_list[-1]
+
+
+    current_epoch = 0
+    # check if there is a .pt file of model after an epoch
+    if os.path.isfile(current_model):
+        checkpoint = torch.load(current_model)
+        model.load_state_dict(checkpoint['model'])
+        current_epoch = checkpoint['epoch']
+        optimizer.load_state_dict(checkpoint['optimizer'])
+
+    # check if there is a .pt file of best model if epoch .pt file is missing
+    elif os.path.isfile(best_model):
+        checkpoint = torch.load(best_model)
+        model.load_state_dict(checkpoint['model'])
+        current_epoch = checkpoint['epoch']
+        optimizer.load_state_dict(checkpoint['optimizer'])
+
+
+
     best_valid_loss = float("inf")
     logger = Logger(str(log_dir))
-    step = 0
+    step = current_epoch
     # TODO: Remove after debugging is done
     if debug_pics:
         input_save_path = Path(os.path.dirname(__file__) + r"/input_pics")
         if input_save_path.is_dir():
             shutil.rmtree(input_save_path)
         os.makedirs(input_save_path)
-    for epoch in range(max_epochs):
+
+    while(step < max_epochs):
+        print(f"current step is {step}")
+        epoch = step
         start_time = time()
         train_loss = valid_loss = 0.0
         model.train()
@@ -300,18 +342,56 @@ def training(
                 memory,
             )
         )
+
+        if architecture == "edsr":
+            save_params = {
+                "epoch": step,
+                "model": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "scheduler": scheduler
+            }
+        else:
+            save_params = {
+                "epoch": step,
+                "model": model.state_dict(),
+                "optimizer": optimizer.state_dict()
+            }
         # Save best validation epoch model
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
-            model_save(
-                model, f"{save_model_path}/{architecture}/{timestamp}_best_model.pt",
-            )
 
-        if step % 10 == 0:
+
             model_save(
-                model, f"{save_model_path}/{architecture}/{timestamp}_model_{step}.pt",
+                save_params, f"{str(best_save_model_path)}/{timestamp}_best_model.pt"
             )
-        model_save(model, f"{save_model_path}/{architecture}/{timestamp}_model.pt")
+            # deleting old best model after new one is saved
+            if os.path.isfile(best_model):
+                os.remove(best_model)
+
+            best_model_list = list(best_save_model_path.rglob("*best_model.pt"))
+            best_model_list = sorted(best_model_list)
+
+            if not best_model_list:
+                best_model = ""
+            else:
+                best_model = best_model_list[-1]
+
+
+        model_save(save_params, f"{str(current_save_model_path)}/{timestamp}_model_{step}.pt")
+
+        # deleting old current model after new one is saved
+        print(f"the current model path is {current_model}")
+        if os.path.isfile(current_model):
+            os.remove(current_model)
+
+        current_model_list = list(current_save_model_path.rglob('*.pt'))
+        current_model_list = sorted(current_model_list)
+
+        if not current_model_list:
+            current_model = ""
+        else:
+            current_model = current_model_list[-1]
+
         torch.cuda.empty_cache()
 
 
@@ -327,7 +407,7 @@ def process(
     dilation,
     act,
     model_save_path,
-    kernel=False,
+    kernel = False
 ):
     """
 
@@ -368,7 +448,7 @@ def process(
         dilation,
         act,
         model_save_path,
-        kernel,
+        kernel
     )
 
 
@@ -386,7 +466,6 @@ if __name__ == "__main__":
     aspp = arguments["--aspp"]
     dilation = arguments["--dilation"]
     act = arguments["--act"]
-    kernel_factor = arguments["--kernel_factor"]
     model_save_path = Path(arguments["--model_save"])
 
     process(
@@ -400,6 +479,5 @@ if __name__ == "__main__":
         aspp,
         dilation,
         act,
-        model_save_path,
-        kernel_factor,
+        model_save_path
     )

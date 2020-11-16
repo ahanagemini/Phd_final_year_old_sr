@@ -1,5 +1,7 @@
 import argparse
 import torch
+import itertools
+from pathlib import Path
 import os
 
 
@@ -40,6 +42,11 @@ class Config:
         self.parser.add_argument('--d_lr', type=float, default=2e-4, help='initial learning rate for discriminator')
         self.parser.add_argument('--beta1', type=float, default=0.5, help='Adam momentum')
 
+        # Extra Kernel Gan Parameters
+        self.parser.add_argument('--kernel_save', default=os.path.dirname(__file__) + r"/kernel_folder",
+                                 help="The kernel files will be stored here")
+
+
         # Trainer.py Parameters
         self.parser.add_argument('--train', default=os.path.dirname(__file__) + r"/results/train",
                                  help="train files path")
@@ -56,6 +63,9 @@ class Config:
         self.parser.add_argument('--act', default="leakyrelu", help="activation type relu or leakyrelu for edsr")
         self.parser.add_argument('--model_save', default=os.path.dirname(__file__)+"r/saved_models",
                                  help= "the path where model will be saved")
+        self.parser.add_argument('--load_one_old', type=bool, default=False,
+                                 help="This command is to can be used to load the last model trained")
+        self.parser.add_argument('--resume', default=None, help="this coomand can be used to load trained model")
 
         # Tester.py Parameters
         self.parser.add_argument("--test_input_dir")
@@ -85,7 +95,60 @@ class Config:
         self.conf = self.parser.parse_args(args=args)
         self.set_gpu_device()
         self.conf.G_structure = [7, 5, 3, 1, 1, 1]
+
+        # if model available which needs to resume training
+        if self.conf.resume:
+            self.conf.model_save = self.conf.resume
+            return self.conf
+
+        # if no model has been created yet
+        if not os.path.isdir(self.conf.model_save):
+            os.makedirs(self.conf.model_save)
+
+        self.conf.model_save = self.get_model_directories(self.conf.model_save)
+
+        #  if command not present it will create new directory
+        #  for saving models or else last model trained will be loaded
+        if not self.conf.load_one_old:
+            self.conf.model_save = self.check_model_directory(self.conf.model_save)
         return self.conf
+
+    def get_model_directories(self, model_save):
+        """
+
+        Parameters
+        ----------
+        model_save:
+
+        Returns
+        -------
+        last_folder
+        """
+        directories = os.scandir(model_save)
+        directories = [str(x.path) for x in directories]
+        if not directories:
+            return model_save + f"/{self.conf.architecture}"
+        last_folder = sorted(directories)[-1]
+        return last_folder
+
+    def check_model_directory(self, model_save):
+        """
+
+        Parameters
+        ----------
+        model_save: Path of model directory
+
+        Returns
+        -------
+        model_save
+        """
+        if os.path.isdir(model_save):
+            for i in itertools.count(start=1, step=1):
+                new_folder = model_save + '({0})'.format(i)
+                if not os.path.isdir(new_folder):
+                    model_save = new_folder
+                    break
+        return model_save
 
     def set_gpu_device(self):
         """Sets the GPU device if one is given"""

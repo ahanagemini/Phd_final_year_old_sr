@@ -113,7 +113,7 @@ def evaluate(args):
     act = args["--act"]
     # model create and load
     if args["--architecture"] == 'unet':
-        model = UNET(in_channels=1, out_channels=1, init_features=32)
+        model = UNET(in_channels=1, out_channels=1, init_features=64, depth=4)
     elif args["--architecture"] == 'axial':
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif  args["--architecture"] == 'edsr_16_64':
@@ -135,7 +135,8 @@ def evaluate(args):
     test_ssim = 0.0
     lr_tot_psnr = 0.0
     lr_tot_ssim = 0.0
-    model.load_state_dict(torch.load(args["--model"]))
+    checkpoint = torch.load(args["--model"])
+    model.load_state_dict(checkpoint['model'])
     active_list = []
     with torch.no_grad():
         for batch_idx, data in enumerate(tqdm(test_generator)):
