@@ -80,7 +80,7 @@ def perform_pca(pca_list):
     print(f"PCA time {time.time() - start}")
     return X_transformed.tolist()
 
-def write_diversity(img_dir, pca_list, img4list):
+def write_dim_reduced(img_dir, pca_list, img4list):
 
     '''
     Function to write dimensio reduced images to file
@@ -92,7 +92,7 @@ def write_diversity(img_dir, pca_list, img4list):
     [pca_list[i].insert(0, img4list[i]) for i in range(len(pca_list))]
     
     active_file = str(img_dir).split('/')[-1]
-    with open(f"active_diversity_metrics/{active_file}.csv", 'w') as f:
+    with open(f"active_dim_reduced_metrics/{active_file}.csv", 'w') as f:
         # using csv.writer method from CSV package
         write = csv.writer(f)
         write.writerows(pca_list)
@@ -105,6 +105,6 @@ if __name__ == "__main__":
     start = time.time()
     img4list, pre_pca_list = preprocess_images(img_dir)
     pca_list = perform_pca(pre_pca_list)
-    write_diversity(img_dir, pca_list, img4list)
+    write_dim_reduced(img_dir, pca_list, img4list)
     print(f"Total time {time.time() - start}")
 
