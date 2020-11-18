@@ -380,20 +380,8 @@ def training(
 
 
             model_save(
-                save_params, f"{str(best_save_model_path)}/{timestamp}_best_model.pt"
+                save_params, f"{str(best_save_model_path)}/best_model.pt"
             )
-            # deleting old best model after new one is saved
-            if os.path.isfile(best_model):
-                os.remove(best_model)
-
-            best_model_list = list(best_save_model_path.rglob("*best_model.pt"))
-            best_model_list = sorted(best_model_list)
-
-            if not best_model_list:
-                best_model = ""
-            else:
-                best_model = best_model_list[-1]
-
 
         model_save(save_params, f"{str(current_save_model_path)}/{timestamp}_model_{step}.pt")
 

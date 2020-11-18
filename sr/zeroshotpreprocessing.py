@@ -126,7 +126,8 @@ def get_kernel_non_kernel_directories(directories):
         temp_directory = list(directory.rglob("*.npz"))
         if len(temp_directory) <= 15:
             stats = assert_stats(directory)
-            directories_dict["kernel"].append((temp_directory, stats))
+            directory_name = directory.name
+            directories_dict["kernel"].append((temp_directory, stats, directory_name))
         else:
             stats = assert_stats(directory)
             directories_dict["scipy"].append((temp_directory, stats))
@@ -170,6 +171,54 @@ def predict_kernel(image_matrix, image_name, output_directory, stats):
         np.savez_compressed(hr_opath / fname, imat)
 
 
+def check_kernel(conf, directory_name, image_name):
+    """
+    This method will check if kernel gan was run before and if it was it will directly load the saved kernel and if not
+    it will run kernelgan. Finally it will return kernel.
+
+    Parameters
+    ----------
+    conf : contains the configurations required by kernelgan
+    directory_name : contains the name of the directory
+    image_name: contains the name of the image
+
+    Returns
+    -------
+    kernel
+    """
+
+    kernel_save = Path(conf.kernel_save) / directory_name
+
+    # checking if the directory exists
+    if not os.path.isdir(kernel_save):
+        os.makedirs(kernel_save)
+        kernel = kernelgan_train(conf)
+        return kernel
+    else:
+        # checking if kernel entry file exists
+        if not os.path.isfile(kernel_save / "kernel_entry.json"):
+            kernel = kernelgan_train(conf)
+            return kernel
+        else:
+            images_data = json.load(open(str(kernel_save / "kernel_entry.json")))
+
+            # checking if the image details is present in the entry
+            if image_name in images_data.keys():
+                data_image_sum = images_data[image_name]
+                actual_image_sum = float(np.sum(conf.image))
+
+                # checking if the kernel belongs to the correct image
+                if actual_image_sum == data_image_sum:
+                    kernel = np.load(str(kernel_save / (image_name + ".npy")))
+                    return kernel
+                else:
+                    kernel = kernelgan_train(conf)
+                    return kernel
+            else:
+                kernel = kernelgan_train(conf)
+                return kernel
+
+
 def perform_kernelgan(kernel_directories, conf):
     """
 
@@ -185,8 +234,10 @@ def perform_kernelgan(kernel_directories, conf):
 
     print("kernelgan process has started")
     output_directory = Path(conf.cutting_output_dir_path)
-    for kernel_directory, stats in kernel_directories:
+    for kernel_directory, stats, directory_name in kernel_directories:
 
+        kernel_entry = {}
+        kernel_save = Path(conf.kernel_save) / directory_name
         for image_path in tqdm(kernel_directory):
 
             """
@@ -200,10 +251,11 @@ def perform_kernelgan(kernel_directories, conf):
             print("Image shape:", image.shape)
             conf.image = image
             conf.stats = stats
-            kernel = kernelgan_train(conf)
+            kernel = check_kernel(conf, directory_name, image_name)
+            kernel_entry[image_name] = float(np.sum(image))
+            np.save(str(kernel_save / (image_name + ".npy")), kernel)
             sample_list = [image]
             print("Image shape:", image.shape)
-
             print(f"The image is being rescaled by given {conf.n_resize} times")
             scale_factor = 0.95
             for i in range(conf.n_resize):
@@ -212,7 +264,7 @@ def perform_kernelgan(kernel_directories, conf):
                 sample_list.append(out_image)
 
                 height, width = out_image.shape[0], out_image.shape[1]
-                assert (height >= 256 and width >=256)
+                assert height >= 256 and width >= 256
 
             print("process of cutting and saving images has started")
             sample_count = len(sample_list)
@@ -266,6 +318,10 @@ def perform_kernelgan(kernel_directories, conf):
             print("the process of creating predict folder has started")
             predict_kernel(image[:, :, 0], image_name, output_directory, stats)
             print("the process of creating predict has ended")
+
+        # saving the kernel entries in json file
+        with open(str(kernel_save / "kernel_entry.json"), "w") as kfile:
+            json.dump(kernel_entry, kfile)
 
     print("kernelgan process has finished")
 
@@ -355,7 +411,7 @@ def image_stat_processing(conf):
     directories = os.scandir(input_directory)
 
     # gets a dictionary containing directories that need kernelgan and directories that need scipy.ndimage.zoom
-    directories_dict= get_kernel_non_kernel_directories(directories)
+    directories_dict = get_kernel_non_kernel_directories(directories)
 
     perform_kernelgan(directories_dict["kernel"], conf)
     perform_scipy_ndimage_zoom(directories_dict["scipy"], conf)

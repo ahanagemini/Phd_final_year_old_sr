@@ -102,6 +102,7 @@ class Config:
             return self.conf
 
         # if no model has been created yet
+        self.conf.model_save = self.conf.model_save+f"/{self.conf.architecture}"
         if not os.path.isdir(self.conf.model_save):
             os.makedirs(self.conf.model_save)
 
@@ -111,6 +112,7 @@ class Config:
         #  for saving models or else last model trained will be loaded
         if not self.conf.load_one_old:
             self.conf.model_save = self.check_model_directory(self.conf.model_save)
+            os.makedirs(self.conf.model_save)
         return self.conf
 
     def get_model_directories(self, model_save):
