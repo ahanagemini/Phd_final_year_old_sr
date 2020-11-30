@@ -1,10 +1,13 @@
 from torch.utils.tensorboard import SummaryWriter
 import shutil
+import os
 
 
 class Logger(object):
     def __init__(self, log_dir):
-        shutil.rmtree(log_dir)
+        if os.path.isdir(log_dir):
+            shutil.rmtree(log_dir)
+        os.makedirs(log_dir)
         self.writer = SummaryWriter(log_dir=log_dir)
 
     def scalar_summary(self, tag, value, step):

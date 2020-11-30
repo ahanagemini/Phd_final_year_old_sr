@@ -133,6 +133,91 @@ class PSNR(nn.Module):
         """
         mse = torch.mean((y_pred - y_true) ** 2)
         return 10 * torch.log10(1.0 / mse)
-        #l1 = L1loss()
-        #mae = l1(y_pred=y_pred, y_true=y_true)
-        #return 10 * torch.log10(1 / mae)
+
+
+class Column_Difference(nn.Module):
+    """This class will calculate the sum of the adjacent column difference between two tensors"""
+
+    def __init__(self):
+        super(Column_Difference, self).__init__()
+
+    def column_difference_calculation(self, y_tensor):
+        """
+
+        Parameters
+        ----------
+        y_tensor: Tensor
+        The image tensor
+
+        Returns
+        -------
+        y_new_tensor: Tensor
+        The tensor contains the adjacent column difference
+
+        """
+        # calculating adjacent column difference
+        y_new_tensor = torch.abs(y_tensor[:, 1:, :] - y_tensor[:, :-1, :])
+        return y_new_tensor
+
+    def forward(self, y_pred, y_true):
+        """
+
+        Parameters
+        ----------
+        y_pred: Tensor
+        predicted values
+
+        y_true: Tensor
+        ground truth values
+
+        Returns
+        -------
+        column_loss: Tensor
+        """
+        y_pred = self.column_difference_calculation(y_tensor=y_pred)
+        y_true = self.column_difference_calculation(y_tensor=y_true)
+        column_loss = torch.sum(torch.abs(y_pred - y_true))
+        return column_loss
+
+
+class Row_Difference(nn.Module):
+    """This class calculates the sum of the adjacent row difference between two tensors"""
+
+    def __init__(self):
+        super(Row_Difference, self).__init__()
+
+    def row_difference_calculation(self, y_tensor):
+        """
+
+        Parameters
+        ----------
+        y_tensor: Tensor
+        the image tensor
+
+        Returns
+        -------
+        y_new_tensor: Tensor
+        the tensor contains the adjacent row difference
+        """
+        y_new_tensor = y_tensor[1:, :, :] - y_tensor[:-1, :, :]
+        return y_new_tensor
+
+    def forward(self, y_pred, y_true):
+        """
+
+        Parameters
+        ----------
+        y_pred: Tensor
+        The predicted tensor
+
+        y_true: Tensor
+        The ground truth tensor
+
+        Returns
+        -------
+        row_loss
+        """
+        y_pred = self.row_difference_calculation(y_tensor=y_pred)
+        y_true = self.row_difference_calculation(y_tensor=y_true)
+        row_loss = torch.sum(torch.abs(y_pred - y_true))
+        return row_loss

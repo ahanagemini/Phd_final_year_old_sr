@@ -31,6 +31,8 @@ import numpy as np
 import scipy.ndimage
 from pathlib import Path
 from cutter import loader, matrix_cutter
+import matplotlib.pyplot as plt
+from PIL import Image, ImageDraw, ImageFont
 from kernelgan import imresize
 from kernelgan import train as kernelgan_train
 from configs import Config
@@ -39,6 +41,17 @@ from tester import evaluate
 from tqdm import tqdm
 
 sample_dict = {"--X2": 0.5, "--X4": 0.25, "--X8": 0.125}
+
+
+def writetext(imgfile):
+    img = Image.open(imgfile)
+    width, height = img.size
+    draw = ImageDraw.Draw(img)
+    font_path = os.path.abspath(os.path.expanduser("./font/dancing.ttf"))
+    font = ImageFont.truetype(font_path, 10)
+    draw.text((0, 0), "KERNEL GAN IMAGE RESIZE", font=font, fill=(0, 255, 0))
+    draw.text((width / 2, 0), "PIL IMAGE RESIZE", font=font, fill=(0, 0, 255))
+    img.save(imgfile)
 
 
 def stat_calculator(input_path):
@@ -219,6 +232,31 @@ def check_kernel(conf, directory_name, image_name):
                 return kernel
 
 
+def compare_images(save_path, image_name, image_1, image_2, stat):
+    """
+
+    Parameters
+    ----------
+    save_path
+    image_1
+    image_2
+    stat
+
+    Returns
+    -------
+
+    """
+    if not os.path.isdir(save_path):
+        os.makedirs(save_path)
+    save_path = save_path + f"/{image_name}.png"
+    save_plots = np.hstack([image_1, image_2])
+    save_plots = np.clip(save_plots, stat["min"], stat["max"])
+    vmax = stat["mean"] + 3 * stat["std"]
+    vmin = stat["min"]
+    plt.imsave(save_path, save_plots, vmin=vmin, vmax=vmax, cmap="gray")
+    writetext(imgfile=save_path)
+
+
 def perform_kernelgan(kernel_directories, conf):
     """
 
@@ -307,8 +345,20 @@ def perform_kernelgan(kernel_directories, conf):
                         + "_"
                         + format(j, "05d")
                     )
+                    if conf.compare:
+                        img_mat = mat
+                        img = Image.fromarray(img_mat)
+                        img = img.resize((128, 128))
+                        img_mat = np.reshape(mat, (mat.shape[0], mat.shape[1], 1))
+
+                        img_mat = imresize(im=img_mat, scale_factor=0.5, kernel=kernel)
+                        img_mat = img_mat[:, :, 0]
+                        save_path = os.path.dirname(__file__) + r"/comparision"
+                        compare_images(save_path, image_name, img_mat, img, stats)
+
                     np.savez_compressed(hr_opath / fname, mat)
                     mat = np.reshape(mat, (mat.shape[0], mat.shape[1], 1))
+
                     mat = imresize(
                         im=mat, scale_factor=conf.scale_factor, kernel=kernel
                     )
@@ -381,9 +431,14 @@ def perform_scipy_ndimage_zoom(scipy_directories, conf):
                     + "_"
                     + format(j, "05d")
                 )
-                np.savez_compressed(hr_opath / fname, mat)
-                mat = scipy.ndimage.zoom(mat, 0.25)
-                np.savez_compressed(lr_opath / fname, mat)
+                if np.random.randint(1, 100) < 50:
+                    img = Image.fromarray(mat)
+                    img = img.resize((64, 64))
+                    np.savez_compressed(hr_opath / fname, np.array(img))
+                else:
+                    np.savez_compressed(hr_opath / fname, mat)
+                    mat = scipy.ndimage.zoom(mat, 0.25)
+                    np.savez_compressed(lr_opath / fname, mat)
 
     print("scipy zoom process has finished")
 

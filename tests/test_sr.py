@@ -11,6 +11,9 @@ from sr import cutter
 
 # TODO: Write a test here for using cutter
 class TestLoader(unittest.TestCase):
+    def test_ssim(self):
+
+
     def test_load(self):
         matrix = np.random.rand(256, 256)
         np.savez(os.getcwd()+"/TestFiles/matrix.npz", matrix)

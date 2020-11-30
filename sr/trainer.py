@@ -49,7 +49,7 @@ from models import UNET
 from models import EDSR
 from dataset import SrDataset, PairedDataset
 from axial_bicubic import AxialNet
-from losses import SSIM, L1loss, PSNR
+from losses import SSIM, L1loss, PSNR, Column_Difference, Row_Difference
 from logger import Logger
 
 BATCH_SIZE = {
@@ -116,6 +116,7 @@ def model_save(save_params, train_model_path):
         os.makedirs(model_folder)
     torch.save(save_params, model_path)
 
+
 def training(
     training_generator,
     validation_generator,
@@ -128,7 +129,7 @@ def training(
     dilation,
     act,
     model_save_path,
-    kernel
+    kernel,
 ):
     """
 
@@ -164,29 +165,27 @@ def training(
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif architecture == "edsr_16_64":
-        model = EDSR(
-            n_resblocks=16, n_feats=64, aspp=aspp, dilation=dilation, act=act
-        )
+        model = EDSR(n_resblocks=16, n_feats=64, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_8_256":
-        model = EDSR(
-            n_resblocks=8, n_feats=256, aspp=aspp, dilation=dilation, act=act
-        )
+        model = EDSR(n_resblocks=8, n_feats=256, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_16_256":
-        model = EDSR(
-            n_resblocks=16, n_feats=256, aspp=aspp, dilation=dilation, act=act
-        )
+        model = EDSR(n_resblocks=16, n_feats=256, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_32_256":
         model = EDSR(n_resblocks=32, n_feats=256)
-
-
-
 
     model.to(device)
     summary(model, (1, 64, 64), batch_size=1, device="cuda")
     max_epochs = num_epochs
     criterion = torch.nn.L1Loss()
+
+    # we have to tune the lambda values
+    lambda_1 = 0.9
+    lambda_2 = 0.9
+
+    col_diff_loss = Column_Difference()
+    row_diff_loss = Row_Difference()
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    current_model_list = list(current_save_model_path.rglob('*.pt'))
+    current_model_list = list(current_save_model_path.rglob("*.pt"))
     current_model_list = sorted(current_model_list)
     best_model_list = list(best_save_model_path.rglob("*best_model.pt"))
     best_model_list = sorted(best_model_list)
@@ -205,41 +204,36 @@ def training(
     else:
         best_model = best_model_list[-1]
 
-
     current_epoch = 0
     # check if there is a .pt file of model after an epoch
     if os.path.isfile(current_model):
         if architecture == "edsr":
             checkpoint = torch.load(current_model)
-            model.load_state_dict(checkpoint['model'])
-            current_epoch = checkpoint['epoch']
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            scheduler.load_state_dict(checkpoint['scheduler'])
+            model.load_state_dict(checkpoint["model"])
+            current_epoch = checkpoint["epoch"]
+            optimizer.load_state_dict(checkpoint["optimizer"])
+            scheduler.load_state_dict(checkpoint["scheduler"])
 
         else:
             checkpoint = torch.load(current_model)
-            model.load_state_dict(checkpoint['model'])
-            current_epoch = checkpoint['epoch']
-            optimizer.load_state_dict(checkpoint['optimizer'])
-
-
+            model.load_state_dict(checkpoint["model"])
+            current_epoch = checkpoint["epoch"]
+            optimizer.load_state_dict(checkpoint["optimizer"])
 
     # check if there is a .pt file of best model if epoch .pt file is missing
     elif os.path.isfile(best_model):
         if architecture == "edsr":
             checkpoint = torch.load(current_model)
-            model.load_state_dict(checkpoint['model'])
-            current_epoch = checkpoint['epoch']
-            optimizer.load_state_dict(checkpoint['optimizer'])
-            scheduler.load_state_dict(checkpoint['scheduler'])
+            model.load_state_dict(checkpoint["model"])
+            current_epoch = checkpoint["epoch"]
+            optimizer.load_state_dict(checkpoint["optimizer"])
+            scheduler.load_state_dict(checkpoint["scheduler"])
 
         else:
             checkpoint = torch.load(current_model)
-            model.load_state_dict(checkpoint['model'])
-            current_epoch = checkpoint['epoch']
-            optimizer.load_state_dict(checkpoint['optimizer'])
-
-
+            model.load_state_dict(checkpoint["model"])
+            current_epoch = checkpoint["epoch"]
+            optimizer.load_state_dict(checkpoint["optimizer"])
 
     best_valid_loss = float("inf")
     logger = Logger(str(log_dir))
@@ -251,7 +245,7 @@ def training(
             shutil.rmtree(input_save_path)
         os.makedirs(input_save_path)
 
-    while(step < max_epochs):
+    while step < max_epochs:
         print(f"current step is {step}")
         epoch = step
         start_time = time()
@@ -306,7 +300,11 @@ def training(
             with torch.autograd.set_detect_anomaly(True):
                 with torch.set_grad_enabled(True):
                     y_pred = model(x_train)
-                    loss_train = criterion(y_pred, y_train)
+                    loss_train = (
+                        criterion(y_pred, y_train)
+                        + lambda_1 * col_diff_loss(y_pred, y_train)
+                        + lambda_2 * row_diff_loss(y_pred, y_train)
+                    )
                     train_loss = train_loss + (
                         (1 / (batch_idx + 1)) * (loss_train.data - train_loss)
                     )
@@ -366,31 +364,30 @@ def training(
                 "epoch": step,
                 "model": model.state_dict(),
                 "optimizer": optimizer.state_dict(),
-                "scheduler": scheduler
+                "scheduler": scheduler,
             }
         else:
             save_params = {
                 "epoch": step,
                 "model": model.state_dict(),
-                "optimizer": optimizer.state_dict()
+                "optimizer": optimizer.state_dict(),
             }
         # Save best validation epoch model
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
 
+            model_save(save_params, f"{str(best_save_model_path)}/best_model.pt")
 
-            model_save(
-                save_params, f"{str(best_save_model_path)}/best_model.pt"
-            )
-
-        model_save(save_params, f"{str(current_save_model_path)}/{timestamp}_model_{step}.pt")
+        model_save(
+            save_params, f"{str(current_save_model_path)}/{timestamp}_model_{step}.pt"
+        )
 
         # deleting old current model after new one is saved
         print(f"the current model path is {current_model}")
         if os.path.isfile(current_model):
             os.remove(current_model)
 
-        current_model_list = list(current_save_model_path.rglob('*.pt'))
+        current_model_list = list(current_save_model_path.rglob("*.pt"))
         current_model_list = sorted(current_model_list)
 
         if not current_model_list:
@@ -413,7 +410,7 @@ def process(
     dilation,
     act,
     model_save_path,
-    kernel = False
+    kernel=False,
 ):
     """
 
@@ -454,7 +451,7 @@ def process(
         dilation,
         act,
         model_save_path,
-        kernel
+        kernel,
     )
 
 
@@ -485,5 +482,5 @@ if __name__ == "__main__":
         aspp,
         dilation,
         act,
-        model_save_path
+        model_save_path,
     )
