@@ -116,6 +116,13 @@ class Config:
             help="plots to images for comparision",
         )
 
+        self.parser.add_argument(
+            "--save_compare_stat",
+            type=bool,
+            default=False,
+            help="save image stat for comparision"
+        )
+
         # Trainer.py Parameters
         self.parser.add_argument(
             "--train",

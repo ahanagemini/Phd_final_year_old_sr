@@ -231,6 +231,123 @@ def check_kernel(conf, directory_name, image_name):
                 kernel = kernelgan_train(conf)
                 return kernel
 
+def saving_different_image_resize_stats(save_path, image_name, image, kernel):
+    """
+
+    Parameters
+    ----------
+    save_path
+    image_name
+    image
+    kernel
+
+    Returns
+    -------
+    """
+
+    stat_image = {}
+    kernel_image = image
+    scipy_image = image
+    pil_image = Image.fromarray(image)
+
+    # creating save folder
+    save_path = Path(save_path)
+    save_path = save_path / image_name
+    if not os.path.isdir(save_path):
+        os.makedirs(save_path)
+
+    # kernel resize
+    kernel_image = kernel_image.reshape((kernel_image.shape[0], kernel_image.shape[1], 1))
+    kernel_image = imresize(im=kernel_image, scale_factor=0.5, kernel=kernel)
+    kernel_image = kernel_image[:, :, 0]
+
+    # PIL resize
+    pil_image = pil_image.resize((128, 128))
+    pil_image = np.array(pil_image)
+
+    # scipy ndzoom
+    scipy_image = scipy.ndimage.zoom(scipy_image, 0.5)
+
+    # mean calculation
+    stat_image[image_name+"_mean"] = float(np.mean(image))
+    stat_image[image_name+"_kernel_image_mean"] = float(np.mean(kernel_image))
+    stat_image[image_name+"_pil_image_resize_mean"] = float(np.mean(pil_image))
+    stat_image[image_name+"_scipy_image_mean"] = float(np.mean(scipy_image))
+    # storing in list for plot
+    mean_list = [stat_image[image_name+"_mean"], stat_image[image_name+"_kernel_image_mean"],
+                 stat_image[image_name+"_pil_image_resize_mean"], stat_image[image_name+"_scipy_image_mean"]]
+
+    # std calculation
+    stat_image[image_name+"_std"] = float(np.std(image))
+    stat_image[image_name+"_kernel_image_std"] = float(np.std(kernel_image))
+    stat_image[image_name+"_pil_image_resize_std"] = float(np.std(pil_image))
+    stat_image[image_name+"_scipy_image_std"] = float(np.std(scipy_image))
+    # storing in list for plot
+    std_list = [stat_image[image_name+"_std"], stat_image[image_name+"_kernel_image_std"],
+                stat_image[image_name+"_pil_image_resize_std"], stat_image[image_name+"_scipy_image_std"]]
+
+    # max calculation
+    stat_image[image_name+"_max"] = float(np.max(image))
+    stat_image[image_name+"_kernel_image_max"] = float(np.max(kernel_image))
+    stat_image[image_name+"_pil_image_max"] = float(np.max(pil_image))
+    stat_image[image_name+"_scipy_image_max"] = float(np.max(scipy_image))
+    # storing in list for plot
+    max_list = [stat_image[image_name+"_max"], stat_image[image_name+"_kernel_image_max"],
+                stat_image[image_name+"_pil_image_max"], stat_image[image_name+"_scipy_image_max"]]
+
+    # min calculation
+    stat_image[image_name+"_min"] = float(np.min(image))
+    stat_image[image_name+"_kernel_image_min"] = float(np.min(kernel_image))
+    stat_image[image_name+"_pil_image_min"] = float(np.min(pil_image))
+    stat_image[image_name+"_scipy_image_min"] = float(np.min(scipy_image))
+    # storing in list for plot
+    min_list = [stat_image[image_name+"_min"], stat_image[image_name+"_kernel_image_min"],
+                stat_image[image_name+"_pil_image_min"], stat_image[image_name+"_scipy_image_min"]]
+
+    fig_mean = plt.figure()
+    plt.title("Mean Plot for different type of images")
+    plt.ylabel("mean")
+    plt.xlabel("different types of images")
+    x_values = ["ground_truth", "kernel_image", "PIL_image", "Scipy_image"]
+    plt.bar(x_values, mean_list, width = 0.4)
+    fig_mean.savefig(str(save_path / ("mean_plot.png")))
+    plt.close(fig_mean)
+
+    fig_std = plt.figure()
+    plt.title("std plot for different types of images")
+    plt.ylabel("standard deviation")
+    plt.xlabel("different types of images")
+    x_values = ["ground_truth", "kernel_image", "PIL_image", "Scipy_image"]
+    plt.bar(x_values, std_list, width=0.4)
+    fig_std.savefig(str(save_path / ("std_plot.png")))
+    plt.close(fig_std)
+
+    fig_max = plt.figure()
+    plt.title("max plot for different types of images")
+    plt.ylabel("max pixel")
+    plt.xlabel("different type of images")
+    x_values = ["ground_truth", "kernel_image", "PIL_image", "Scipy_image"]
+    plt.bar(x_values, max_list, width=0.4)
+    fig_max.savefig(str(save_path / ("max_plot.png")))
+    plt.close(fig_max)
+
+    fig_min = plt.figure()
+    plt.title("min plot for different images")
+    plt.ylabel("min pixel")
+    plt.ylabel("different types of images")
+    x_values = ["ground_truth", "kernel_image", "PIL_image", "Scipy_image"]
+    plt.bar(x_values, min_list, width=0.4)
+    fig_min.savefig(str(save_path / ("min_plot.png")))
+    plt.close(fig_min)
+
+    save_path_stats = save_path / "stats.json"
+    with open(str(save_path_stats), "w") as sfile:
+        json.dump(stat_image, sfile)
+
+    del [stat_image, kernel_image, pil_image, scipy_image, fig_max, fig_mean, fig_std, fig_min]
+
+
+
 
 def compare_images(save_path, image_name, image_1, image_2, stat):
     """
@@ -354,7 +471,11 @@ def perform_kernelgan(kernel_directories, conf):
                         img_mat = imresize(im=img_mat, scale_factor=0.5, kernel=kernel)
                         img_mat = img_mat[:, :, 0]
                         save_path = os.path.dirname(__file__) + r"/comparision"
-                        compare_images(save_path, image_name, img_mat, img, stats)
+                        compare_images(save_path, fname, img_mat, img, stats)
+
+                    if conf.save_compare_stat:
+                        save_path = os.path.dirname(os.path.abspath(__file__)) + r"/comparision_stat"
+                        saving_different_image_resize_stats(save_path, fname, mat, kernel)
 
                     np.savez_compressed(hr_opath / fname, mat)
                     mat = np.reshape(mat, (mat.shape[0], mat.shape[1], 1))
