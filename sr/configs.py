@@ -13,6 +13,14 @@ class Config:
         self.image = None
         self.stats = None
 
+        # kernel_Gan or PIl_resize
+        self.parser.add_argument(
+            "--kernel_gan",
+            type=bool,
+            default=None,
+            help="Enable this command to use kernel gan",
+        )
+
         # Paths
         self.parser.add_argument(
             "--img_name", default="image1", help="image name for saving purposes"
@@ -83,7 +91,7 @@ class Config:
 
         # Iterations
         self.parser.add_argument(
-            "--max_iters", type=int, default=3000, help="# of iterations"
+            "--max_iters", type=int, default=10000, help="# of iterations"
         )
 
         # Optimization hyper-parameters
@@ -120,7 +128,7 @@ class Config:
             "--save_compare_stat",
             type=bool,
             default=False,
-            help="save image stat for comparision"
+            help="save image stat for comparision",
         )
 
         # Trainer.py Parameters
@@ -174,7 +182,7 @@ class Config:
             help="the path where model will be saved",
         )
         self.parser.add_argument(
-            "--load_one_old",
+            "--load_last_trained",
             type=bool,
             default=False,
             help="This command is to can be used to load the last model trained",
@@ -250,7 +258,7 @@ class Config:
 
         #  if command not present it will create new directory
         #  for saving models or else last model trained will be loaded
-        if not self.conf.load_one_old:
+        if not self.conf.load_last_trained:
             self.conf.model_save = self.check_model_directory(self.conf.model_save)
             os.makedirs(self.conf.model_save)
         return self.conf

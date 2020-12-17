@@ -179,8 +179,7 @@ def training(
     criterion = torch.nn.L1Loss()
 
     # we have to tune the lambda values
-    lambda_1 = 0.9
-    lambda_2 = 0.9
+    lambda_2 = 0.01
 
     col_diff_loss = Column_Difference()
     row_diff_loss = Row_Difference()
@@ -245,7 +244,7 @@ def training(
             shutil.rmtree(input_save_path)
         os.makedirs(input_save_path)
 
-    while step < max_epochs:
+    while epoch < max_epochs:
         print(f"current step is {step}")
         epoch = step
         start_time = time()
@@ -286,7 +285,7 @@ def training(
                     if kernel:
                         x_rescale_pad = scipy.ndimage.zoom(x_rescale_pad, 4.0)
                     save_plots = np.hstack(
-                        [x_rescale_pad, y_rescale.reshape(y_rescale.shape[1], -1),]
+                        [x_rescale_pad, y_rescale.reshape(y_rescale.shape[1], -1)]
                     )
                     save_plots = np.clip(
                         save_plots, stat["min"][i].numpy(), stat["max"][i].numpy()
@@ -300,10 +299,8 @@ def training(
             with torch.autograd.set_detect_anomaly(True):
                 with torch.set_grad_enabled(True):
                     y_pred = model(x_train)
-                    loss_train = (
-                        criterion(y_pred, y_train)
-                        + lambda_1 * col_diff_loss(y_pred, y_train)
-                        + lambda_2 * row_diff_loss(y_pred, y_train)
+                    loss_train = criterion(y_pred, y_train) + lambda_2 * row_diff_loss(
+                        y_pred, y_train
                     )
                     train_loss = train_loss + (
                         (1 / (batch_idx + 1)) * (loss_train.data - train_loss)

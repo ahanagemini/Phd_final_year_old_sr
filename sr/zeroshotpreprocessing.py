@@ -39,6 +39,8 @@ from configs import Config
 from trainer import process
 from tester import evaluate
 from tqdm import tqdm
+from stat_plotter import PlotStat
+from different_loss_plotter import LossPlotter
 
 sample_dict = {"--X2": 0.5, "--X4": 0.25, "--X8": 0.125}
 
@@ -231,7 +233,10 @@ def check_kernel(conf, directory_name, image_name):
                 kernel = kernelgan_train(conf)
                 return kernel
 
-def saving_different_image_resize_stats(save_path, image_name, image, kernel):
+
+def saving_different_image_resize_stats(
+    save_path, image_name, image, kernel, scale_factor=0.5
+):
     """
 
     Parameters
@@ -245,108 +250,16 @@ def saving_different_image_resize_stats(save_path, image_name, image, kernel):
     -------
     """
 
-    stat_image = {}
-    kernel_image = image
-    scipy_image = image
-    pil_image = Image.fromarray(image)
-
     # creating save folder
     save_path = Path(save_path)
     save_path = save_path / image_name
     if not os.path.isdir(save_path):
         os.makedirs(save_path)
-
-    # kernel resize
-    kernel_image = kernel_image.reshape((kernel_image.shape[0], kernel_image.shape[1], 1))
-    kernel_image = imresize(im=kernel_image, scale_factor=0.5, kernel=kernel)
-    kernel_image = kernel_image[:, :, 0]
-
-    # PIL resize
-    pil_image = pil_image.resize((128, 128))
-    pil_image = np.array(pil_image)
-
-    # scipy ndzoom
-    scipy_image = scipy.ndimage.zoom(scipy_image, 0.5)
-
-    # mean calculation
-    stat_image[image_name+"_mean"] = float(np.mean(image))
-    stat_image[image_name+"_kernel_image_mean"] = float(np.mean(kernel_image))
-    stat_image[image_name+"_pil_image_resize_mean"] = float(np.mean(pil_image))
-    stat_image[image_name+"_scipy_image_mean"] = float(np.mean(scipy_image))
-    # storing in list for plot
-    mean_list = [stat_image[image_name+"_mean"], stat_image[image_name+"_kernel_image_mean"],
-                 stat_image[image_name+"_pil_image_resize_mean"], stat_image[image_name+"_scipy_image_mean"]]
-
-    # std calculation
-    stat_image[image_name+"_std"] = float(np.std(image))
-    stat_image[image_name+"_kernel_image_std"] = float(np.std(kernel_image))
-    stat_image[image_name+"_pil_image_resize_std"] = float(np.std(pil_image))
-    stat_image[image_name+"_scipy_image_std"] = float(np.std(scipy_image))
-    # storing in list for plot
-    std_list = [stat_image[image_name+"_std"], stat_image[image_name+"_kernel_image_std"],
-                stat_image[image_name+"_pil_image_resize_std"], stat_image[image_name+"_scipy_image_std"]]
-
-    # max calculation
-    stat_image[image_name+"_max"] = float(np.max(image))
-    stat_image[image_name+"_kernel_image_max"] = float(np.max(kernel_image))
-    stat_image[image_name+"_pil_image_max"] = float(np.max(pil_image))
-    stat_image[image_name+"_scipy_image_max"] = float(np.max(scipy_image))
-    # storing in list for plot
-    max_list = [stat_image[image_name+"_max"], stat_image[image_name+"_kernel_image_max"],
-                stat_image[image_name+"_pil_image_max"], stat_image[image_name+"_scipy_image_max"]]
-
-    # min calculation
-    stat_image[image_name+"_min"] = float(np.min(image))
-    stat_image[image_name+"_kernel_image_min"] = float(np.min(kernel_image))
-    stat_image[image_name+"_pil_image_min"] = float(np.min(pil_image))
-    stat_image[image_name+"_scipy_image_min"] = float(np.min(scipy_image))
-    # storing in list for plot
-    min_list = [stat_image[image_name+"_min"], stat_image[image_name+"_kernel_image_min"],
-                stat_image[image_name+"_pil_image_min"], stat_image[image_name+"_scipy_image_min"]]
-
-    fig_mean = plt.figure()
-    plt.title("Mean Plot for different type of images")
-    plt.ylabel("mean")
-    plt.xlabel("different types of images")
-    x_values = ["ground_truth", "kernel_image", "PIL_image", "Scipy_image"]
-    plt.bar(x_values, mean_list, width = 0.4)
-    fig_mean.savefig(str(save_path / ("mean_plot.png")))
-    plt.close(fig_mean)
-
-    fig_std = plt.figure()
-    plt.title("std plot for different types of images")
-    plt.ylabel("standard deviation")
-    plt.xlabel("different types of images")
-    x_values = ["ground_truth", "kernel_image", "PIL_image", "Scipy_image"]
-    plt.bar(x_values, std_list, width=0.4)
-    fig_std.savefig(str(save_path / ("std_plot.png")))
-    plt.close(fig_std)
-
-    fig_max = plt.figure()
-    plt.title("max plot for different types of images")
-    plt.ylabel("max pixel")
-    plt.xlabel("different type of images")
-    x_values = ["ground_truth", "kernel_image", "PIL_image", "Scipy_image"]
-    plt.bar(x_values, max_list, width=0.4)
-    fig_max.savefig(str(save_path / ("max_plot.png")))
-    plt.close(fig_max)
-
-    fig_min = plt.figure()
-    plt.title("min plot for different images")
-    plt.ylabel("min pixel")
-    plt.ylabel("different types of images")
-    x_values = ["ground_truth", "kernel_image", "PIL_image", "Scipy_image"]
-    plt.bar(x_values, min_list, width=0.4)
-    fig_min.savefig(str(save_path / ("min_plot.png")))
-    plt.close(fig_min)
-
-    save_path_stats = save_path / "stats.json"
-    with open(str(save_path_stats), "w") as sfile:
-        json.dump(stat_image, sfile)
-
-    del [stat_image, kernel_image, pil_image, scipy_image, fig_max, fig_mean, fig_std, fig_min]
-
-
+    save_path = save_path
+    plotter = PlotStat()
+    plotter.plot_stat(
+        str(save_path), image=image, kernel=kernel, scale_factor=scale_factor
+    )
 
 
 def compare_images(save_path, image_name, image_1, image_2, stat):
@@ -374,6 +287,109 @@ def compare_images(save_path, image_name, image_1, image_2, stat):
     writetext(imgfile=save_path)
 
 
+def pil_saving_images(sample_list, conf):
+    """
+
+    Parameters
+    ----------
+    sample_list: This contains the list of images that needed to be cut and saved
+    conf: configuration
+    Returns
+    -------
+
+    """
+    image_name = conf.image_name
+    stats = conf.stats
+    output_directory = conf.output_directory
+    print("process of cutting and pasting images has started")
+    sample_count = len(sample_list)
+    resizer = PlotStat()
+    # iterating through the sample list
+    for i, sample in enumerate(tqdm(sample_list)):
+        images_cut = matrix_cutter(sample)
+        # this is done to create training sets and validation sets for training edsr
+        if i > int(0.7 * sample_count) and i < int(0.9 * sample_count):
+            data_type = "valid"
+        elif i >= int(0.9 * sample_count):
+            data_type = "test"
+        else:
+            data_type = "train"
+        hr_opath = output_directory / data_type / "HR" / image_name
+        lr_opath = output_directory / data_type / "LR" / image_name
+        if not os.path.isdir(hr_opath):
+            os.makedirs(str(hr_opath))
+        if not os.path.isdir(lr_opath):
+            os.makedirs(str(lr_opath))
+
+        # saving stat file in lr
+        with open(str(lr_opath / "stats.json"), "w") as sfile:
+            json.dump(stats, sfile)
+
+        # saving stat file in hr
+        with open(str(hr_opath / "stats.json"), "w") as sfile:
+            json.dump(stats, sfile)
+
+        for k, j, mat in images_cut:
+            fname = (
+                image_name
+                + "_"
+                + format(i, "05d")
+                + "_"
+                + format(k, "05d")
+                + "_"
+                + format(j, "05d")
+            )
+            np.savez_compressed(hr_opath / fname, mat)
+            if conf.kernel_gan:
+                mat = np.reshape(mat, (mat.shape[0], mat.shape[1], 1))
+
+                mat = imresize(
+                    im=mat, scale_factor=conf.scale_factor, kernel=conf.kernel
+                )
+                mat = mat[:, :, 0]
+            else:
+                mat = resizer.pil_image(mat, conf.scale_factor)
+            np.savez_compressed(lr_opath / fname, mat)
+
+    print("process of cutting and saving images has ended")
+
+
+def compare_stat(sample_list, conf):
+    """
+
+    Parameters
+    ----------
+    sample_list
+    conf
+
+    Returns
+    -------
+
+    """
+    print("started stat comparision")
+    for i, sample in enumerate(tqdm(sample_list)):
+        images_cut = matrix_cutter(sample)
+        for k, j, mat in images_cut:
+            fname = (
+                conf.image_name
+                + "_"
+                + format(i, "05d")
+                + "_"
+                + format(k, "05d")
+                + "_"
+                + format(j, "05d")
+            )
+
+            if conf.save_compare_stat:
+                save_path = (
+                    os.path.dirname(os.path.abspath(__file__)) + r"/comparision_stat"
+                )
+                saving_different_image_resize_stats(
+                    save_path, fname, mat, conf.kernel, scale_factor=conf.scale_factor
+                )
+    print("ended stat comparision")
+
+
 def perform_kernelgan(kernel_directories, conf):
     """
 
@@ -389,10 +405,12 @@ def perform_kernelgan(kernel_directories, conf):
 
     print("kernelgan process has started")
     output_directory = Path(conf.cutting_output_dir_path)
+    image_kernel_tuple = []
+    loss_plotter = LossPlotter()
     for kernel_directory, stats, directory_name in kernel_directories:
-
         kernel_entry = {}
         kernel_save = Path(conf.kernel_save) / directory_name
+
         for image_path in tqdm(kernel_directory):
 
             """
@@ -422,69 +440,14 @@ def perform_kernelgan(kernel_directories, conf):
                 assert height >= 256 and width >= 256
 
             print("process of cutting and saving images has started")
-            sample_count = len(sample_list)
             np.random.shuffle(sample_list)
-            # looping over the n samples
-            for i, sample in enumerate(tqdm(sample_list)):
-                sample = sample[:, :, 0]
-                images_cut = matrix_cutter(sample)
-
-                # this is done to create training sets and validation sets for training edsr
-                if i > int(0.7 * sample_count) and i < int(0.9 * sample_count):
-                    data_type = "valid"
-                elif i >= int(0.9 * sample_count):
-                    data_type = "test"
-                else:
-                    data_type = "train"
-                hr_opath = output_directory / data_type / "HR" / image_name
-                lr_opath = output_directory / data_type / "LR" / image_name
-                if not os.path.isdir(hr_opath):
-                    os.makedirs(str(hr_opath))
-                if not os.path.isdir(lr_opath):
-                    os.makedirs(str(lr_opath))
-
-                # saving stat file in lr
-                with open(str(lr_opath / "stats.json"), "w") as sfile:
-                    json.dump(stats, sfile)
-
-                # saving stat file in hr
-                with open(str(hr_opath / "stats.json"), "w") as sfile:
-                    json.dump(stats, sfile)
-
-                # saving the cut images
-                for k, j, mat in images_cut:
-                    fname = (
-                        image_name
-                        + "_"
-                        + format(i, "05d")
-                        + "_"
-                        + format(k, "05d")
-                        + "_"
-                        + format(j, "05d")
-                    )
-                    if conf.compare:
-                        img_mat = mat
-                        img = Image.fromarray(img_mat)
-                        img = img.resize((128, 128))
-                        img_mat = np.reshape(mat, (mat.shape[0], mat.shape[1], 1))
-
-                        img_mat = imresize(im=img_mat, scale_factor=0.5, kernel=kernel)
-                        img_mat = img_mat[:, :, 0]
-                        save_path = os.path.dirname(__file__) + r"/comparision"
-                        compare_images(save_path, fname, img_mat, img, stats)
-
-                    if conf.save_compare_stat:
-                        save_path = os.path.dirname(os.path.abspath(__file__)) + r"/comparision_stat"
-                        saving_different_image_resize_stats(save_path, fname, mat, kernel)
-
-                    np.savez_compressed(hr_opath / fname, mat)
-                    mat = np.reshape(mat, (mat.shape[0], mat.shape[1], 1))
-
-                    mat = imresize(
-                        im=mat, scale_factor=conf.scale_factor, kernel=kernel
-                    )
-                    mat = mat[:, :, 0]
-                    np.savez_compressed(lr_opath / fname, mat)
+            conf.stats = stats
+            conf.output_directory = output_directory
+            conf.image_name = image_name
+            conf.kernel = kernel
+            if conf.save_compare_stat:
+                compare_stat(sample_list, conf)
+            pil_saving_images(sample_list, conf)
 
             print("the process of creating predict folder has started")
             predict_kernel(image[:, :, 0], image_name, output_directory, stats)
@@ -494,12 +457,57 @@ def perform_kernelgan(kernel_directories, conf):
         with open(str(kernel_save / "kernel_entry.json"), "w") as kfile:
             json.dump(kernel_entry, kfile)
 
+    print(f"len of image_kernel_tuple = {len(image_kernel_tuple)}")
+    save_path = os.path.dirname(os.path.abspath(__file__)) + r"/comparision_stat"
+    loss_plotter.ssim_plotter(save_path, image_kernel_tuple, scale_factor=0.25)
     print("kernelgan process has finished")
 
 
-def perform_scipy_ndimage_zoom(scipy_directories, conf):
+def perform_pil_image_resize(pil_directories, conf):
     """
+    This method will perform pil_image resize on the images
+    Parameters
+    ----------
+    pil_directories: Contains directories that need pil_image_resize
+    conf: configuration
 
+    Returns
+    -------
+
+    """
+    print("pil image resize has begun")
+    output_directory = Path(conf.cutting_output_dir_path)
+    plotter = PlotStat()
+    for pil_directory, stats, directory_name in pil_directories:
+        for image_path in tqdm(pil_directory):
+            """
+            this is for creating output folder for each distribution in output directory
+            """
+            image_name = os.path.splitext(image_path.name)[0]
+            image = loader(image_path)
+            scale_factor = 0.95
+            sample_list = [image]
+
+            # scaling down 5 % using pil resize
+            for i in range(conf.n_resize):
+                image = plotter.pil_image(image, scale_factor)
+                sample_list.append(image)
+                height, width = image.shape[0], image.shape[1]
+                assert height >= 256 and width >= 256
+
+            # shuffling the sample list
+            np.random.shuffle(sample_list)
+            conf.stats = stats
+            conf.output_directory = output_directory
+            conf.image_name = image_name
+            pil_saving_images(sample_list, conf)
+            print("the process of creating predict folder has started")
+            predict_kernel(image, image_name, output_directory, stats)
+            print("the process of creating predict has ended")
+
+
+def perform_bilinear_and_stats_zoom(scipy_directories, conf):
+    """
     Parameters
     ----------
     scipy_directories: Contains the directories that require scipy.ndimage.zoom
@@ -511,6 +519,7 @@ def perform_scipy_ndimage_zoom(scipy_directories, conf):
     """
     print("scipy zoom process has begun")
 
+    resizer = PlotStat()
     output_directory = Path(conf.cutting_output_dir_path)
     for scipy_directory, stats in scipy_directories:
         scipy_len = len(scipy_directory)
@@ -553,12 +562,11 @@ def perform_scipy_ndimage_zoom(scipy_directories, conf):
                     + format(j, "05d")
                 )
                 if np.random.randint(1, 100) < 50:
-                    img = Image.fromarray(mat)
-                    img = img.resize((64, 64))
-                    np.savez_compressed(hr_opath / fname, np.array(img))
+                    mat = resizer.pil_image(mat, scale_factor=0.25)
+                    np.savez_compressed(hr_opath / fname, np.array(mat))
                 else:
                     np.savez_compressed(hr_opath / fname, mat)
-                    mat = scipy.ndimage.zoom(mat, 0.25)
+                    mat = resizer.t_interpolate(mat, mode="bilinear", scale_factor=0.25)
                     np.savez_compressed(lr_opath / fname, mat)
 
     print("scipy zoom process has finished")
@@ -578,19 +586,24 @@ def image_stat_processing(conf):
     conf.real_image = True
     output_directory = Path(conf.cutting_output_dir_path)
 
-    # deletting if cutting out existed already to avoid overlaps
-    if os.path.isdir(output_directory):
-        shutil.rmtree(output_directory)
-    input_directory = Path(conf.input_dir_path)
+    if not conf.resume or not conf.load_last_trained:
+        # deletting if cutting out existed already to avoid overlaps
+        if os.path.isdir(output_directory):
+            shutil.rmtree(output_directory)
 
-    # scanning for directories in input directory
-    directories = os.scandir(input_directory)
+        input_directory = Path(conf.input_dir_path)
 
-    # gets a dictionary containing directories that need kernelgan and directories that need scipy.ndimage.zoom
-    directories_dict = get_kernel_non_kernel_directories(directories)
+        # scanning for directories in input directory
+        directories = os.scandir(input_directory)
 
-    perform_kernelgan(directories_dict["kernel"], conf)
-    perform_scipy_ndimage_zoom(directories_dict["scipy"], conf)
+        # gets a dictionary containing directories that need kernelgan and directories that need scipy.ndimage.zoom
+        directories_dict = get_kernel_non_kernel_directories(directories)
+        if conf.kernel_gan:
+            perform_kernelgan(directories_dict["kernel"], conf)
+        else:
+            perform_pil_image_resize(directories_dict["kernel"], conf)
+
+        perform_bilinear_and_stats_zoom(directories_dict["scipy"], conf)
 
     train_path = output_directory / "train"
     valid_path = output_directory / "valid"
