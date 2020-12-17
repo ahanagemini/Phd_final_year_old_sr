@@ -244,7 +244,7 @@ def training(
             shutil.rmtree(input_save_path)
         os.makedirs(input_save_path)
 
-    while epoch < max_epochs:
+    while step < max_epochs:
         print(f"current step is {step}")
         epoch = step
         start_time = time()
