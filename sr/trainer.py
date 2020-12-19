@@ -179,7 +179,7 @@ def training(
     criterion = torch.nn.L1Loss()
 
     # we have to tune the lambda values
-    lambda_2 = 0.01
+    lambda_2 = 0.2
 
     col_diff_loss = Column_Difference()
     row_diff_loss = Row_Difference()

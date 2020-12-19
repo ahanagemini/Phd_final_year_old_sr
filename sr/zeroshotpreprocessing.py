@@ -55,6 +55,31 @@ def writetext(imgfile):
     draw.text((width / 2, 0), "PIL IMAGE RESIZE", font=font, fill=(0, 0, 255))
     img.save(imgfile)
 
+def image_clipper(image, stats):
+    """
+    This method clips the data max value and min value to 5 % of max value and min value of entire image distribution
+    in stats file
+    Parameters
+    ----------
+    image: image matrix
+    stats: image statistics
+
+    Returns
+    -------
+
+    """
+    max_value = 0.05 * stats["max"]
+    min_value = 0.05 * stats["min"]
+    width, height = image.shape
+    for x in range(width):
+        for y in range(height):
+            if image[x][y] > max_value:
+                image[x][y] = max_value
+            elif image[x][y] < min_value:
+                image[x][y] = min_value
+
+    return image
+
 
 def stat_calculator(input_path):
     print("creating stats")
@@ -203,7 +228,6 @@ def check_kernel(conf, directory_name, image_name):
     """
 
     kernel_save = Path(conf.kernel_save) / directory_name
-
     # checking if the directory exists
     if not os.path.isdir(kernel_save):
         os.makedirs(kernel_save)
@@ -418,6 +442,7 @@ def perform_kernelgan(kernel_directories, conf):
             """
             image_name = os.path.splitext(image_path.name)[0]
             image = loader(image_path)
+            image = image_clipper(image, stats)
 
             # Run kernelgan, compute kernel, then reshape the images
             image = image.reshape((image.shape[0], image.shape[1], 1))
@@ -427,16 +452,17 @@ def perform_kernelgan(kernel_directories, conf):
             kernel = check_kernel(conf, directory_name, image_name)
             kernel_entry[image_name] = float(np.sum(image))
             np.save(str(kernel_save / (image_name + ".npy")), kernel)
-            sample_list = [image]
+            sample_list = [image[:, :, 0]]
             print("Image shape:", image.shape)
             print(f"The image is being rescaled by given {conf.n_resize} times")
             scale_factor = 0.95
             for i in range(conf.n_resize):
                 scale = scale_factor ** (i + 1)
                 out_image = imresize(im=image, scale_factor=scale, kernel=kernel)
+                out_image = out_image[:, :, 0]
                 sample_list.append(out_image)
 
-                height, width = out_image.shape[0], out_image.shape[1]
+                height, width = out_image.shape
                 assert height >= 256 and width >= 256
 
             print("process of cutting and saving images has started")
@@ -485,6 +511,7 @@ def perform_pil_image_resize(pil_directories, conf):
             """
             image_name = os.path.splitext(image_path.name)[0]
             image = loader(image_path)
+            image = image_clipper(image, stats)
             scale_factor = 0.95
             sample_list = [image]
 
@@ -527,6 +554,8 @@ def perform_bilinear_and_stats_zoom(scipy_directories, conf):
             directory_name = image_path.parent.name
             image_name = os.path.splitext(image_path.name)[0]
             image_matrix = loader(image_path)
+            image_matrix = image_clipper(image_matrix, stats)
+
             images_cut = matrix_cutter(image_matrix)
 
             if i < int(0.9 * scipy_len):
