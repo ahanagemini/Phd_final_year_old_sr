@@ -81,12 +81,21 @@ class Converter:
                     image[x][y] = min_value
 
         return image
-    def image_converter(self, idir, odir):
-        """This method will take an input directory and load all the images present in the directory and interpolates
-        them and finally stores them in a output directory"""
+    def image_converter(self, conf):
+        """
+        This method will take an input directory and load all the images present in the directory and interpolates
+        them and finally stores them in a output directory
+        Parameters
+        ----------
+        conf
+
+        Returns
+        -------
+
+        """
         plotter = PlotStat()
-        idir = Path(idir)
-        odir = Path(odir)
+        idir = Path(conf.input_dir)
+        odir = Path(conf.output_dir)
 
         if not os.path.isdir(odir):
             os.makedirs(odir)
@@ -95,7 +104,7 @@ class Converter:
         stats = json.load(open(str(idir/"stats.json")))
         max_value = 0.05 * stats["max"]
         min_value = 0.05 * stats["min"]
-        lab = ColorMap("lab.yaml", min_value, max_value)
+        lab = ColorMap(conf.lab_yaml, min_value, max_value)
         for i, image_path in enumerate(tqdm(image_paths)):
             image_name = os.path.splitext(image_path.name)[0]
             image_matrix = self.loader(image_path)
@@ -120,6 +129,8 @@ class Configurator:
                                  help="use this command to pass the input directory where the images are present")
         self.parser.add_argument("--output_dir", default=os.path.dirname(os.path.abspath(__file__))+r"/output_images",
                                  help="use this command to pass the out put directory where you want images to be saved")
+        self.parser.add_argument("--lab_yaml", default=os.path.dirname(os.path.abspath(__file__))+r"/lab.yaml",
+                                 help="use this command to specify the location of lab.yaml")
 
     def parse(self, args=None):
         """Parse the configuration"""
@@ -131,10 +142,9 @@ if __name__ == "__main__":
 
     if (
         len(sys.argv) == 1
-        or "--input_dir_path" not in str(sys.argv)
-        or "--output" not in str(sys.argv)
+        or "--input_dir" not in str(sys.argv)
     ):
         sys.argv.append("-h")
     conf = Configurator().parse()
     colormap = Converter()
-    colormap.image_converter(conf.input_dir, conf.output_dir)
+    colormap.image_converter(conf)
