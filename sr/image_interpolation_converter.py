@@ -128,7 +128,7 @@ class Configurator:
 
 
 if __name__ == "__main__":
-    '''
+
     if (
         len(sys.argv) == 1
         or "--input_dir_path" not in str(sys.argv)
@@ -136,8 +136,5 @@ if __name__ == "__main__":
     ):
         sys.argv.append("-h")
     conf = Configurator().parse()
-    '''
-    idir = r"/home/venkat/Documents/PiyushKumarProject/earth1"
-    odir = r"/home/venkat/Documents/PiyushKumarProject/earth_1_color"
     colormap = Converter()
-    colormap.image_converter(idir, odir)
+    colormap.image_converter(conf.input_dir, conf.output_dir)
