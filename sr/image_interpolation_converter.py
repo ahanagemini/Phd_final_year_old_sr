@@ -93,9 +93,9 @@ class Converter:
 
         image_paths = idir.rglob("*")
         stats = json.load(open(str(idir/"stats.json")))
-        max_value = stats["max"]
-        min_value = stats["min"]
-        lab = ColorMap("lab.yaml", max_value, min_value)
+        max_value = 0.05 * stats["max"]
+        min_value = 0.05 * stats["min"]
+        lab = ColorMap("lab.yaml", min_value, max_value)
         for i, image_path in enumerate(tqdm(image_paths)):
             image_name = os.path.splitext(image_path.name)[0]
             image_matrix = self.loader(image_path)
