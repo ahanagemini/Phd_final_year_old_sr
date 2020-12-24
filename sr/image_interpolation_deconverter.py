@@ -40,7 +40,8 @@ class Deconverter:
         fileExt = "." + ".".join(fname.split(".")[1:])
         if fileExt in ImagePaths:
             image = Image.open(ifile)
-            image = np.array(image.convert(mode="L"))
+            image = np.array(image)
+            #image = np.array(image.convert(mode="L"))
         elif fileExt in TiffPaths:
             # 16 bit tifffiles are not read correctly by Pillow
             image = tifffile.imread(str(ifile))
@@ -84,6 +85,8 @@ class Deconverter:
     def image_decoder(self, conf):
         idir = Path(conf.input_dir)
         odir = Path(conf.output_dir)
+        if not os.path.isdir(odir):
+            os.makedirs(odir)
         stats = json.load(open(str(idir / "stats.json")))
         extreme = max(abs(stats["max"]), abs(stats["min"]))
         max_value = conf.factor * extreme
@@ -93,16 +96,16 @@ class Deconverter:
         for i, image_path in enumerate(tqdm(image_paths)):
             image_name = os.path.splitext(image_path.name)[0]
             image_matrix = self.loader(image_path)
-            width, height= image_matrix.shape
+            width, height, channels= image_matrix.shape
             final_matrix = np.zeros((width, height))
             for x in range(width):
                 for y in range(height):
-                    print(f"{image_matrix[x][y]}")
-                    final_matrix[x][y] = lab.deconvert(image_matrix[x][y])
+                    final_matrix[x][y] = lab.deconvert(image_matrix[x][y][:])
             #np.savez_compressed(str(odir/image_name), final_matrix)
 
-            image = Image.fromarray(final_matrix)
-            image.save(str(odir / image_name) + r".png")
+            vmax = np.max(final_matrix)
+            vmin = np.min(final_matrix)
+            plt.imsave(str(odir / (image_name+r".png")), final_matrix, cmap="gray", vmin=vmin, vmax=vmax)
 
         with open(str(odir/"stats.json"), "w") as sfile:
             json.dump(stats, sfile)

@@ -65,7 +65,7 @@ def process(infile, outfile):
             image = Image.fromarray(tifffile.imread(files))
         elif file_ext in image_paths:
             image = Image.open(files)
-        image = image.convert(mode="L")
+        image = image.convert(mode="F")
         output_file = outfile
         if not output_file.is_dir():
             os.makedirs(output_file)
