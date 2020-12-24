@@ -8,40 +8,13 @@ import argparse
 import sys
 from pathlib import Path
 from PIL import Image
-from stat_plotter import PlotStat
 from tqdm import tqdm
 from loadmap import ColorMap
 import matplotlib.pyplot as plt
 
-
-
-class Converter:
-    """This class takes a image and converts it into an interpolated form"""
-
-    def latest_image_clipper(self, image, stats, factor):
-        """
-        This method clips the data max value and min value to 5 % of max value and min value of entire image distribution
-        in stats file
-        Parameters
-        ----------
-        image: image matrix
-        stats: image statistics
-        factor: interval
-        Returns
-        -------
-        """
-        extreme = max(abs(stats["max"]), abs(stats["min"]))
-        max_value = factor * extreme
-        min_value = -factor * extreme
-        width, height = image.shape
-        for x in range(width):
-            for y in range(height):
-                if image[x][y] > max_value:
-                    image[x][y] = max_value
-                elif image[x][y] < min_value:
-                    image[x][y] = min_value
-
-        return image
+class Deconverter:
+    """This class takes a image and deconverts it back to floating point and calculates ssim between the original image
+    and the decoded image"""
 
     def loader(self, ifile):
         """
@@ -83,7 +56,7 @@ class Converter:
             return
         return image
 
-    def image_clipper(self, image, stats):
+    def latest_image_clipper(self, image, stats, factor):
         """
         This method clips the data max value and min value to 5 % of max value and min value of entire image distribution
         in stats file
@@ -91,13 +64,13 @@ class Converter:
         ----------
         image: image matrix
         stats: image statistics
-
+        factor: interval
         Returns
         -------
-
         """
-        max_value = 0.05 * stats["max"]
-        min_value = 0.05 * stats["min"]
+        extreme = max(abs(stats["max"]), abs(stats["min"]))
+        max_value = factor * extreme
+        min_value = -factor * extreme
         width, height = image.shape
         for x in range(width):
             for y in range(height):
@@ -107,49 +80,31 @@ class Converter:
                     image[x][y] = min_value
 
         return image
-    def image_converter(self, conf):
-        """
-        This method will take an input directory and load all the images present in the directory and interpolates
-        them and finally stores them in a output directory
-        Parameters
-        ----------
-        conf
 
-        Returns
-        -------
-
-        """
-        plotter = PlotStat()
+    def image_decoder(self, conf):
         idir = Path(conf.input_dir)
         odir = Path(conf.output_dir)
-
-        if not os.path.isdir(odir):
-            os.makedirs(odir)
-
-        image_paths = idir.rglob("*.npz")
-        stats = json.load(open(str(idir/"stats.json")))
+        stats = json.load(open(str(idir / "stats.json")))
         extreme = max(abs(stats["max"]), abs(stats["min"]))
         max_value = conf.factor * extreme
         min_value = -conf.factor * extreme
-        lab = ColorMap(conf.lab_yaml, min_value, max_value)
+        lab = ColorMap(conf.lab_yaml, max_value, min_value)
+        image_paths = idir.rglob("*.png")
         for i, image_path in enumerate(tqdm(image_paths)):
             image_name = os.path.splitext(image_path.name)[0]
             image_matrix = self.loader(image_path)
-            image_matrix = self.latest_image_clipper(image_matrix, stats, conf.factor)
-            image_matrix = plotter.t_interpolate(image_matrix, "bicubic", 0.25)
-
-            # converting each image pixel to color
-            width, height = image_matrix.shape
-            print(f"{image_name}")
-            final_matrix = np.zeros((width, height, 3), dtype=np.uint8)
+            width, height= image_matrix.shape
+            final_matrix = np.zeros((width, height))
             for x in range(width):
                 for y in range(height):
-                    final_matrix[x][y][:] = lab.convert(image_matrix[x][y])
-                    print(f"{final_matrix[x][y][:]}")
+                    print(f"{image_matrix[x][y]}")
+                    final_matrix[x][y] = lab.deconvert(image_matrix[x][y])
+            #np.savez_compressed(str(odir/image_name), final_matrix)
 
             image = Image.fromarray(final_matrix)
-            image.save(str(odir/ image_name)+r".png")
-        with open(str(odir/ "stats.json"), "w") as sfile:
+            image.save(str(odir / image_name) + r".png")
+
+        with open(str(odir/"stats.json"), "w") as sfile:
             json.dump(stats, sfile)
 
 class Configurator:
@@ -170,8 +125,9 @@ class Configurator:
         self.conf = self.parser.parse_args(args=args)
         return self.conf
 
-
 if __name__ == "__main__":
+
+    idir = r"/home/venkat/"
 
     if (
         len(sys.argv) == 1
@@ -179,5 +135,5 @@ if __name__ == "__main__":
     ):
         sys.argv.append("-h")
     conf = Configurator().parse()
-    colormap = Converter()
-    colormap.image_converter(conf)
+    colormap = Deconverter()
+    colormap.image_decoder(conf)

@@ -348,20 +348,17 @@ class Reshape:
         """
 
         # setting hr width and height
-        hr_width = sample["hr"].shape[1]
-        hr_height = sample["hr"].shape[0]
+        hr_width, hr_height = sample["hr"].shape
 
         # setting lr width and height
-        lr_width = sample["lr"].shape[1]
-        lr_height = sample["lr"].shape[0]
+        lr_width, lr_height = sample["lr"].shape
 
         # seeting lr uniform width and height
-        lr_un_width = sample["lr_un"].shape[1]
-        lr_un_height = sample["lr_un"].shape[0]
+        lr_un_width, lr_un_height = sample["lr_un"].shape
 
-        sample["hr"] = np.reshape(sample["hr"], (1, hr_height, hr_width))
-        sample["lr"] = np.reshape(sample["lr"], (1, lr_height, lr_width))
-        sample["lr_un"] = np.reshape(sample["lr_un"], (1, lr_un_height, lr_un_width))
+        sample["hr"] = np.reshape(sample["hr"], (1, hr_width, hr_height))
+        sample["lr"] = np.reshape(sample["lr"], (1, lr_width, lr_height))
+        sample["lr_un"] = np.reshape(sample["lr_un"], (1, lr_un_width, lr_un_height))
         return sample
 
 

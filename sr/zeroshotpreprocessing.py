@@ -519,7 +519,7 @@ def perform_pil_image_resize(pil_directories, conf):
             for i in range(conf.n_resize):
                 image = plotter.pil_image(image, scale_factor)
                 sample_list.append(image)
-                height, width = image.shape[0], image.shape[1]
+                width, height = image.shape[0], image.shape[1]
                 assert height >= 256 and width >= 256
 
             # shuffling the sample list

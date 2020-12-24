@@ -157,6 +157,7 @@ class Column_Difference(nn.Module):
         """
         # calculating adjacent column difference
         y_new_tensor = torch.abs(y_tensor[:, :, :, 1:] - y_tensor[:, :, :, :-1])
+        y_new_tensor = torch.abs(y_new_tensor)
         return y_new_tensor
 
     def forward(self, y_pred, y_true):
@@ -200,6 +201,7 @@ class Row_Difference(nn.Module):
         the tensor contains the adjacent row difference
         """
         y_new_tensor = y_tensor[:, :, 1:, :] - y_tensor[:, :, :-1, :]
+        y_new_tensor = torch.abs(y_new_tensor)
         return y_new_tensor
 
     def forward(self, y_pred, y_true):
@@ -219,5 +221,6 @@ class Row_Difference(nn.Module):
         """
         y_pred = self.row_difference_calculation(y_tensor=y_pred)
         y_true = self.row_difference_calculation(y_tensor=y_true)
-        row_loss = torch.sum(torch.abs(y_pred - y_true))
+        row_loss = torch.mean(torch.abs(y_pred - y_true))
+        print(row_loss)
         return row_loss
