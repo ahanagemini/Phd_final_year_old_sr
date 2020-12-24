@@ -41,7 +41,7 @@ class Deconverter:
         if fileExt in ImagePaths:
             image = Image.open(ifile)
             image = np.array(image)
-            #image = np.array(image.convert(mode="L"))
+            #image = np.array(image.convert(mode="F"))
         elif fileExt in TiffPaths:
             # 16 bit tifffiles are not read correctly by Pillow
             image = tifffile.imread(str(ifile))
