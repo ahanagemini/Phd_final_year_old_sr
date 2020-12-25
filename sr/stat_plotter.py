@@ -26,7 +26,7 @@ class PlotStat:
 
         """
         image = image.reshape((image.shape[0], image.shape[1], 1))
-        image = image.reshape((1, 1, image.shape[0], image.shape[1]))
+        image = image.reshape((1, 1, image.shape[1], image.shape[0]))
         image = torch.tensor(image, dtype=torch.float32)
         if mode == "nearest":
             image = F.interpolate(
