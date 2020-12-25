@@ -135,8 +135,8 @@ class Converter:
         for i, image_path in enumerate(tqdm(image_paths)):
             image_name = os.path.splitext(image_path.name)[0]
             image_matrix = self.loader(image_path)
-            image_matrix = self.latest_image_clipper(image_matrix, stats, conf.factor)
             image_matrix = plotter.t_interpolate(image_matrix, "bicubic", 0.25)
+            image_matrix = self.latest_image_clipper(image_matrix, stats, conf.factor)
 
             # converting each image pixel to color
             width, height = image_matrix.shape

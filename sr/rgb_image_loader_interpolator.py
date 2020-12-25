@@ -64,9 +64,12 @@ class RGB_Interpolator:
         for i, image_path in enumerate(tqdm(image_paths)):
             image_name = os.path.splitext(image_path.name)[0]
             image = self.loader(image_path)
-            print(image.shape)
-            image = self.t_interpolate(image, conf.mode, conf.scale_factor)
-            image = Image.fromarray(np.uint8(image))
+            width, height, channels = image.shape
+            width = int(conf.scale_factor * width)
+            height = int(conf.scale_factor * height)
+            image = Image.fromarray(image)
+            image = image.resize((width, height), resample=Image.BICUBIC)
+            #image = self.t_interpolate(image, conf.mode, conf.scale_factor)
             image.save(str(odir/(image_name + r".png")))
 
 class Configurator:
