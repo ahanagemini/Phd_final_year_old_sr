@@ -125,8 +125,11 @@ class SSIM_Calculator:
                     hr_image, sr_image, data_range=vmax, multichannel=True
                 )
             out_sr = odir / image_name
-            self.check_dif_matrix(hr_image, sr_image)
-            diff_image = np.abs(np.subtract(hr_image, sr_image))
+            #self.check_dif_matrix(hr_image, sr_image)
+            hr_image_sub = hr_image.astype(np.float32)
+            sr_image_sub = sr_image.astype(np.float32)
+            diff_image = np.abs(np.subtract(hr_image_sub, sr_image_sub))
+            diff_image = diff_image.astype(np.uint8)
             self.writetext(sr_image, out_sr, l1_loss, psnr_loss, ssim_loss)
             #self.plotter(hr_image, sr_image, str(odir/(os.path.splitext(image_name)[0])))
             self.error_image_plot(hr_image, sr_image, str(odir/(os.path.splitext(image_name)[0])))
