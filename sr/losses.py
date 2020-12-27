@@ -28,7 +28,9 @@ class L1loss(nn.Module):
         -------
         l1 loss
         """
-        return torch.mean(torch.abs(y_pred - y_true))
+        l1_loss = torch.mean(torch.abs(y_pred - y_true))
+        print("The l1 loss is {0}".format(l1_loss))
+        return l1_loss
 
 
 class SSIM(nn.Module):
@@ -178,6 +180,7 @@ class Column_Difference(nn.Module):
         y_pred = self.column_difference_calculation(y_tensor=y_pred)
         y_true = self.column_difference_calculation(y_tensor=y_true)
         column_loss = torch.sum(torch.abs(y_pred - y_true))
+        print("the column loss is {0}".format(column_loss))
         return column_loss
 
 
@@ -222,5 +225,5 @@ class Row_Difference(nn.Module):
         y_pred = self.row_difference_calculation(y_tensor=y_pred)
         y_true = self.row_difference_calculation(y_tensor=y_true)
         row_loss = torch.mean(torch.abs(y_pred - y_true))
-        print(row_loss)
+        print("The row loss is {0}".format(row_loss))
         return row_loss

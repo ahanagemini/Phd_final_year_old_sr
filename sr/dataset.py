@@ -255,7 +255,7 @@ class Transpose:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
-        if random.randint(1, 10) > 5:
+        if random.random() > 0.5:
             sample["hr"] = np.transpose(sample["hr"])
             sample["lr"] = np.transpose(sample["lr"])
 

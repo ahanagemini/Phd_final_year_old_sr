@@ -329,7 +329,9 @@ def training(
 
                 x_valid, y_valid = x_valid.to(device), y_valid.to(device)
                 y_pred = model(x_valid)
-                loss_valid = criterion(y_pred, y_valid)
+                loss_valid = criterion(y_pred, y_train) + lambda_2 * row_diff_loss(
+                        y_pred, y_train
+                    )
                 loss_valid_list.append(loss_valid.item())
                 valid_loss = valid_loss + (
                     (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
