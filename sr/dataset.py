@@ -402,9 +402,9 @@ class Differential:
         -------
 
         """
-        hr_width, hr_height = sample["hr"].shape
-        lr_width, lr_height = sample["lr"].shape
         if random.random() < self.prob:
+            hr_width, hr_height = sample["hr"].shape
+            lr_width, lr_height = sample["lr"].shape
             sample["hr"] = np.diff(np.pad(sample["hr"], 1))[1:1+hr_width, 0:hr_height]
             sample["lr"] = np.diff(np.pad(sample["lr"], 1))[1: 1+lr_width, 0:lr_height]
         return sample
