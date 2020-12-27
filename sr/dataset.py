@@ -111,7 +111,7 @@ class PairedDataset(Dataset):
 
 
 class SrDataset(Dataset):
-    """Dataset class for loading large amount of image arrays data"""
+    """Dataset class for loading large amount of image arrays data. This dataset doe not have hr"""
 
     def __init__(self, root_dir, lognorm=False, test=False, hr=True):
         """
@@ -168,6 +168,7 @@ class SrDataset(Dataset):
             }
             transforms = Compose(
                 [
+                    Differential(),
                     Rotate(),
                     Transpose(),
                     HorizontalFlip(),
@@ -274,7 +275,7 @@ class VerticalFlip:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
-        if random.randint(1, 10) > 5:
+        if random.random() > 0.5:
             sample["hr"] = np.flipud(sample["hr"])
             sample["lr"] = np.flipud(sample["lr"])
 
@@ -295,7 +296,7 @@ class HorizontalFlip:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
-        if random.randint(1, 10) > 5:
+        if random.random() > 0.5:
             sample["hr"] = np.fliplr(sample["hr"])
             sample["lr"] = np.fliplr(sample["lr"])
 
@@ -378,3 +379,26 @@ class Normalize:
         hr_image: returns normalized hr image
         """
         return (hr_image - stats["mean"]) / stats["std"]
+
+class Differential:
+    """This will calculate the difference gradient matrix of the image"""
+    def __init__(self, prob):
+        self.prob = prob
+
+    def __call__(self, sample):
+        """
+
+        Parameters
+        ----------
+        sample
+        prob
+        Returns
+        -------
+
+        """
+
+        if random.random() < self.prob:
+            sample["hr"] = np.pad(sample["hr"], 1)[1:, :] - np.pad(sample["hr"], 1)[:-1, :]
+            sample["lr"] = np.pad(sample["lr"], 1)[1:, :] - np.pad(sample["lr"], 1)[:-1, :]
+        return sample
+
