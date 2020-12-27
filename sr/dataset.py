@@ -93,6 +93,7 @@ class PairedDataset(Dataset):
         if not self.test:
             transforms = Compose(
                 [
+                    Differential(0.4),
                     Rotate(),
                     Transpose(),
                     HorizontalFlip(),
@@ -168,7 +169,7 @@ class SrDataset(Dataset):
             }
             transforms = Compose(
                 [
-                    Differential(),
+                    Differential(0.4),
                     Rotate(),
                     Transpose(),
                     HorizontalFlip(),
@@ -383,6 +384,12 @@ class Normalize:
 class Differential:
     """This will calculate the difference gradient matrix of the image"""
     def __init__(self, prob):
+        """
+
+        Parameters
+        ----------
+        prob: The probability of this filter running between 0 and 1
+        """
         self.prob = prob
 
     def __call__(self, sample):
@@ -390,15 +397,15 @@ class Differential:
 
         Parameters
         ----------
-        sample
-        prob
+        sample: Contains lr, hr images
         Returns
         -------
 
         """
-
+        hr_width, hr_height = sample["hr"].shape
+        lr_width, lr_height = sample["lr"].shape
         if random.random() < self.prob:
-            sample["hr"] = np.pad(sample["hr"], 1)[1:, :] - np.pad(sample["hr"], 1)[:-1, :]
-            sample["lr"] = np.pad(sample["lr"], 1)[1:, :] - np.pad(sample["lr"], 1)[:-1, :]
+            sample["hr"] = np.diff(np.pad(sample["hr"], 1))[1:1+hr_width, 0:hr_height]
+            sample["lr"] = np.diff(np.pad(sample["lr"], 1))[1: 1+lr_width, 0:lr_height]
         return sample
 
