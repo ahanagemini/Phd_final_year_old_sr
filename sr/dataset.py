@@ -98,7 +98,7 @@ class PairedDataset(Dataset):
                     Transpose(),
                     HorizontalFlip(),
                     VerticalFlip(),
-                    Pertube(1.00e-6),
+                    Pertube(0.5, 0.5),
                     Reshape(),
                     ToFloatTensor(),
                 ]
@@ -174,7 +174,7 @@ class SrDataset(Dataset):
                     Transpose(),
                     HorizontalFlip(),
                     VerticalFlip(),
-                    Pertube(1.00e-6),
+                    Pertube(0.5, 0.5),
                     Reshape(),
                     ToFloatTensor(),
                 ]
@@ -235,8 +235,8 @@ class ToFloatTensor:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
-        sample["hr"] = torch.tensor(sample["hr"], dtype=torch.float32)
-        sample["lr"] = torch.tensor(sample["lr"], dtype=torch.float32)
+        sample["hr"] = torch.from_numpy(sample["hr"].copy()).float()
+        sample["lr"] = torch.from_numpy(sample["lr"].copy()).float()
 
         return sample
 
@@ -307,14 +307,16 @@ class HorizontalFlip:
 class Pertube:
     """ Pertube class transforms image array by adding very small values to the array """
 
-    def __init__(self, episilon=1.00e-10):
+    def __init__(self, prob=0.5, random_prob=0.5):
         """
 
         Parameters
         ----------
-        episilon: a very small float value
+        prob: probabilty of no. of images to be processed using this filter
+        random_prob: the probability of generating zeros in an array
         """
-        self.episilon = episilon
+        self.prob = prob
+        self.random_prob = random_prob
 
     def __call__(self, sample):
         """
@@ -327,10 +329,10 @@ class Pertube:
         sample: dictionary containing transformed lr and transformed hr
         """
 
-        data = sample["stats"]
-        sample["hr"] = sample["hr"] + 0.0
-        # sample["lr"] = sample["lr"] + (data["std"] / 100.0) * np.random.rand(*(sample["lr"].shape))
-        sample["lr"] = sample["lr"] + 0.0
+        if random.random() < self.prob:
+            lr_width, lr_height = sample["lr"].shape
+            sample["lr"] = np.random.choice([0, 1], size=(lr_width, lr_height),
+                                                      p=[self.random_prob, 1-self.random_prob]) * sample["lr"]
         return sample
 
 
@@ -405,7 +407,7 @@ class Differential:
         if random.random() < self.prob:
             hr_width, hr_height = sample["hr"].shape
             lr_width, lr_height = sample["lr"].shape
-            sample["hr"] = np.diff(np.pad(sample["hr"], 1))[1:1+hr_width, 0:hr_height]
-            sample["lr"] = np.diff(np.pad(sample["lr"], 1))[1: 1+lr_width, 0:lr_height]
+            sample["hr"] = np.abs(np.diff(np.pad(sample["hr"], 1))[1:1+hr_width, 0:hr_height])
+            sample["lr"] = np.abs(np.diff(np.pad(sample["lr"], 1))[1: 1+lr_width, 0:lr_height])
         return sample
 
