@@ -313,7 +313,7 @@ def training(
         log_loss_summary(logger, loss_train_list, step, prefix="train_")
         loss_train_list = []
 
-        del x_train, y_train, mean, sigma, loss_train_list
+        del x_train, mean, sigma, loss_train_list
         torch.cuda.empty_cache()
 
         # Main validation loop for this epoch
