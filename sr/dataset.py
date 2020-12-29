@@ -68,7 +68,8 @@ class PairedDataset(Dataset):
         stats_lr, stats_hr = self.lr_hr_stat_tuple[idx]
         hr_image = loader(hrimg_name)
         lr_image = loader(lrimg_name)
-        lr_unorm = lr_image.copy()
+
+
         if self.lognorm:
             image_sign = np.sign(lr_image)
             lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
@@ -85,12 +86,16 @@ class PairedDataset(Dataset):
         lr_image = Normalize()(lr_image, stats_lr)
         sample = {
             "lr": lr_image,
-            "lr_un": lr_unorm,
             "hr": hr_image,
             "stats": stats_hr,
             "file": filename,
         }
-        if not self.test:
+        if self.test:
+            transforms = Compose([Reshape(), ToFloatTensor()])
+            sample = transforms(sample)
+            lr_unorm = lr_image.copy()
+            sample["lr_unorm"] = Single_Image_Reshape()(lr_unorm)
+        else:
             transforms = Compose(
                 [
                     Differential(0.4),
@@ -105,9 +110,6 @@ class PairedDataset(Dataset):
             )
             for i, trans in enumerate([transforms]):
                 sample = trans(sample)
-        if self.test:
-            transforms = Compose([Pertube(1.00e-6), Reshape(), ToFloatTensor()])
-            sample = transforms(sample)
         return sample
 
 
@@ -159,7 +161,24 @@ class SrDataset(Dataset):
         else:
             lr_image = loader(img_name)
             hr_image = np.zeros_like(lr_image)
-        if not self.test:
+        if self.test:
+            if self.lognorm:
+                image_sign = np.sign(lr_image)
+                lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
+            if stats["std"] <= 0.001:
+                stats["std"] = 1
+            lr_unorm = lr_image.copy()
+            lr_image = Normalize()(lr_image, stats)
+            sample = {
+                "lr": lr_image,
+                "lr_un": lr_unorm,
+                "hr": hr_image,
+                "stats": stats,
+                "file": filename,
+            }
+            transforms = Compose([Reshape(), ToFloatTensor()])
+            sample = transforms(sample)
+        else:
             sample = {
                 "lr": lr_image,
                 "lr_un": lr_image,
@@ -181,23 +200,6 @@ class SrDataset(Dataset):
             )
             for i, trans in enumerate([transforms]):
                 sample = trans(sample)
-        else:
-            if self.lognorm:
-                image_sign = np.sign(lr_image)
-                lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
-            if stats["std"] <= 0.001:
-                stats["std"] = 1
-            lr_unorm = lr_image.copy()
-            lr_image = Normalize()(lr_image, stats)
-            sample = {
-                "lr": lr_image,
-                "lr_un": lr_unorm,
-                "hr": hr_image,
-                "stats": stats,
-                "file": filename,
-            }
-            transforms = Compose([Pertube(1.00e-6), Reshape(), ToFloatTensor()])
-            sample = transforms(sample)
         return sample
 
 
@@ -336,6 +338,24 @@ class Pertube:
         return sample
 
 
+class Single_Image_Reshape:
+    """Reshape single image"""
+
+    def __call__(self, image):
+        """
+
+        Parameters
+        ----------
+        image: single image of size m*n
+
+        Returns
+        -------
+        image: returns image of shape 1*n*m
+        """
+        width, height = image.shape
+        image = np.reshape(image, (1, height, width))
+        return image
+
 class Reshape:
     """Reshaping tensors"""
 
@@ -357,12 +377,8 @@ class Reshape:
         # setting lr width and height
         lr_width, lr_height = sample["lr"].shape
 
-        # seeting lr uniform width and height
-        lr_un_width, lr_un_height = sample["lr_un"].shape
-
-        sample["hr"] = np.reshape(sample["hr"], (1, hr_width, hr_height))
-        sample["lr"] = np.reshape(sample["lr"], (1, lr_width, lr_height))
-        sample["lr_un"] = np.reshape(sample["lr_un"], (1, lr_un_width, lr_un_height))
+        sample["hr"] = np.reshape(sample["hr"], (1, hr_height, hr_width))
+        sample["lr"] = np.reshape(sample["lr"], (1, lr_height, lr_width))
         return sample
 
 

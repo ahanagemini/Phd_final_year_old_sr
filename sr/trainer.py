@@ -249,6 +249,8 @@ def training(
         epoch = step
         start_time = time()
         train_loss = valid_loss = 0.0
+        row_loss = valid_row_loss = 0.0
+        l1_loss = valid_l1_loss = 0.0
         model.train()
         loss_train_list = []
         step += 1
@@ -299,11 +301,17 @@ def training(
             with torch.autograd.set_detect_anomaly(True):
                 with torch.set_grad_enabled(True):
                     y_pred = model(x_train)
-                    loss_train = criterion(y_pred, y_train) + lambda_2 * row_diff_loss(
-                        y_pred, y_train
-                    )
+                    loss_l1 = criterion(y_pred, y_train)
+                    loss_row = lambda_2 * row_diff_loss(y_pred, y_train)
+                    loss_train = loss_l1 + loss_row
                     train_loss = train_loss + (
                         (1 / (batch_idx + 1)) * (loss_train.data - train_loss)
+                    )
+                    l1_loss = l1_loss + (
+                        (1 / (batch_idx + 1)) * (loss_l1.data - l1_loss))
+
+                    row_loss = row_loss + (
+                        (1 / (batch_idx + 1)) * (loss_row.data - row_loss)
                     )
                     loss_train_list.append(loss_train.item())
                     loss_train.backward()
@@ -329,13 +337,17 @@ def training(
 
                 x_valid, y_valid = x_valid.to(device), y_valid.to(device)
                 y_pred = model(x_valid)
-                loss_valid = criterion(y_pred, y_valid) + lambda_2 * row_diff_loss(
-                        y_pred, y_valid
-                    )
+                loss_l1_valid = criterion(y_pred, y_valid)
+                loss_row_valid = lambda_2 * row_diff_loss(y_pred, y_valid)
+                loss_valid = loss_l1_valid + loss_row_valid
                 loss_valid_list.append(loss_valid.item())
                 valid_loss = valid_loss + (
                     (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
                 )
+                valid_row_loss = row_loss + (
+                    (1 / (batch_idx + 1)) * (loss_row_valid.data - valid_row_loss))
+                valid_l1_loss = valid_l1_loss + (
+                    (1 / (batch_idx + 1)) * (loss_l1_valid.data - valid_l1_loss))
 
         if architecture == "edsr":
             # calling scheduler based on valid loss
@@ -355,7 +367,10 @@ def training(
                 time() - start_time,
                 optimizer.param_groups[0]["lr"],
                 memory,
-            )
+            ))
+
+        print("Train_L1_loss: {:.6f} \t Train_Row loss: {:.6f} \t Valid_L1_loss: {:.6f} \t Valid_row_loss: {:.6f}".format(
+            l1_loss, row_loss, valid_l1_loss, valid_row_loss)
         )
 
         if architecture == "edsr":
