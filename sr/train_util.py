@@ -1,29 +1,16 @@
 from pathlib import Path
 import os
-import sys
-import shutil
-from time import time
-import datetime
 import scipy.ndimage
 
 import torch
 import torch.optim as optim
 import torch.nn
-
-from torchsummary import summary
-
-from docopt import docopt
-
 import numpy as np
-import tifffile
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from models import UNET
 from models import EDSR
-from dataset import SrDataset, PairedDataset
 from axial_bicubic import AxialNet
-from losses import SSIM, L1loss, PSNR, Column_Difference, Row_Difference
-from logger import Logger
 
 def model_selection(architecture, aspp, dilation, act):
     """
@@ -199,6 +186,8 @@ def train_model(training_generator, training_parameters):
     row_diff_loss = training_parameters["row_diff_loss"]
     lambda_row = training_parameters["lambda_row"]
     loss_train_list = []
+    l1_loss_list = []
+    row_diff_list = []
     train_loss = row_loss = l1_loss = 0.0
     for batch_idx, data in enumerate(tqdm(training_generator)):
         model.train(True)
@@ -229,10 +218,12 @@ def train_model(training_generator, training_parameters):
                         (1 / (batch_idx + 1)) * (loss_row.data - row_loss)
                 )
                 loss_train_list.append(loss_train.item())
+                l1_loss_list.append(loss_l1.item())
+                row_diff_list.append(loss_row.item())
                 loss_train.backward()
                 optimizer.step()
 
-    return loss_train_list, train_loss, l1_loss, row_loss
+    return loss_train_list, train_loss, l1_loss, row_loss, l1_loss_list, row_diff_list
 
 def valid_model(validation_generator, training_parameters):
     model = training_parameters["model"]
@@ -245,6 +236,8 @@ def valid_model(validation_generator, training_parameters):
     epoch = training_parameters["current_epoch"]
     max_epochs = training_parameters["max_epochs"]
     loss_valid_list = []
+    l1_loss_valid_list = []
+    row_diff_valid_list = []
     valid_loss = valid_row_loss = valid_l1_loss = 0.0
     scheduler.factor = 1 + (epoch / max_epochs) ** 0.9
     with torch.no_grad():
@@ -260,6 +253,8 @@ def valid_model(validation_generator, training_parameters):
             loss_row_valid = lambda_row * row_diff_loss(y_pred, y_valid)
             loss_valid = loss_l1_valid + loss_row_valid
             loss_valid_list.append(loss_valid.item())
+            l1_loss_valid_list.append(loss_l1_valid.item())
+            row_diff_valid_list.append(loss_row_valid.item())
             valid_loss = valid_loss + (
                     (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
             )
@@ -269,4 +264,4 @@ def valid_model(validation_generator, training_parameters):
                     (1 / (batch_idx + 1)) * (loss_l1_valid.data - valid_l1_loss))
         scheduler.step(valid_loss)
 
-    return loss_valid_list, valid_loss, valid_l1_loss, valid_row_loss
+    return loss_valid_list, valid_loss, valid_l1_loss, valid_row_loss, l1_loss_valid_list, row_diff_valid_list

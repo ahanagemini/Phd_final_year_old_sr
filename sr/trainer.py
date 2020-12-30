@@ -168,17 +168,21 @@ def training(
         start_time = time()
         model.train()
         # training
-        loss_train_list, train_loss, l1_loss, row_loss = train_model(training_generator, training_parameters)
+        loss_train_list, train_loss, l1_loss, row_loss, l1_list, row_diff_list = train_model(training_generator, training_parameters)
 
         # training log summary after every 10 epochs
         log_loss_summary(logger, loss_train_list, step, prefix="train_")
-        del loss_train_list
+        log_loss_summary(logger, l1_list, step, prefix="_train_l1")
+        log_loss_summary(logger, row_diff_list, step, prefix="_train_row")
+        del loss_train_list, l1_list, row_diff_list
         torch.cuda.empty_cache()
 
         # validation
-        loss_valid_list, valid_loss, valid_l1_loss, valid_row_loss = valid_model(validation_generator, training_parameters)
+        loss_valid_list, valid_loss, valid_l1_loss, valid_row_loss, val_l1_list, val_row_list = valid_model(validation_generator, training_parameters)
         log_loss_summary(logger, loss_valid_list, step, prefix="val_")
-        del loss_valid_list
+        log_loss_summary(logger, val_l1_list, step, prefix="_val_l1")
+        log_loss_summary(logger, val_row_list, step, prefix="_val_row")
+        del loss_valid_list, val_l1_list, val_row_list
         torch.cuda.empty_cache()
 
 
