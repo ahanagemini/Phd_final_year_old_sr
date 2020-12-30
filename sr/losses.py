@@ -155,10 +155,11 @@ class Column_Difference(nn.Module):
         -------
         y_new_tensor: Tensor
         The tensor contains the adjacent column difference
+        shape: Batches*channels*columns*rows
 
         """
         # calculating adjacent column difference
-        y_new_tensor = torch.abs(y_tensor[:, :, :, 1:] - y_tensor[:, :, :, :-1])
+        y_new_tensor = torch.abs(y_tensor[:, :, 1:, :] - y_tensor[:, :, :-1, :])
         return y_new_tensor
 
     def forward(self, y_pred, y_true):
@@ -195,13 +196,14 @@ class Row_Difference(nn.Module):
         ----------
         y_tensor: Tensor
         the image tensor
+        shape: Batches*channels*columns*rows
 
         Returns
         -------
         y_new_tensor: Tensor
         the tensor contains the adjacent row difference
         """
-        y_new_tensor = torch.abs(y_tensor[:, :, 1:, :] - y_tensor[:, :, :-1, :])
+        y_new_tensor = torch.abs(y_tensor[:, :, :, 1:] - y_tensor[:, :, :, :-1])
         return y_new_tensor
 
     def forward(self, y_pred, y_true):

@@ -615,7 +615,7 @@ def image_stat_processing(conf):
     conf.real_image = True
     output_directory = Path(conf.cutting_output_dir_path)
 
-    if not conf.resume or not conf.load_last_trained:
+    if not conf.resume and not conf.load_last_trained:
         # deletting if cutting out existed already to avoid overlaps
         if os.path.isdir(output_directory):
             shutil.rmtree(output_directory)

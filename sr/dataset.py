@@ -94,7 +94,7 @@ class PairedDataset(Dataset):
             transforms = Compose([Reshape(), ToFloatTensor()])
             sample = transforms(sample)
             lr_unorm = lr_image.copy()
-            sample["lr_unorm"] = Single_Image_Reshape()(lr_unorm)
+            sample["lr_un"] = Single_Image_Reshape()(lr_unorm)
         else:
             transforms = Compose(
                 [
@@ -181,7 +181,6 @@ class SrDataset(Dataset):
         else:
             sample = {
                 "lr": lr_image,
-                "lr_un": lr_image,
                 "hr": hr_image,
                 "stats": stats,
                 "file": filename,

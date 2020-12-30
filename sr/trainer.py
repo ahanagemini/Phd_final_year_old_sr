@@ -51,6 +51,7 @@ from dataset import SrDataset, PairedDataset
 from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR, Column_Difference, Row_Difference
 from logger import Logger
+from train_util import model_selection, debug_pics,  check_load_model, model_save, train_model, valid_model
 
 BATCH_SIZE = {
     "unet": 4,
@@ -98,25 +99,6 @@ def create_dataset(path, lognorm=False):
         return SrDataset(path, lognorm=lognorm)
 
 
-def model_save(save_params, train_model_path):
-    """
-
-    Parameters
-    ----------
-    save_params: dictionary containing all params to be saved
-    train_model_path: model path
-
-    Returns
-    -------
-
-    """
-    model_path = Path(train_model_path)
-    model_folder = model_path.parent
-    if not model_folder.is_dir():
-        os.makedirs(model_folder)
-    torch.save(save_params, model_path)
-
-
 def training(
     training_generator,
     validation_generator,
@@ -154,89 +136,26 @@ def training(
     save_model_path = Path(model_save_path)
     current_save_model_path = save_model_path / "current"
     best_save_model_path = save_model_path / "best"
-    if not current_save_model_path.is_dir():
-        os.makedirs(current_save_model_path)
-    if not best_save_model_path.is_dir():
-        os.makedirs(best_save_model_path)
+
+    # setting up the srchitecture for training
+    model = model_selection(architecture, aspp, dilation, act)
     # parameters
     lr = LR[architecture]
-    if architecture == "unet":
-        model = UNET(in_channels=1, out_channels=1, init_features=64, depth=4)
-    elif architecture == "axial":
-        model = AxialNet(num_channels=1, resblocks=2, skip=1)
-    elif architecture == "edsr_16_64":
-        model = EDSR(n_resblocks=16, n_feats=64, aspp=aspp, dilation=dilation, act=act)
-    elif architecture == "edsr_8_256":
-        model = EDSR(n_resblocks=8, n_feats=256, aspp=aspp, dilation=dilation, act=act)
-    elif architecture == "edsr_16_256":
-        model = EDSR(n_resblocks=16, n_feats=256, aspp=aspp, dilation=dilation, act=act)
-    elif architecture == "edsr_32_256":
-        model = EDSR(n_resblocks=32, n_feats=256)
-
     model.to(device)
     summary(model, (1, 64, 64), batch_size=1, device="cuda")
     max_epochs = num_epochs
-    criterion = torch.nn.L1Loss()
 
-    # we have to tune the lambda values
-    lambda_2 = 0.2
-
-    col_diff_loss = Column_Difference()
-    row_diff_loss = Row_Difference()
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-    current_model_list = list(current_save_model_path.rglob("*.pt"))
-    current_model_list = sorted(current_model_list)
-    best_model_list = list(best_save_model_path.rglob("*best_model.pt"))
-    best_model_list = sorted(best_model_list)
-
-    # learning rate scheduler
-    if architecture == "edsr":
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=1)
-
-    if not current_model_list:
-        current_model = ""
-    else:
-        current_model = current_model_list[-1]
-
-    if not best_model_list:
-        best_model = ""
-    else:
-        best_model = best_model_list[-1]
-
-    current_epoch = 0
-    # check if there is a .pt file of model after an epoch
-    if os.path.isfile(current_model):
-        if architecture == "edsr":
-            checkpoint = torch.load(current_model)
-            model.load_state_dict(checkpoint["model"])
-            current_epoch = checkpoint["epoch"]
-            optimizer.load_state_dict(checkpoint["optimizer"])
-            scheduler.load_state_dict(checkpoint["scheduler"])
-
-        else:
-            checkpoint = torch.load(current_model)
-            model.load_state_dict(checkpoint["model"])
-            current_epoch = checkpoint["epoch"]
-            optimizer.load_state_dict(checkpoint["optimizer"])
-
-    # check if there is a .pt file of best model if epoch .pt file is missing
-    elif os.path.isfile(best_model):
-        if architecture == "edsr":
-            checkpoint = torch.load(current_model)
-            model.load_state_dict(checkpoint["model"])
-            current_epoch = checkpoint["epoch"]
-            optimizer.load_state_dict(checkpoint["optimizer"])
-            scheduler.load_state_dict(checkpoint["scheduler"])
-
-        else:
-            checkpoint = torch.load(current_model)
-            model.load_state_dict(checkpoint["model"])
-            current_epoch = checkpoint["epoch"]
-            optimizer.load_state_dict(checkpoint["optimizer"])
+    # loading the model
+    training_parameters = check_load_model(save_model_path, model, lr)
+    training_parameters["criterion"] = torch.nn.L1Loss()
+    training_parameters["row_diff_loss"] = Row_Difference()
+    training_parameters["device"] = device
+    training_parameters["lambda_row"] = 0.1
+    training_parameters["max_epochs"] = max_epochs
 
     best_valid_loss = float("inf")
     logger = Logger(str(log_dir))
-    step = current_epoch
+    step = training_parameters["current_epoch"]
     # TODO: Remove after debugging is done
     if debug_pics:
         input_save_path = Path(os.path.dirname(__file__) + r"/input_pics")
@@ -246,126 +165,31 @@ def training(
 
     while step < max_epochs:
         print(f"current step is {step}")
-        epoch = step
         start_time = time()
-        train_loss = valid_loss = 0.0
-        row_loss = valid_row_loss = 0.0
-        l1_loss = valid_l1_loss = 0.0
         model.train()
-        loss_train_list = []
-        step += 1
-        # Main training loop for this epoch
-        for batch_idx, data in enumerate(tqdm(training_generator)):
-            model.train(True)
-            x_train = data["lr"]
-            y_train = data["hr"]
-            stat = data["stats"]
-            mean, sigma = stat["mean"], stat["std"]
-            x_train, y_train, mean, sigma = (
-                x_train.to(device),
-                y_train.to(device),
-                mean.to(device),
-                sigma.to(device),
-            )
-            # TODO: Remove this after debugging is over
-            if debug_pics:
-                x_np = x_train.cpu().numpy()
-                y_np = y_train.cpu().numpy()
-                for i in range(x_np.shape[0]):
-                    filename = data["file"][i]
-                    x_rescale = (
-                        x_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
-                    )
-                    y_rescale = (
-                        y_np[i] * stat["std"][i].numpy() + stat["mean"][i].numpy()
-                    )
-
-                    # image padded to make sure lr and hr are same size
-                    x_rescale_pad = x_rescale.reshape(x_rescale.shape[1], -1)
-
-                    image_width, image_height = x_rescale_pad.shape
-                    if kernel:
-                        x_rescale_pad = scipy.ndimage.zoom(x_rescale_pad, 4.0)
-                    save_plots = np.hstack(
-                        [x_rescale_pad, y_rescale.reshape(y_rescale.shape[1], -1)]
-                    )
-                    save_plots = np.clip(
-                        save_plots, stat["min"][i].numpy(), stat["max"][i].numpy()
-                    )
-                    vmax = stat["mean"][i].numpy() + 3 * stat["std"][i].numpy()
-                    vmin = stat["min"][i].numpy()
-                    filename = os.path.join(f"{input_save_path}/{filename}.tiff")
-                    plt.imsave(filename, save_plots, vmin=vmin, vmax=vmax, cmap="gray")
-
-            optimizer.zero_grad()
-            with torch.autograd.set_detect_anomaly(True):
-                with torch.set_grad_enabled(True):
-                    y_pred = model(x_train)
-                    loss_l1 = criterion(y_pred, y_train)
-                    loss_row = lambda_2 * row_diff_loss(y_pred, y_train)
-                    loss_train = loss_l1 + loss_row
-                    train_loss = train_loss + (
-                        (1 / (batch_idx + 1)) * (loss_train.data - train_loss)
-                    )
-                    l1_loss = l1_loss + (
-                        (1 / (batch_idx + 1)) * (loss_l1.data - l1_loss))
-
-                    row_loss = row_loss + (
-                        (1 / (batch_idx + 1)) * (loss_row.data - row_loss)
-                    )
-                    loss_train_list.append(loss_train.item())
-                    loss_train.backward()
-                    optimizer.step()
+        # training
+        loss_train_list, train_loss, l1_loss, row_loss = train_model(training_generator, training_parameters)
 
         # training log summary after every 10 epochs
         log_loss_summary(logger, loss_train_list, step, prefix="train_")
-        loss_train_list = []
-
-        del x_train, y_train, mean, sigma, loss_train_list
+        del loss_train_list
         torch.cuda.empty_cache()
 
-        # Main validation loop for this epoch
-        if architecture == "edsr":
-            scheduler.factor = 1 + (epoch / max_epochs) ** 0.9
-        with torch.no_grad():
-            loss_valid_list = []
-            for batch_idx, data in enumerate(tqdm(validation_generator)):
-                # unet.eval()
-                model.train(False)
-                x_valid = data["lr"]
-                y_valid = data["hr"]
-
-                x_valid, y_valid = x_valid.to(device), y_valid.to(device)
-                y_pred = model(x_valid)
-                loss_l1_valid = criterion(y_pred, y_valid)
-                loss_row_valid = lambda_2 * row_diff_loss(y_pred, y_valid)
-                loss_valid = loss_l1_valid + loss_row_valid
-                loss_valid_list.append(loss_valid.item())
-                valid_loss = valid_loss + (
-                    (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
-                )
-                valid_row_loss = row_loss + (
-                    (1 / (batch_idx + 1)) * (loss_row_valid.data - valid_row_loss))
-                valid_l1_loss = valid_l1_loss + (
-                    (1 / (batch_idx + 1)) * (loss_l1_valid.data - valid_l1_loss))
-
-        if architecture == "edsr":
-            # calling scheduler based on valid loss
-            scheduler.step(valid_loss)
-            # print(optimizer.param_groups[0]['lr'])
-        # valid log summary after every 10 epochs
+        # validation
+        loss_valid_list, valid_loss, valid_l1_loss, valid_row_loss = valid_model(validation_generator, training_parameters)
         log_loss_summary(logger, loss_valid_list, step, prefix="val_")
-        loss_valid_list = []
+        del loss_valid_list
+        torch.cuda.empty_cache()
 
-        del x_valid, y_valid, loss_valid_list
+
         memory = torch.cuda.max_memory_allocated() / 1024.0 / 1024.0
         print(
             "\nEpoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f} in {:.1f} seconds. [lr:{:.8f}][max mem:{:.0f}MB]".format(
-                epoch,
+                training_parameters["current_epoch"],
                 train_loss,
                 valid_loss,
                 time() - start_time,
-                optimizer.param_groups[0]["lr"],
+                training_parameters["optimizer"].param_groups[0]["lr"],
                 memory,
             ))
 
@@ -373,43 +197,45 @@ def training(
             l1_loss, row_loss, valid_l1_loss, valid_row_loss)
         )
 
-        if architecture == "edsr":
-            save_params = {
+        save_params = {
                 "epoch": step,
                 "model": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-                "scheduler": scheduler,
-            }
-        else:
-            save_params = {
-                "epoch": step,
-                "model": model.state_dict(),
-                "optimizer": optimizer.state_dict(),
-            }
+                "optimizer": training_parameters["optimizer"].state_dict(),
+                "scheduler": training_parameters["scheduler"].state_dict(),
+        }
         # Save best validation epoch model
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
 
             model_save(save_params, f"{str(best_save_model_path)}/best_model.pt")
+            # deleting the old_best_model after new one is saved
+            if os.path.isfile(training_parameters["best_model"]):
+                os.remove(training_parameters["best_model"])
+
+            current_best_model_list = list(best_save_model_path.rglob("*.pt"))
+            if not current_best_model_list:
+                training_parameters["best_model"] = ""
+            else:
+                training_parameters["best_model"] = current_best_model_list[-1]
 
         model_save(
             save_params, f"{str(current_save_model_path)}/{timestamp}_model_{step}.pt"
         )
 
         # deleting old current model after new one is saved
-        print(f"the current model path is {current_model}")
-        if os.path.isfile(current_model):
-            os.remove(current_model)
+        print(f"the current model path is {training_parameters['current_model']}")
+        if os.path.isfile(training_parameters["current_model"]):
+            os.remove(training_parameters["current_model"])
 
         current_model_list = list(current_save_model_path.rglob("*.pt"))
-        current_model_list = sorted(current_model_list)
-
         if not current_model_list:
-            current_model = ""
+            training_parameters["current_model"] = ""
         else:
-            current_model = current_model_list[-1]
+            training_parameters["current_model"] = current_model_list[-1]
 
         torch.cuda.empty_cache()
+        step += 1
+        training_parameters["current_epoch"] = step
 
 
 def process(
