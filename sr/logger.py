@@ -14,3 +14,8 @@ class Logger(object):
         """took the summary logger from https://github.com/mateuszbuda/brain-segmentation-pytorch/blob/master/logger.py"""
         self.writer.add_scalar(tag=tag, scalar_value=value, global_step=step)
         self.writer.flush()
+
+    def model_graph(self, model, input_to_model):
+        """This method is used to draw the model"""
+        self.writer.add_graph(model, input_to_model)
+        self.writer.close()

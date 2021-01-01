@@ -56,7 +56,7 @@ from train_util import model_selection, debug_pics,  check_load_model, model_sav
 BATCH_SIZE = {
     "unet": 4,
     "axial": 16,
-    "edsr_16_64": 8,
+    "edsr_16_64": 16,
     "edsr_8_256": 16,
     "edsr_16_256": 8,
     "edsr_32_256": 8,
@@ -73,7 +73,8 @@ LR = {
 
 def log_loss_summary(logger, loss, step, prefix=""):
     logger.scalar_summary(prefix + "loss", np.mean(loss), step)
-
+def model_draw(logger, model, input_to_model):
+    logger.model_graph(model, input_to_model)
 
 def create_dataset(path, lognorm=False):
     """
@@ -136,6 +137,7 @@ def training(
     save_model_path = Path(model_save_path)
     current_save_model_path = save_model_path / "current"
     best_save_model_path = save_model_path / "best"
+    logger = Logger(str(log_dir))
 
     # setting up the srchitecture for training
     model = model_selection(architecture, aspp, dilation, act)
@@ -144,6 +146,12 @@ def training(
     model.to(device)
     summary(model, (1, 64, 64), batch_size=1, device="cuda")
     max_epochs = num_epochs
+
+    # drawing model
+    dummy_input = torch.from_numpy(np.random.randn(1, 1, 64, 64)).float()
+    dummy_input = dummy_input.to(device)
+    model_draw(logger, model, dummy_input)
+    del dummy_input
 
     # loading the model
     training_parameters = check_load_model(save_model_path, model, lr)
@@ -154,7 +162,7 @@ def training(
     training_parameters["max_epochs"] = max_epochs
 
     best_valid_loss = float("inf")
-    logger = Logger(str(log_dir))
+
     step = training_parameters["current_epoch"]
     # TODO: Remove after debugging is done
     if debug_pics:
