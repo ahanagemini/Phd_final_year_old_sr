@@ -56,7 +56,7 @@ from train_util import model_selection, debug_pics,  check_load_model, model_sav
 BATCH_SIZE = {
     "unet": 4,
     "axial": 16,
-    "edsr_16_64": 16,
+    "edsr_16_64": 8,
     "edsr_8_256": 16,
     "edsr_16_256": 8,
     "edsr_32_256": 8,
