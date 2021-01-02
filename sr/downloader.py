@@ -10,13 +10,14 @@ Options:
     -h --help -h
 """
 import os
-import zipfile
+import shutil
+import sys
 import tarfile
+import zipfile
 from pathlib import Path
+
 import wget
 from docopt import docopt
-import sys
-import shutil
 
 
 def get_file_name(url):
@@ -53,11 +54,15 @@ def file_extraction(file_tmp, file_ext, odir):
         tar.extractall(odir)
 
 
-
 def bar_progress(current, total, width=80):
-    progress_message = "Downloading: %d%% [%d / %d] bytes" % (current / total * 100, current, total)
+    progress_message = "Downloading: %d%% [%d / %d] bytes" % (
+        current / total * 100,
+        current,
+        total,
+    )
     sys.stdout.write("\r" + progress_message)
     sys.stdout.flush()
+
 
 def data_download(dataname, odir):
     """
@@ -74,9 +79,9 @@ def data_download(dataname, odir):
         "chest_xray": r"https://www.dropbox.com/s/hzqcuct3phd7g5s/earth1.tar?dl=0",
         "Retinal_OCT": r"https://www.dropbox.com/s/e9p0dt001mrej99/earth2.tar?dl=0",
         "Medical_3D": r"https://www.dropbox.com/s/ri3cpsunqed32my/Medical_data.tar.gz?dl=0",
-        "slices" : r"https://www.dropbox.com/s/oi4o4fxn2hzkevs/slices.tar.gz?dl=0"
+        "slices": r"https://www.dropbox.com/s/oi4o4fxn2hzkevs/slices.tar.gz?dl=0",
     }
-    down_path = Path(os.getcwd()+r"/Download")
+    down_path = Path(os.getcwd() + r"/Download")
     if os.path.isdir(down_path):
         shutil.rmtree(down_path)
     os.mkdir(down_path)
@@ -84,23 +89,26 @@ def data_download(dataname, odir):
         for i, url_key in enumerate(datadict):
             url = datadict[url_key]
             file_name, file_ext = get_file_name(url)
-            file_down_path = down_path / (file_name+"."+file_ext)
+            file_down_path = down_path / (file_name + "." + file_ext)
             # file_tmp = wget.download(url, out=str(file_down_path), bar=bar_progress)
-            os.system(f'wget {url} -O {file_down_path}')
+            os.system(f"wget {url} -O {file_down_path}")
             file_extraction(file_down_path, file_ext, odir)
             if url_key == "Medical_3D":
                 files = os.listdir(odir / "Medical_3D")
                 for compressed_file in files:
-                    file_extraction(odir / "Medical_3D" / compressed_file, file_ext, odir)
+                    file_extraction(
+                        odir / "Medical_3D" / compressed_file, file_ext, odir
+                    )
                     os.remove(odir / "Medical_3D" / compressed_file)
     else:
         url = datadict[dataname]
         file_name, file_ext = get_file_name(url)
-        file_down_path = down_path / (file_name+"."+file_ext)
+        file_down_path = down_path / (file_name + "." + file_ext)
         # file_tmp = wget.download(url, out=str(file_down_path), bar=bar_progress)
-        os.system(f'wget {url} -O {file_down_path}')
+        os.system(f"wget {url} -O {file_down_path}")
         file_extraction(file_down_path, file_ext, odir)
     shutil.rmtree(down_path)
+
 
 if __name__ == "__main__":
     arguments = docopt(__doc__)
