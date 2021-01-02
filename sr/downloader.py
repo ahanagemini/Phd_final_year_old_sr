@@ -106,7 +106,10 @@ if __name__ == "__main__":
     arguments = docopt(__doc__)
     down = str(arguments["--download"])
     odir = Path(arguments["--output_directory"])
-    data_download(down, odir)
+    if odir.is_dir():
+        print("Skipping...Output directory already exists: ", odir)
+    else:
+        data_download(down, odir)
 
 
 """
