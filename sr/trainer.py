@@ -158,7 +158,7 @@ def training(
     training_parameters["criterion"] = torch.nn.L1Loss()
     training_parameters["row_diff_loss"] = Row_Difference()
     training_parameters["device"] = device
-    training_parameters["lambda_row"] = 0.1
+    training_parameters["lambda_row"] = 1.0
     training_parameters["max_epochs"] = max_epochs
 
     best_valid_loss = float("inf")
