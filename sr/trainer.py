@@ -160,6 +160,7 @@ def training(
     training_parameters["device"] = device
     training_parameters["lambda_row"] = 1.0
     training_parameters["max_epochs"] = max_epochs
+    training_parameters["learning_rate"] = lr
 
     best_valid_loss = float("inf")
 

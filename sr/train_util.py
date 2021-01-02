@@ -185,6 +185,7 @@ def train_model(training_generator, training_parameters):
     criterion = training_parameters["criterion"]
     row_diff_loss = training_parameters["row_diff_loss"]
     lambda_row = training_parameters["lambda_row"]
+    lr = training_parameters["learning_rate"]
     loss_train_list = []
     l1_loss_list = []
     row_diff_list = []
@@ -201,6 +202,8 @@ def train_model(training_generator, training_parameters):
             mean.to(device),
             sigma.to(device),
         )
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
         optimizer.zero_grad()
         with torch.autograd.set_detect_anomaly(True):
             with torch.set_grad_enabled(True):
