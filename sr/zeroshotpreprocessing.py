@@ -71,15 +71,7 @@ def image_clipper(image, stats, factor=0.33):
     extreme = max(abs(stats["max"]), abs(stats["min"]))
     max_value = factor * extreme
     min_value = -factor * extreme
-    width, height = image.shape
-    for x in range(width):
-        for y in range(height):
-            if image[x][y] > max_value:
-                image[x][y] = max_value
-            elif image[x][y] < min_value:
-                image[x][y] = min_value
-
-    return image
+    return np.clip(image, min_value, max_value)
 
 
 def stat_calculator(input_path):
@@ -592,11 +584,14 @@ def perform_bilinear_and_stats_zoom(scipy_directories, conf):
                     + format(j, "05d")
                 )
                 if random.random() < 0.5:
-                    mat = resizer.pil_image(mat, scale_factor=0.25)
                     np.savez_compressed(hr_opath / fname, np.array(mat))
+                    mat = resizer.pil_image(mat, scale_factor=0.25)
+                    mat = image_clipper(mat, stats)
+                    np.savez_compressed(lr_opath / fname, np.array(mat))
                 else:
                     np.savez_compressed(hr_opath / fname, mat)
                     mat = resizer.t_interpolate(mat, mode="bilinear", scale_factor=0.25)
+                    mat = image_clipper(mat, stats)
                     np.savez_compressed(lr_opath / fname, mat)
 
     print("scipy zoom process has finished")
