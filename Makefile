@@ -21,12 +21,12 @@ run:
 	$(PYTHON) sr/downloader.py --download="slices" --output_directory=$(inputdir)
 	echo "download ended"
 
-	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=1 --log_dir=$(loggerdir) --architecture=$(architecture)
+	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=3 --log_dir=$(loggerdir) --architecture=$(architecture)
 	echo "training ended"
 
 
 resume:
-	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=3 --log_dir=$(loggerdir) --architecture=$(architecture) --resume=$(resumedir)
+	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=5 --log_dir=$(loggerdir) --architecture=$(architecture) --resume=$(resumedir)
 	
 		
 setup:

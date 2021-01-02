@@ -208,7 +208,7 @@ def training(
         print("Train_L1_loss: {:.6f} \t Train_Row loss: {:.6f} \t Valid_L1_loss: {:.6f} \t Valid_row_loss: {:.6f}".format(
             l1_loss, row_loss, valid_l1_loss, valid_row_loss)
         )
-
+        step += 1
         save_params = {
                 "epoch": step,
                 "model": model.state_dict(),
@@ -246,7 +246,6 @@ def training(
             training_parameters["current_model"] = current_model_list[-1]
 
         torch.cuda.empty_cache()
-        step += 1
         training_parameters["current_epoch"] = step
 
 
