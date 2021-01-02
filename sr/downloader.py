@@ -82,9 +82,10 @@ def data_download(dataname, odir):
         "slices": r"https://www.dropbox.com/s/oi4o4fxn2hzkevs/slices.tar.gz?dl=0",
     }
     down_path = Path(os.getcwd() + r"/Download")
-    if os.path.isdir(down_path):
-        shutil.rmtree(down_path)
-    os.mkdir(down_path)
+    #if os.path.isdir(down_path):
+    #    shutil.rmtree(down_path)
+    if not os.path.isdir(down_path):        
+        os.mkdir(down_path)
     if dataname == "all":
         for i, url_key in enumerate(datadict):
             url = datadict[url_key]
@@ -105,19 +106,17 @@ def data_download(dataname, odir):
         file_name, file_ext = get_file_name(url)
         file_down_path = down_path / (file_name + "." + file_ext)
         # file_tmp = wget.download(url, out=str(file_down_path), bar=bar_progress)
-        os.system(f"wget {url} -O {file_down_path}")
-        file_extraction(file_down_path, file_ext, odir)
-    shutil.rmtree(down_path)
+        if not file_down_path.exists():
+            os.system(f"wget {url} -O {file_down_path}")
+            file_extraction(file_down_path, file_ext, odir)
+    #shutil.rmtree(down_path)
 
 
 if __name__ == "__main__":
     arguments = docopt(__doc__)
     down = str(arguments["--download"])
     odir = Path(arguments["--output_directory"])
-    if odir.is_dir():
-        print("Skipping...Output directory already exists: ", odir)
-    else:
-        data_download(down, odir)
+    data_download(down, odir)
 
 
 """
