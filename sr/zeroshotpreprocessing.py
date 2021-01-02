@@ -617,6 +617,9 @@ def image_stat_processing(conf):
         # deletting if cutting out existed already to avoid overlaps
         if os.path.isdir(output_directory):
             shutil.rmtree(output_directory)
+        # deleting log_dir if starting new experiment
+        if os.path.isdir(conf.log_dir):
+            shutil.rmtree(conf.log_dir)
 
         input_directory = Path(conf.input_dir_path)
 

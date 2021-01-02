@@ -10,10 +10,10 @@ architecture := "edsr_16_64"
 
 clean:
 	echo "clean started"
-	if [ -d inputdir ]; then rm -Rf inputdir; fi
-	if [ -d outputdir ]; then rm -Rf outputdir; fi
+	if [ -d $(inputdir) ]; then rm -Rf $(inputdir); fi
+	if [ -d $(outputdir) ]; then rm -Rf $(outputdir); fi
 	echo "clean ended"
-	
+
 run:
 	mkdir -p $(outputdir);
 	echo "download started"
