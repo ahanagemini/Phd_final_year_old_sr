@@ -55,7 +55,7 @@ def writetext(imgfile):
     draw.text((width / 2, 0), "PIL IMAGE RESIZE", font=font, fill=(0, 0, 255))
     img.save(imgfile)
 
-def image_clipper(image, stats):
+def image_clipper(image, stats, factor=0.33):
     """
     This method clips the data max value and min value to 5 % of max value and min value of entire image distribution
     in stats file
@@ -68,8 +68,9 @@ def image_clipper(image, stats):
     -------
 
     """
-    max_value = 0.05 * stats["max"]
-    min_value = 0.05 * stats["min"]
+    extreme = max(abs(stats["max"]), abs(stats["min"]))
+    max_value = factor * extreme
+    min_value = -factor * extreme
     width, height = image.shape
     for x in range(width):
         for y in range(height):
@@ -590,7 +591,7 @@ def perform_bilinear_and_stats_zoom(scipy_directories, conf):
                     + "_"
                     + format(j, "05d")
                 )
-                if np.random.randint(1, 100) < 50:
+                if random.random() < 0.5:
                     mat = resizer.pil_image(mat, scale_factor=0.25)
                     np.savez_compressed(hr_opath / fname, np.array(mat))
                 else:
@@ -614,6 +615,8 @@ def image_stat_processing(conf):
     """
     conf.real_image = True
     output_directory = Path(conf.cutting_output_dir_path)
+    print(f"resume file {conf.resume}")
+    print(f"cuttingdir {conf.cutting_output_dir_path}")
 
     if not conf.resume and not conf.load_last_trained:
         # deletting if cutting out existed already to avoid overlaps
