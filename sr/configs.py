@@ -259,8 +259,9 @@ class Config:
         #  if command not present it will create new directory
         #  for saving models or else last model trained will be loaded
         if not self.conf.load_last_trained:
-            self.conf.model_save = self.check_model_directory(self.conf.model_save)
-            os.makedirs(self.conf.model_save)
+            #self.conf.model_save = self.check_model_directory(self.conf.model_save)
+            if not os.path.isdir(self.conf.model_save):
+                 os.makedirs(self.conf.model_save)
         return self.conf
 
     def get_model_directories(self, model_save):

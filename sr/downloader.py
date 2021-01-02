@@ -74,6 +74,7 @@ def data_download(dataname, odir):
         "chest_xray": r"https://www.dropbox.com/s/hzqcuct3phd7g5s/earth1.tar?dl=0",
         "Retinal_OCT": r"https://www.dropbox.com/s/e9p0dt001mrej99/earth2.tar?dl=0",
         "Medical_3D": r"https://www.dropbox.com/s/ri3cpsunqed32my/Medical_data.tar.gz?dl=0",
+        "slices" : r"https://www.dropbox.com/s/oi4o4fxn2hzkevs/slices.tar.gz?dl=0"
     }
     down_path = Path(os.getcwd()+r"/Download")
     if os.path.isdir(down_path):
