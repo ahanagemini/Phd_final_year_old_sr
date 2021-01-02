@@ -250,25 +250,31 @@ def evaluate(args):
                 df.to_csv(f"active_metrics/{active_file}.csv")
 
 if __name__ == "__main__":
+    '''
     args = docopt(__doc__)
     for a in ["--input", "--output", "--model"]:
         args[a] = Path(args[a]).resolve()
     print("Input being read from:", args["--input"])
-    #print(args)
-    evaluate(args)
-    """ An example:
-     ./tester hr --input input.npz --output output.npz --model srunet.pt
-    {'--help': False,
+    '''
+
+    args = {'--help': False,
      '--input': True,
      '--model': True,
      '--output': True,
      '-e': False,
      '-l': False,
      '-p': False,
-     'input': 'input_dir',
-     'model': 'srunet.pt',
-     'output': 'output_dir',
-     'architecture': 'arch',
+     '--input': r"/home/venkat/Documents/PiyushKumarProject/Libraries/predict",
+     '--model': r'/home/venkat/Documents/PiyushKumarProject/Libraries/edsr_16_64/edsr_16_64/current/2020-12-28-21:20:05.167183_model_200.pt',
+     '--output': r'/home/venkat/Documents/PiyushKumarProject/Libraries/predict_output',
+     '--architecture': 'edsr_16_64',
      'hr': True,
-     'lr': False}
-    """
+     'lr': False,
+     '--act': 'leakyrelu',
+     '--dilation': False,
+     '--aspp': False,
+     '--lognorm': False,
+     '--active': False,
+     'kernel': True,
+     "--save_slice": False}
+    evaluate(args)

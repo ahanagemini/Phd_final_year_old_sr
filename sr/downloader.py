@@ -76,6 +76,8 @@ def data_download(dataname, odir):
         "Medical_3D": r"https://www.dropbox.com/s/ri3cpsunqed32my/Medical_data.tar.gz?dl=0",
     }
     down_path = Path(os.getcwd()+r"/Download")
+    if os.path.isdir(down_path):
+        shutil.rmtree(down_path)
     os.mkdir(down_path)
     if dataname == "all":
         for i, url_key in enumerate(datadict):
