@@ -22,4 +22,6 @@ run:
 	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=inputdir --output_dir_path=outputdir --cutting_output_dir_path=cuttingdir --model_save=outputdir --num_epochs=5 --log_dir=loggerdir --architecture="edsr_16_64"
 	echo "training ended"
 	
+setup:
+	$(PYTHON) -m pip install -r requirements.txt
 	
