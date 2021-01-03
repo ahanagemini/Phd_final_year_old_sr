@@ -108,8 +108,7 @@ class PairedDataset(Dataset):
                     ToFloatTensor(),
                 ]
             )
-            for i, trans in enumerate([transforms]):
-                sample = trans(sample)
+            sample = transforms(sample)
         return sample
 
 

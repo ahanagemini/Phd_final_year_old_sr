@@ -6,6 +6,7 @@ outputdir := "$(root_dir)/output_dir"
 cuttingdir := "$(root_dir)/output_dir/cutting_out"
 resumedir := "$(root_dir)/output_dir/edsr_16_64/edsr_16_64"
 loggerdir := "$(root_dir)/output_dir/logger"
+epochs := 350
 architecture := "edsr_16_64"
 
 clean:
@@ -15,18 +16,17 @@ clean:
 	echo "clean ended"
 
 run:
-	mkdir -p $(outputdir);
 	echo "download started"
 	$(PYTHON) sr/downloader.py --download="earth1" --output_directory=$(inputdir)
 	$(PYTHON) sr/downloader.py --download="slices" --output_directory=$(inputdir)
 	echo "download ended"
 
-	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=350 --log_dir=$(loggerdir) --architecture=$(architecture)
+	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=$(epochs) --log_dir=$(loggerdir) --architecture=$(architecture)
 	echo "training ended"
 
 
 resume:
-	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=350 --log_dir=$(loggerdir) --architecture=$(architecture) --resume=$(resumedir)
+	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=$(epochs) --log_dir=$(loggerdir) --architecture=$(architecture) --resume=$(resumedir)
 	
 		
 setup:
