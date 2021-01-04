@@ -6,7 +6,7 @@ outputdir := "$(root_dir)/output_dir"
 cuttingdir := "$(root_dir)/output_dir/cutting_out"
 resumedir := "$(root_dir)/output_dir/edsr_16_64/edsr_16_64"
 loggerdir := "$(root_dir)/output_dir/logger"
-epochs := 1
+epochs := 350
 architecture := "edsr_16_64"
 
 clean:
@@ -17,7 +17,7 @@ clean:
 
 run:
 	echo "download started"
-	#$(PYTHON) sr/downloader.py --download="earth1" --output_directory=$(inputdir)
+	$(PYTHON) sr/downloader.py --download="earth1" --output_directory=$(inputdir)
 	$(PYTHON) sr/downloader.py --download="slices" --output_directory=$(inputdir)
 	echo "download ended"
 
