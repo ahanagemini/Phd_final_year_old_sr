@@ -217,7 +217,7 @@ def training(
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
 
-            model_save(save_params, f"{str(best_save_model_path)}/best_model.pt")
+            model_save(save_params, f"{str(best_save_model_path)}/{timestamp}_best_model_{step}.pt")
             # deleting the old_best_model after new one is saved
 
 
