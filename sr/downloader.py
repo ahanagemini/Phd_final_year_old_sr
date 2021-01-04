@@ -73,7 +73,7 @@ def data_download(dataname, odir):
     """
     datadict = {
         "div2k": r"http://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_train_HR.zip",
-        "earth1": r"https://www.dropbox.com/s/hzqcuct3phd7g5s/earth1.tar?dl=0",
+        "earth1": r"https://www.dropbox.com/s/2mld5jbsab1cpc9/earth1.tar.gz?dl=0",
         "earth2": r"https://www.dropbox.com/s/e9p0dt001mrej99/earth2.tar?dl=0",
         "BloodData": r"http://data.vision.ee.ethz.ch/cvl/DIV2K/DIV2K_train_HR.zip",
         "chest_xray": r"https://www.dropbox.com/s/hzqcuct3phd7g5s/earth1.tar?dl=0",
