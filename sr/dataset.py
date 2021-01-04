@@ -14,6 +14,7 @@ from torch.utils.data import Dataset
 from torchvision.transforms import Compose
 import scipy.ndimage
 import numpy as np
+from stat_plotter import PlotStat
 from cutter import loader
 
 
@@ -21,7 +22,7 @@ class PairedDataset(Dataset):
     """Dataset class for loading large amount of image arrays data"""
 
     def __init__(
-        self, root_dir, lognorm=False, test=False
+        self, root_dir, lognorm=False, test=False, switch=True
     ):
         """
         Args:
@@ -30,7 +31,9 @@ class PairedDataset(Dataset):
             test: True only for test dataset
             transform (callable, optional): Optional transform to be applied
                 on a sample.
+            switch: CutBlur switch
         """
+        self.switch = switch
         self.root_dir = Path(root_dir).expanduser().resolve().absolute()
         self.lr_dir = self.root_dir / "LR"
         self.hr_dir = self.root_dir / "HR"
@@ -83,9 +86,9 @@ class PairedDataset(Dataset):
 
         if not self.test:
             hr_image = Normalize()(hr_image, stats_hr)
-        lr_image = Normalize()(lr_image, stats_lr)
+        lr_image_aug = Normalize()(lr_image, stats_lr)
         sample = {
-            "lr": lr_image,
+            "lr": lr_image_aug,
             "hr": hr_image,
             "stats": stats_hr,
             "file": filename,
@@ -93,11 +96,11 @@ class PairedDataset(Dataset):
         if self.test:
             transforms = Compose([Reshape(), ToFloatTensor()])
             sample = transforms(sample)
-            lr_unorm = lr_image.copy()
-            sample["lr_un"] = Single_Image_Reshape()(lr_unorm)
+            sample["lr_un"] = Single_Image_Reshape()(lr_image)
         else:
             transforms = Compose(
                 [
+                    Cut_Blur(self.switch),
                     Differential(0.4),
                     Rotate(),
                     Transpose(),
@@ -115,7 +118,7 @@ class PairedDataset(Dataset):
 class SrDataset(Dataset):
     """Dataset class for loading large amount of image arrays data. This dataset doe not have hr"""
 
-    def __init__(self, root_dir, lognorm=False, test=False, hr=True):
+    def __init__(self, root_dir, lognorm=False, test=False, hr=True, switch=True):
         """
         Args:
             root_dir (string): Directory with all the images.
@@ -124,12 +127,14 @@ class SrDataset(Dataset):
             hr: Input is hr image, lr is computed, then True
             transform (callable, optional): Optional transform to be applied
                 on a sample.
+            switch: CutBlur switch
         """
         self.root_dir = Path(root_dir).expanduser().resolve().absolute()
         self.datalist = list(self.root_dir.rglob("*.npz"))
         self.lognorm = lognorm
         self.test = test
         self.hr = hr
+        self.switch = switch
         self.statlist = []
         for fname in self.datalist:
             file_path = Path(fname)
@@ -186,6 +191,7 @@ class SrDataset(Dataset):
             }
             transforms = Compose(
                 [
+                    Cut_Blur(self.switch),
                     Differential(0.4),
                     Rotate(),
                     Transpose(),
@@ -350,7 +356,7 @@ class Single_Image_Reshape:
         -------
         image: returns image of shape 1*n*m
         """
-        width, height = image.shape
+        height, width = image.shape
         image = np.reshape(image, (1, height, width))
         return image
 
@@ -370,10 +376,10 @@ class Reshape:
         """
 
         # setting hr width and height
-        hr_width, hr_height = sample["hr"].shape
+        hr_height, hr_width = sample["hr"].shape
 
         # setting lr width and height
-        lr_width, lr_height = sample["lr"].shape
+        lr_height, lr_width = sample["lr"].shape
 
         sample["hr"] = np.reshape(sample["hr"], (1, hr_height, hr_width))
         sample["lr"] = np.reshape(sample["lr"], (1, lr_height, lr_width))
@@ -419,9 +425,53 @@ class Differential:
 
         """
         if random.random() < self.prob:
-            hr_width, hr_height = sample["hr"].shape
-            lr_width, lr_height = sample["lr"].shape
+            hr_height, hr_width = sample["hr"].shape
+            lr_height, lr_width = sample["lr"].shape
             sample["hr"] = np.abs(np.diff(np.pad(sample["hr"], 1))[1:1+hr_width, 0:hr_height])
             sample["lr"] = np.abs(np.diff(np.pad(sample["lr"], 1))[1: 1+lr_width, 0:lr_height])
         return sample
+
+class Cut_Blur:
+    """ """
+    def __init__(self, switch=True,  prob=1.0, alpha=1.0):
+        """
+
+        Parameters
+        ----------
+        switch: It decides whether to apply cutblur or not
+        prob:
+        alpha
+        """
+        self.switch = switch
+        self.prob = prob
+        self.alpha = alpha
+
+    def __ceil__(self, sample):
+        if self.switch:
+            resizer = PlotStat()
+            img_1 = resizer.t_interpolate(sample["lr"], "bicubic", 4)
+            img_2 = sample["hr"]
+            assert img_1.shape == img_2.shape
+            if self.alpha <= 0 or np.random.rand(1) >= self.prob:
+                img_1 = resizer.t_interpolate(img_1, "bicubic", 0.25)
+                sample["lr"] = img_1
+                sample["hr"] = img_2
+                return sample
+
+            cut_ratio = np.random.rand() * 0.01 + self.alpha
+            height, width = img_2.shape
+            cheight, cwidth = np.int(cut_ratio * height), np.int(cut_ratio * width)
+            cy = np.random.randint(0, height - cheight + 1)
+            cx = np.random.randint(0, width - cwidth + 1)
+            if np.random.random() > 0.5:
+                img_1[cy:cy + cheight, cx:cx + cwidth] = img_2[cy:cy + cheight, cx:cx + cwidth]
+            else:
+                img_1_aug = img_2.clone()
+                img_1_aug[cy:cy + cheight, cx:cx + width] = img_2[cy:cy + cheight, cx:cx + cwidth]
+                img_1 = img_1_aug
+
+            sample["hr"] = img_2
+            sample["lr"] = resizer.t_interpolate(img_1, "bicubic", 0.25)
+        return sample
+
 

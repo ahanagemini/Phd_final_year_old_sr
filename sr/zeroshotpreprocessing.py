@@ -512,7 +512,7 @@ def perform_pil_image_resize(pil_directories, conf):
             for i in range(conf.n_resize):
                 image = plotter.pil_image(image, scale_factor)
                 sample_list.append(image)
-                width, height = image.shape[0], image.shape[1]
+                height, width = image.shape[0], image.shape[1]
                 assert height >= 256 and width >= 256
 
             # shuffling the sample list
@@ -590,7 +590,7 @@ def perform_bilinear_and_stats_zoom(scipy_directories, conf):
                     np.savez_compressed(lr_opath / fname, np.array(mat))
                 else:
                     np.savez_compressed(hr_opath / fname, mat)
-                    mat = resizer.t_interpolate(mat, mode="bilinear", scale_factor=0.25)
+                    mat = resizer.t_interpolate(mat, mode="bicubic", scale_factor=0.25)
                     mat = image_clipper(mat, stats)
                     np.savez_compressed(lr_opath / fname, mat)
 
