@@ -433,7 +433,7 @@ class Differential:
 
 class Cut_Blur:
     """ """
-    def __init__(self, switch=True,  prob=1.0, alpha=1.0):
+    def __init__(self, switch=True,  prob=1.0, alpha=0.7):
         """
 
         Parameters
@@ -446,7 +446,7 @@ class Cut_Blur:
         self.prob = prob
         self.alpha = alpha
 
-    def __ceil__(self, sample):
+    def __call__(self, sample):
         if self.switch:
             resizer = PlotStat()
             img_1 = resizer.t_interpolate(sample["lr"], "bicubic", 4)
@@ -458,7 +458,7 @@ class Cut_Blur:
                 sample["hr"] = img_2
                 return sample
 
-            cut_ratio = np.random.rand() * 0.01 + self.alpha
+            cut_ratio = np.random.randn() * 0.01 + self.alpha
             height, width = img_2.shape
             cheight, cwidth = np.int(cut_ratio * height), np.int(cut_ratio * width)
             cy = np.random.randint(0, height - cheight + 1)
@@ -466,8 +466,8 @@ class Cut_Blur:
             if np.random.random() > 0.5:
                 img_1[cy:cy + cheight, cx:cx + cwidth] = img_2[cy:cy + cheight, cx:cx + cwidth]
             else:
-                img_1_aug = img_2.clone()
-                img_1_aug[cy:cy + cheight, cx:cx + width] = img_2[cy:cy + cheight, cx:cx + cwidth]
+                img_1_aug = img_2.copy()
+                img_1_aug[cy:cy + cheight, cx:cx + cwidth] = img_2[cy:cy + cheight, cx:cx + cwidth]
                 img_1 = img_1_aug
 
             sample["hr"] = img_2
