@@ -151,17 +151,12 @@ def check_load_model(save_model_path, model, learning_rate=0.0005):
     training_parameters = {}
 
     # learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=1)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=0, factor=0.5, verbose=True)
 
     if not current_model_list:
         current_model = ""
     else:
         current_model = current_model_list[-1]
-
-    if not best_model_list:
-        best_model = ""
-    else:
-        best_model = best_model_list[-1]
 
     current_epoch = 0
     # check if there is a .pt file of model after an epoch
@@ -169,15 +164,9 @@ def check_load_model(save_model_path, model, learning_rate=0.0005):
     training_parameters["optimizer"] = optimizer
     training_parameters["scheduler"] = scheduler
     training_parameters["current_epoch"] = current_epoch
-    training_parameters["best_model"] = best_model
     training_parameters["current_model"] = current_model
     if os.path.isfile(current_model):
         load_model(current_model, training_parameters)
-
-    # check if there is a .pt file of best model if epoch .pt file is missing
-    elif os.path.isfile(best_model):
-        load_model(best_model, training_parameters)
-
     return training_parameters
 
 
@@ -191,14 +180,23 @@ def model_save(save_params, train_model_path):
 
     Returns
     -------
-
     """
     model_path = Path(train_model_path)
     model_folder = model_path.parent
+    model_list = list(model_folder.rglob("*.pt"))
+    if not model_list:
+        model_current = ""
+    else:
+        model_current = model_list[-1]
+
+
     if not model_folder.is_dir():
         os.makedirs(model_folder)
     torch.save(save_params, model_path)
 
+    # deleting the old model after generating new one
+    if os.path.isfile(model_current):
+        os.remove(model_current)
 
 def train_model(training_generator, training_parameters):
     """
@@ -213,19 +211,16 @@ def train_model(training_generator, training_parameters):
 
     """
     model = training_parameters["model"]
-    optimizer = training_parameters["optimizer"]
-    scheduler = training_parameters["scheduler"]
     device = training_parameters["device"]
     criterion = training_parameters["criterion"]
     row_diff_loss = training_parameters["row_diff_loss"]
     lambda_row = training_parameters["lambda_row"]
-    lr = training_parameters["learning_rate"]
     loss_train_list = []
     l1_loss_list = []
     row_diff_list = []
     train_loss = row_loss = l1_loss = 0.0
+    model.train(True)
     for batch_idx, data in enumerate(tqdm(training_generator)):
-        model.train(True)
         x_train = data["lr"]
         y_train = data["hr"]
         stat = data["stats"]
@@ -236,9 +231,11 @@ def train_model(training_generator, training_parameters):
             mean.to(device),
             sigma.to(device),
         )
+        '''
         for param_group in optimizer.param_groups:
             param_group['lr'] = lr
-        optimizer.zero_grad()
+        '''
+        training_parameters['optimizer'].zero_grad()
         with torch.autograd.set_detect_anomaly(True):
             with torch.set_grad_enabled(True):
                 y_pred = model(x_train)
@@ -258,7 +255,8 @@ def train_model(training_generator, training_parameters):
                 l1_loss_list.append(loss_l1.item())
                 row_diff_list.append(loss_row.item())
                 loss_train.backward()
-                optimizer.step()
+                training_parameters['optimizer'].step()
+
 
     return loss_train_list, train_loss, l1_loss, row_loss, l1_loss_list, row_diff_list
 
@@ -275,23 +273,18 @@ def valid_model(validation_generator, training_parameters):
     -------
     """
     model = training_parameters["model"]
-    optimizer = training_parameters["optimizer"]
-    scheduler = training_parameters["scheduler"]
     device = training_parameters["device"]
     criterion = training_parameters["criterion"]
     row_diff_loss = training_parameters["row_diff_loss"]
     lambda_row = training_parameters["lambda_row"]
-    epoch = training_parameters["current_epoch"]
-    max_epochs = training_parameters["max_epochs"]
     loss_valid_list = []
     l1_loss_valid_list = []
     row_diff_valid_list = []
     valid_loss = valid_row_loss = valid_l1_loss = 0.0
-    scheduler.factor = 1 + (epoch / max_epochs) ** 0.9
+    model.train(False)
     with torch.no_grad():
         for batch_idx, data in enumerate(tqdm(validation_generator)):
-            # unet.eval()
-            model.train(False)
+
             x_valid = data["lr"]
             y_valid = data["hr"]
 
@@ -310,7 +303,7 @@ def valid_model(validation_generator, training_parameters):
                     (1 / (batch_idx + 1)) * (loss_row_valid.data - valid_row_loss))
             valid_l1_loss = valid_l1_loss + (
                     (1 / (batch_idx + 1)) * (loss_l1_valid.data - valid_l1_loss))
-        scheduler.step(valid_loss)
+        training_parameters['scheduler'].step(valid_loss)
 
     return loss_valid_list, valid_loss, valid_l1_loss, valid_row_loss, l1_loss_valid_list, row_diff_valid_list
 

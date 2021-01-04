@@ -76,7 +76,7 @@ def log_loss_summary(logger, loss, step, prefix=""):
 def model_draw(logger, model, input_to_model):
     logger.model_graph(model, input_to_model)
 
-def create_dataset(path, lognorm=False):
+def create_dataset(path, lognorm=False, test=False):
     """
 
     Parameters
@@ -94,7 +94,7 @@ def create_dataset(path, lognorm=False):
 
     if set(os.listdir(path)) == set(["LR", "HR"]):
         print("running PairedDataset")
-        return PairedDataset(path, lognorm=lognorm)
+        return PairedDataset(path, lognorm=lognorm, test=test)
     else:
         print("Running SrDataset")
         return SrDataset(path, lognorm=lognorm)
@@ -184,7 +184,6 @@ def training(
         log_loss_summary(logger, l1_list, step, prefix="_train_l1")
         log_loss_summary(logger, row_diff_list, step, prefix="_train_row")
         del loss_train_list, l1_list, row_diff_list
-        torch.cuda.empty_cache()
 
         # validation
         loss_valid_list, valid_loss, valid_l1_loss, valid_row_loss, val_l1_list, val_row_list = valid_model(validation_generator, training_parameters)
@@ -192,8 +191,6 @@ def training(
         log_loss_summary(logger, val_l1_list, step, prefix="_val_l1")
         log_loss_summary(logger, val_row_list, step, prefix="_val_row")
         del loss_valid_list, val_l1_list, val_row_list
-        torch.cuda.empty_cache()
-
 
         memory = torch.cuda.max_memory_allocated() / 1024.0 / 1024.0
         print(
@@ -222,14 +219,7 @@ def training(
 
             model_save(save_params, f"{str(best_save_model_path)}/best_model.pt")
             # deleting the old_best_model after new one is saved
-            if os.path.isfile(training_parameters["best_model"]):
-                os.remove(training_parameters["best_model"])
 
-            current_best_model_list = list(best_save_model_path.rglob("*.pt"))
-            if not current_best_model_list:
-                training_parameters["best_model"] = ""
-            else:
-                training_parameters["best_model"] = current_best_model_list[-1]
 
         model_save(
             save_params, f"{str(current_save_model_path)}/{timestamp}_model_{step}.pt"
@@ -245,8 +235,6 @@ def training(
             training_parameters["current_model"] = ""
         else:
             training_parameters["current_model"] = current_model_list[-1]
-
-        torch.cuda.empty_cache()
         training_parameters["current_epoch"] = step
 
 
@@ -286,7 +274,7 @@ def process(
     torch.backends.cudnn.benchmark = True
 
     training_set = create_dataset(train_path, lognorm=lognorm)
-    validation_set = create_dataset(valid_path, lognorm=lognorm)
+    validation_set = create_dataset(valid_path, lognorm=lognorm, test=True)
 
     training_generator = torch.utils.data.DataLoader(training_set, **parameters)
     validation_generator = torch.utils.data.DataLoader(validation_set, **parameters)
