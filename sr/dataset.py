@@ -46,10 +46,13 @@ class PairedDataset(Dataset):
         np.random.shuffle(self.lr_hr_tuple)
         self.lognorm = lognorm
         self.test = test
+        keys = ("mean", "std", "min", "max")
         for ftuple in self.lr_hr_tuple:
             lr_image, hr_image = ftuple
             lstat = json.load(open(str(lr_image.parent / "stats.json")))
+            lstat = {x: lstat[x] for x in keys}
             hstat = json.load(open(str(hr_image.parent / "stats.json")))
+            hstat = {x: hstat[x] for x in keys}
             self.lr_hr_stat_tuple.append((lstat, hstat))
 
         print("Total number of data elements found = ", len(self.lr_hr_tuple))
