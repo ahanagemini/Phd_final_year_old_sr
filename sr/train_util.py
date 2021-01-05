@@ -64,7 +64,7 @@ def model_selection(architecture, aspp, dilation, act):
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif architecture == "edsr_16_64":
-        model = EDSR(n_resblocks=64, n_feats=64, aspp=aspp, dilation=dilation, act=act)
+        model = EDSR(n_resblocks=32, n_feats=64, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_8_256":
         model = EDSR(n_resblocks=8, n_feats=256, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_16_256":
@@ -146,8 +146,6 @@ def check_load_model(save_model_path, model, learning_rate=0.0005):
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     current_model_list = list(current_save_model_path.rglob("*.pt"))
     current_model_list = sorted(current_model_list)
-    best_model_list = list(best_save_model_path.rglob("*best_model.pt"))
-    best_model_list = sorted(best_model_list)
     training_parameters = {}
 
     # learning rate scheduler

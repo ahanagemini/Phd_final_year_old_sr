@@ -76,7 +76,7 @@ def log_loss_summary(logger, loss, step, prefix=""):
 def model_draw(logger, model, input_to_model):
     logger.model_graph(model, input_to_model)
 
-def create_dataset(path, lognorm=False, test=False):
+def create_dataset(path, lognorm=False, test=False, switch=True):
     """
 
     Parameters
@@ -94,7 +94,7 @@ def create_dataset(path, lognorm=False, test=False):
 
     if set(os.listdir(path)) == set(["LR", "HR"]):
         print("running PairedDataset")
-        return PairedDataset(path, lognorm=lognorm, test=test)
+        return PairedDataset(path, lognorm=lognorm, test=test, switch=switch)
     else:
         print("Running SrDataset")
         return SrDataset(path, lognorm=lognorm)
@@ -273,9 +273,8 @@ def process(
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    training_set = create_dataset(train_path, lognorm=lognorm)
-    validation_set = create_dataset(valid_path, lognorm=lognorm, test=True)
-
+    training_set = create_dataset(train_path, lognorm=lognorm, switch=True)
+    validation_set = create_dataset(valid_path, lognorm=lognorm, test=True, switch=True)
     training_generator = torch.utils.data.DataLoader(training_set, **parameters)
     validation_generator = torch.utils.data.DataLoader(validation_set, **parameters)
 

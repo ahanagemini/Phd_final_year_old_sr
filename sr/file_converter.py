@@ -106,7 +106,6 @@ def stat_calculator(input_path):
     total_variance = (total_square_sum / total_count) - (total_sum / total_count) ** 2
     stats = {}
     stats["mean"] = total_mean
-    stats["variance"] = total_variance
     stats["std"] = np.sqrt(total_variance)
     stats["max"] = float(image_max)
     stats["min"] = float(image_min)

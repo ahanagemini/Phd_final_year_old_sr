@@ -5,10 +5,6 @@ from pathlib import Path
 import json
 import random
 import os
-
-from kernelgan import imresize
-
-# from matplotlib import pyplot as plt
 import torch
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose
@@ -95,7 +91,9 @@ class PairedDataset(Dataset):
         }
         if self.test:
             transforms = Compose([Reshape(), ToFloatTensor()])
-            sample = transforms(sample)
+            for i, trans in enumerate([transforms]):
+                sample = trans(sample)
+
             sample["lr_un"] = Single_Image_Reshape()(lr_image)
         else:
             transforms = Compose(
@@ -111,7 +109,9 @@ class PairedDataset(Dataset):
                     ToFloatTensor(),
                 ]
             )
-            sample = transforms(sample)
+            for i, trans in enumerate([transforms]):
+                sample = trans(sample)
+
         return sample
 
 
