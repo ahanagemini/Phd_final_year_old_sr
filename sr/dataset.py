@@ -18,7 +18,7 @@ class PairedDataset(Dataset):
     """Dataset class for loading large amount of image arrays data"""
 
     def __init__(
-        self, root_dir, lognorm=False, test=False, switch=True
+        self, root_dir, lognorm=False, test=False, validate=True, switch=True
     ):
         """
         Args:
@@ -46,6 +46,7 @@ class PairedDataset(Dataset):
         np.random.shuffle(self.lr_hr_tuple)
         self.lognorm = lognorm
         self.test = test
+        self.validate = validate
         keys = ("mean", "std", "min", "max")
         for ftuple in self.lr_hr_tuple:
             lr_image, hr_image = ftuple
@@ -83,7 +84,7 @@ class PairedDataset(Dataset):
         if stats_hr["std"] <= 0.001:
             stats_hr["std"] = 1
 
-        if not self.test:
+        if not self.test or self.validate:
             hr_image = Normalize()(hr_image, stats_hr)
         lr_image_aug = Normalize()(lr_image, stats_lr)
         sample = {
@@ -114,101 +115,7 @@ class PairedDataset(Dataset):
             )
             for i, trans in enumerate([transforms]):
                 sample = trans(sample)
-
         return sample
-
-
-class SrDataset(Dataset):
-    """Dataset class for loading large amount of image arrays data. This dataset doe not have hr"""
-
-    def __init__(self, root_dir, lognorm=False, test=False, hr=True, switch=True):
-        """
-        Args:
-            root_dir (string): Directory with all the images.
-            lognorm: True if we ar eusing log normalization
-            test: True only for test dataset
-            hr: Input is hr image, lr is computed, then True
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
-            switch: CutBlur switch
-        """
-        self.root_dir = Path(root_dir).expanduser().resolve().absolute()
-        self.datalist = list(self.root_dir.rglob("*.npz"))
-        self.lognorm = lognorm
-        self.test = test
-        self.hr = hr
-        self.switch = switch
-        self.statlist = []
-        for fname in self.datalist:
-            file_path = Path(fname)
-            stat_file = json.load(open(str(file_path.parent / "stats.json")))
-            self.statlist.append(stat_file)
-        print("Total number of data elements found = ", len(self.datalist))
-
-    def __len__(self):
-        return len(self.datalist)
-
-    def __getitem__(self, idx):
-        img_name = Path(self.datalist[idx])
-        filename = os.path.basename(img_name)
-        filename = filename.split(".")[0]
-        stats = self.statlist[idx]
-        if self.hr:
-            hr_image = loader(img_name)
-        if not self.test:
-            if self.lognorm:
-                image_sign = np.sign(hr_image)
-                hr_image = image_sign * np.log(np.abs(hr_image) + 1.0)
-            if stats["std"] <= 0.001:
-                stats["std"] = 1
-            hr_image = Normalize()(hr_image, stats)
-
-        if self.hr:
-            lr_image = scipy.ndimage.zoom(scipy.ndimage.zoom(hr_image, 0.25), 4.0)
-        else:
-            lr_image = loader(img_name)
-            hr_image = np.zeros_like(lr_image)
-        if self.test:
-            if self.lognorm:
-                image_sign = np.sign(lr_image)
-                lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
-            if stats["std"] <= 0.001:
-                stats["std"] = 1
-            lr_unorm = lr_image.copy()
-            lr_image = Normalize()(lr_image, stats)
-            sample = {
-                "lr": lr_image,
-                "lr_un": lr_unorm,
-                "hr": hr_image,
-                "stats": stats,
-                "file": filename,
-            }
-            transforms = Compose([Reshape(), ToFloatTensor()])
-            sample = transforms(sample)
-        else:
-            sample = {
-                "lr": lr_image,
-                "hr": hr_image,
-                "stats": stats,
-                "file": filename,
-            }
-            transforms = Compose(
-                [
-                    Cut_Blur(self.switch),
-                    Differential(0.4),
-                    Rotate(),
-                    Transpose(),
-                    HorizontalFlip(),
-                    VerticalFlip(),
-                    Pertube(0.5, 0.5),
-                    Reshape(),
-                    ToFloatTensor(),
-                ]
-            )
-            for i, trans in enumerate([transforms]):
-                sample = trans(sample)
-        return sample
-
 
 class Rotate:
     """Rotate class rotates image array"""

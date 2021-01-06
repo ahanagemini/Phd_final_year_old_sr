@@ -47,7 +47,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from models import UNET
 from models import EDSR
-from dataset import SrDataset, PairedDataset
+from dataset import PairedDataset
 from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR, Column_Difference, Row_Difference
 from logger import Logger
@@ -83,8 +83,6 @@ def create_dataset(path, lognorm=False, test=False, switch=True):
     ----------
     path: path to data directory
     lognorm: Is log normalization used?
-    kernel: Whether to use kernel or not default false
-    kernel_factor: if using kernel then how much to factor the image default --X4 (0.25)
 
     Returns
     -------
@@ -96,9 +94,7 @@ def create_dataset(path, lognorm=False, test=False, switch=True):
         print("running PairedDataset")
         return PairedDataset(path, lognorm=lognorm, test=test, switch=switch)
     else:
-        print("Running SrDataset")
-        return SrDataset(path, lognorm=lognorm)
-
+        raise NotADirectoryError("LR and HR are missing")
 
 def training(
     training_generator,
@@ -112,7 +108,6 @@ def training(
     dilation,
     act,
     model_save_path,
-    kernel,
 ):
     """
 
@@ -144,14 +139,16 @@ def training(
     # parameters
     lr = LR[architecture]
     model.to(device)
-    summary(model, (1, 64, 64), batch_size=1, device="cuda")
+    summary(model, (1, 256, 256), batch_size=1, device="cuda")
     max_epochs = num_epochs
 
+    '''
     # drawing model
     dummy_input = torch.from_numpy(np.random.randn(1, 1, 64, 64)).float()
     dummy_input = dummy_input.to(device)
     model_draw(logger, model, dummy_input)
     del dummy_input
+    '''
 
     # loading the model
     training_parameters = check_load_model(save_model_path, model, lr)

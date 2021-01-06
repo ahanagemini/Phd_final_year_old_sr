@@ -149,7 +149,7 @@ def check_load_model(save_model_path, model, learning_rate=0.0005):
     training_parameters = {}
 
     # learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=0, factor=0.5, verbose=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, factor=0.5, verbose=True)
 
     if not current_model_list:
         current_model = ""
@@ -165,6 +165,8 @@ def check_load_model(save_model_path, model, learning_rate=0.0005):
     training_parameters["current_model"] = current_model
     if os.path.isfile(current_model):
         load_model(current_model, training_parameters)
+    for param_group in training_parameters["optimizer"].param_groups:
+        param_group['lr'] = learning_rate
     return training_parameters
 
 
@@ -229,10 +231,6 @@ def train_model(training_generator, training_parameters):
             mean.to(device),
             sigma.to(device),
         )
-        '''
-        for param_group in optimizer.param_groups:
-            param_group['lr'] = lr
-        '''
         training_parameters['optimizer'].zero_grad()
         with torch.autograd.set_detect_anomaly(True):
             with torch.set_grad_enabled(True):
