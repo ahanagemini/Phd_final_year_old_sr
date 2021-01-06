@@ -246,8 +246,7 @@ def process(
     aspp,
     dilation,
     act,
-    model_save_path,
-    kernel=False,
+    model_save_path
 ):
     """
 
@@ -286,8 +285,7 @@ def process(
         aspp,
         dilation,
         act,
-        model_save_path,
-        kernel,
+        model_save_path
     )
 
 
