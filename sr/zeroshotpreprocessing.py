@@ -672,7 +672,7 @@ def image_stat_processing(conf):
     print("started testing")
     best_model_save = Path(conf.model_save)
     print(f"path of trained model is {best_model_save}")
-    best_model = sorted(list(best_model_save.rglob("*best_model.pt")))[-1]
+    best_model = sorted(list(best_model_save.rglob("*best_model*")))[-1]
 
     final_test_path = Path(conf.output_dir_path) / "Result_Test"
     if not os.path.isdir(final_test_path):
