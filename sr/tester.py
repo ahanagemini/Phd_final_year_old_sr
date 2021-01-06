@@ -39,6 +39,7 @@ from models import EDSR
 from tqdm import tqdm
 from train_util import model_selection, test_model
 import scipy.ndimage
+import argparse
 
 from PIL import Image, ImageFont, ImageDraw
 
@@ -102,33 +103,53 @@ def evaluate(args):
     test_model(test_generator, testing_parameters)
     
 
+class Configurator:
+    """ This is the config class for tester"""
+    def __init__(self):
+        self.parser = argparse.ArgumentParser()
+        self.parser.add_argument('--input', default=os.path.dirname(os.path.abspath(__file__)) +r"/input_dir",
+                                 help="use this command to set input directory")
+        self.parser.add_argument('--output', default=os.path.dirname(os.path.abspath(__file__)) + r"/output_dir",
+                                 help="use this command to set output directory")
+        self.parser.add_argument('--model', default=os.path.dirname(os.path.abspath(__file__)) +r"/model_dir",
+                                 help="use this command to set model directory")
+        self.parser.add_argument('--architecture', default="edsr_16_64",
+                                 help="use this command to set architecture")
+        self.parser.add_argument('--act', default="leakyrelu",
+                                 help="use this command to set activation")
+        self.parser.add_argument('--aspp', default=False,
+                                 help="use this to set aspp for edsr")
+        self.parser.add_argument('--dilation', default=False,
+                                 help="use this to set dilation for edsr")
+        self.parser.add_argument('--hr', default=True,
+                                 help="use this command to set hr")
+        self.parser.add_argument('--lr', default=False,
+                                 help="use this command to set lr")
+        self.parser.add_argument('--lognorm', default=False,
+                                 help="use this command to set lognorm")
+        self.parser.add_argument('--active', default=False,
+                                 help="use this command to set active")
+
+
+    def parse(self, args=None):
+        """Parse the configuration"""
+        self.conf = self.parser.parse_args(args=args)
+        return self.conf
 
 if __name__ == "__main__":
-    '''
-    args = docopt(__doc__)
-    for a in ["--input", "--output", "--model"]:
-        args[a] = Path(args[a]).resolve()
-    print("Input being read from:", args["--input"])
-    '''
-
-    args = {'--help': False,
-     '--input': True,
-     '--model': True,
-     '--output': True,
-     '-e': False,
-     '-l': False,
-     '-p': False,
-     '--input': r"/home/venkat/Documents/PiyushKumarProject/Libraries/predict",
-     '--model': r'/home/venkat/Documents/PiyushKumarProject/Libraries/edsr_16_64/edsr_16_64/current/2020-12-28-21:20:05.167183_model_200.pt',
-     '--output': r'/home/venkat/Documents/PiyushKumarProject/Libraries/predict_output',
-     '--architecture': 'edsr_16_64',
-     'hr': True,
-     'lr': False,
-     '--act': 'leakyrelu',
-     '--dilation': False,
-     '--aspp': False,
-     '--lognorm': False,
-     '--active': False,
+    conf = Configurator().parse()
+    args = {
+     '--input': conf.input,
+     '--model': conf.model,
+     '--output': conf.output,
+     '--architecture':  conf.architecture,
+     'hr': conf.hr,
+     'lr': conf.lr,
+     '--act': conf.act,
+     '--dilation': conf.dilation,
+     '--aspp': conf.aspp,
+     '--lognorm': conf.lognorm,
+     '--active': conf.active,
      'kernel': True,
      "--save_slice": False}
     evaluate(args)
