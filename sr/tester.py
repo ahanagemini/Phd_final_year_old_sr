@@ -82,7 +82,7 @@ def evaluate(args):
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    test_set = create_dataset(args["--input"], lognorm=args["--lognorm"], test=True, vaidate=False, hr=args["hr"])
+    test_set = create_dataset(args["--input"], lognorm=args["--lognorm"], test=True, validate=False, hr=args["hr"])
     test_generator = torch.utils.data.DataLoader(test_set, **parameters)
     dilation = args["--dilation"]
     aspp = args["--aspp"]

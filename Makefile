@@ -6,7 +6,7 @@ outputdir := "$(root_dir)/output_dir"
 cuttingdir := "$(root_dir)/output_dir/cutting_out"
 resumedir := "$(root_dir)/output_dir/edsr_16_64/edsr_16_64"
 loggerdir := "$(root_dir)/output_dir/logger"
-epochs := 2
+epochs := 350
 architecture := "edsr_16_64"
 
 clean:
