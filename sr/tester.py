@@ -26,7 +26,7 @@ import shutil
 import torch
 
 import tifffile
-from dataset import SrDataset, PairedDataset
+from dataset import PairedDataset
 from docopt import docopt
 
 import numpy as np
@@ -62,7 +62,7 @@ def create_dataset(path, lognorm=False, test=True, hr=True):
     if set(os.listdir(path)) == set(["LR", "HR"]):
         return PairedDataset(path, lognorm=lognorm, test=test)
     else:
-        return SrDataset(path, lognorm=lognorm, test=test, hr=hr)
+        raise NotADirectoryError("LR and HR are missing")
 
 def evaluate(args):
     """
