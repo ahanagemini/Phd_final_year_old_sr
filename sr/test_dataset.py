@@ -36,9 +36,11 @@ class Upsampler_Dataset(Dataset):
 
     def __getitem__(self, idx):
         image_file = self.imagelist[idx]
+        keys = ("mean", "std", "min", "max")
         stat_file = self.statlist[idx]
         image = loader(image_file)
         stats = json.load(open(stat_file))
+        stats = {x: stats[x] for x in keys}
 
         image = Normalize()(image, stats)
         sample = {

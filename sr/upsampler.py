@@ -48,9 +48,8 @@ def upsampler(conf):
         for i, sample in enumerate(tqdm(test_generator)):
             stats = sample["stats"]
             filename = str(i) + ".png"
-            print(filename)
             filepath = Path(conf.output) / filename 
-            y_pred = model(sample["lr"].to(device)).numpy()
+            y_pred = model(sample["lr"].to(device))
             y_pred = (y_pred * stats["std"]) + stats["mean"]
             y_pred = np.clip(y_pred, stats["min"].numpy(), stats["max"].numpy())
             if conf.lognorm:

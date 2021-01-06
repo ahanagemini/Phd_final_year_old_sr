@@ -583,11 +583,21 @@ def perform_bilinear_and_stats_zoom(scipy_directories, conf):
                     + "_"
                     + format(j, "05d")
                 )
-                if random.random() < 0.5:
+                if i < int(0.2*scipy_len):
                     np.savez_compressed(hr_opath / fname, np.array(mat))
                     mat = resizer.pil_image(mat, scale_factor=0.25)
                     mat = image_clipper(mat, stats)
                     np.savez_compressed(lr_opath / fname, np.array(mat))
+                elif i > int(0.2 * scipy_len) and i < int(0.4 * scipy_len):
+                    np.savez_compressed(hr_opath / fname, np.array(mat))
+                    mat = resizer.scipy_zoom(mat, scale_factor=0.25)
+                    mat = image_clipper(mat, stats)
+                    np.savez_compressed(lr_opath / fname, np.array(mat))
+                elif i > int(0.4 * scipy_len) and i < int(0.6 * scipy_len):
+                    np.savez_compressed(hr_opath / fname, mat)
+                    mat = resizer.t_interpolate(mat, mode="bilinear", scale_factor=0.25)
+                    mat = image_clipper(mat, stats)
+                    np.savez_compressed(lr_opath / fname, mat)
                 else:
                     np.savez_compressed(hr_opath / fname, mat)
                     mat = resizer.t_interpolate(mat, mode="bicubic", scale_factor=0.25)
