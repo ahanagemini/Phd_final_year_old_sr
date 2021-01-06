@@ -663,8 +663,7 @@ def image_stat_processing(conf):
         conf.aspp,
         conf.dilation,
         conf.act,
-        conf.model_save,
-        kernel=True,
+        conf.model_save
     )
     print("training is complete")
 
