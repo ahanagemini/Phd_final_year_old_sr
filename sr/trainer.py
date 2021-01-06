@@ -139,7 +139,7 @@ def training(
     # parameters
     lr = LR[architecture]
     model.to(device)
-    summary(model, (1, 256, 256), batch_size=1, device="cuda")
+    summary(model, (1, 64, 64), batch_size=1, device="cuda")
     max_epochs = num_epochs
 
     '''
