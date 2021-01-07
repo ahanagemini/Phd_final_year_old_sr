@@ -16,7 +16,6 @@ from axial_bicubic import AxialNet
 from PIL import Image, ImageFont, ImageDraw
 from skimage import metrics
 
-
 def writetext(imgfile, e_sr=None, e_lr=None):
     img = Image.open(imgfile)
     width, height = img.size
@@ -64,7 +63,7 @@ def model_selection(architecture, aspp, dilation, act):
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif architecture == "edsr_16_64":
-        model = EDSR(n_resblocks=32, n_feats=64, aspp=aspp, dilation=dilation, act=act)
+        model = EDSR(n_resblocks=16, n_feats=64, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_8_256":
         model = EDSR(n_resblocks=8, n_feats=256, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_16_256":
@@ -149,7 +148,7 @@ def check_load_model(save_model_path, model, learning_rate=0.0005):
     training_parameters = {}
 
     # learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, factor=0.99, verbose=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, factor=0.99, verbose=True)
 
     if not current_model_list:
         current_model = ""
