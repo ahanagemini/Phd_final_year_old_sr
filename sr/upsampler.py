@@ -1,5 +1,7 @@
 import os
 import torch
+from torch.backends import cudnn
+
 from test_dataset import Upsampler_Dataset
 from train_util import model_selection
 import argparse
@@ -14,6 +16,8 @@ import numpy as np
 from stat_plotter import PlotStat
 from cutter import loader
 from tqdm import tqdm
+from GPUtil import showUtilization as gpu_usage
+
 
 
 def prepare(tensor, conf):
@@ -67,7 +71,14 @@ def upsampler(conf):
             filename = str(i) + ".png"
             filepath = Path(conf.output) / filename
             sample["lr"] = prepare(sample["lr"], conf)
-            y_pred = model.forward(sample["lr"].to(device))
+            print(sample["lr"].numpy().shape)
+            torch.cuda.empty_cache()
+            gpu_usage()
+            cudnn.enabled = True
+            cudnn.benchmark = True
+            y_pred = model(sample["lr"].to(device))
+            gpu_usage()
+            torch.cuda.empty_cache()
             y_pred = (y_pred * stats["std"]) + stats["mean"]
             y_pred = np.clip(y_pred, stats["min"].numpy(), stats["max"].numpy())
             if conf.lognorm:
