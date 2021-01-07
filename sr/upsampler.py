@@ -16,6 +16,20 @@ from cutter import loader
 from tqdm import tqdm
 
 
+def prepare(tensor, conf):
+    """
+
+    Parameters
+    ----------
+    tensor
+    conf
+
+    Returns
+    -------
+
+    """
+    if conf.precision == 'half': tensor = tensor.half()
+    return tensor
 
 def create_dataset(path, lognorm=False):
     """
@@ -32,6 +46,7 @@ def create_dataset(path, lognorm=False):
     """
     return Upsampler_Dataset(path, lognorm)
 
+
 def upsampler(conf):
     parameters = {"batch_size": 1, "shuffle": False, "num_workers": 6}
     use_cuda = torch.cuda.is_available()
@@ -44,12 +59,15 @@ def upsampler(conf):
     checkpoint = torch.load(conf.model)
     model.load_state_dict(checkpoint['model'])
     model.eval()
+    if conf.precision == "half":
+        model.half()
     with torch.no_grad():
         for i, sample in enumerate(tqdm(test_generator)):
             stats = sample["stats"]
             filename = str(i) + ".png"
-            filepath = Path(conf.output) / filename 
-            y_pred = model(sample["lr"].to(device))
+            filepath = Path(conf.output) / filename
+            sample["lr"] = prepare(sample["lr"], conf)
+            y_pred = model.forward(sample["lr"].to(device))
             y_pred = (y_pred * stats["std"]) + stats["mean"]
             y_pred = np.clip(y_pred, stats["min"].numpy(), stats["max"].numpy())
             if conf.lognorm:
@@ -84,6 +102,8 @@ class Configurator:
                                  help="use this to set dilation for edsr")
         self.parser.add_argument('--lognorm', default=False,
                                  help="use this command to set lognorm")
+        self.parser.add_argument('--precision', default='half',
+                                 help="use this to set the command to change the precision")
     
     def parse(self, args=None):
         """Parse the configuration"""
