@@ -166,6 +166,7 @@ def check_load_model(save_model_path, model, learning_rate=0.0005):
         load_model(current_model, training_parameters)
     for param_group in training_parameters["optimizer"].param_groups:
         param_group['lr'] = learning_rate
+    scheduler.factor = 0.999
     return training_parameters
 
 
