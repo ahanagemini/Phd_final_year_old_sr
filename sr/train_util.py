@@ -16,6 +16,74 @@ from axial_bicubic import AxialNet
 from PIL import Image, ImageFont, ImageDraw
 from skimage import metrics
 
+def matrix_cutter(img, width=64, height=64):
+    """
+
+
+    Parameters
+    ----------
+    image : TYPE
+        DESCRIPTION.
+    height : TYPE, optional
+        DESCRIPTION. The default is 256.
+    width : TYPE, optional
+        DESCRIPTION. The default is 256.
+
+    Returns
+    -------
+    None.
+
+    """
+    images = []
+    img_batch, img_channels, img_height, img_width = img.size()
+
+    # check if images have 256 width and 256 height if it does skip cutting
+    if img_height <= height and img_width <= width:
+        return [(0, 0, img)]
+
+    for i, ih in enumerate(range(0, img_height, height)):
+        for j, iw in enumerate(range(0, img_width, width)):
+            posx = iw
+            posy = ih
+            if posx + width > img_width:
+                posx = img_width - width
+            if posy + height > img_height:
+                posy = img_height - height
+
+            cutimg = img[:, :, posy : posy + height, posx : posx + width]
+            cutimg_batch, cutimg_channels, cutimg_height, cutimg_width = cutimg.size()
+            assert cutimg_height == height and cutimg_width == width
+            images.append((i, j, cutimg))
+    return images
+
+def matrix_stitcher(img, mat_dict, device, scale=4, height=256, width=256):
+    img_batch, img_channel, img_height, img_width = img.size()
+    del img
+    img_height, img_width = img_height*scale, img_width*scale
+
+    img = torch.zeros((img_batch, img_channel, img_height, img_width), device=device)
+    for i, ih in enumerate(range(0, img_height, height)):
+        for j, iw in enumerate(range(0, img_width, width)):
+            posx = iw
+            posy = ih
+            if posx + width > img_width:
+                posx = img_width - width
+            if posy + height > img_height:
+                posy = img_height - height
+            img[:, :, posy:posy + height, posx:posx + height] = mat_dict[str(i)+str(j)]
+
+    return img
+
+
+def chop_forward(x, model, device):
+    images = matrix_cutter(x)
+    up_images = {}
+    for i, j, mat in images:
+        up_images[str(i)+str(j)] = model(mat)
+    out_image = matrix_stitcher(x, up_images, device)
+    return out_image
+
+
 def writetext(imgfile, e_sr=None, e_lr=None):
     img = Image.open(imgfile)
     width, height = img.size

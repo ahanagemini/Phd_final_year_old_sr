@@ -3,7 +3,7 @@ import torch
 from torch.backends import cudnn
 
 from test_dataset import Upsampler_Dataset
-from train_util import model_selection
+from train_util import model_selection, chop_forward
 import argparse
 import os
 import torch
@@ -59,7 +59,7 @@ def upsampler(conf):
     test_set = create_dataset(idir, conf.lognorm)
     test_generator = torch.utils.data.DataLoader(test_set, **parameters)
     model = model_selection(conf.architecture, conf.aspp, conf.dilation, conf.act)
-    model.to(device)
+    model = model.to(device)
     checkpoint = torch.load(conf.model)
     model.load_state_dict(checkpoint['model'])
     model.eval()
@@ -68,27 +68,27 @@ def upsampler(conf):
     with torch.no_grad():
         for i, sample in enumerate(tqdm(test_generator)):
             stats = sample["stats"]
+            mean = stats["mean"]
+            std = stats["std"]
+            mean = mean.to(device)
+            std = std.to(device)
             filename = str(i) + ".png"
             filepath = Path(conf.output) / filename
             sample["lr"] = prepare(sample["lr"], conf)
-            print(sample["lr"].numpy().shape)
-            torch.cuda.empty_cache()
-            gpu_usage()
-            cudnn.enabled = True
-            cudnn.benchmark = True
-            y_pred = model(sample["lr"].to(device))
-            gpu_usage()
-            torch.cuda.empty_cache()
-            y_pred = (y_pred * stats["std"]) + stats["mean"]
-            y_pred = np.clip(y_pred, stats["min"].numpy(), stats["max"].numpy())
+            y_pred = chop_forward(sample["lr"].to(device), model, device)
+            print(f" output image size is {y_pred.size()}")
+            y_pred = (y_pred * std) + mean
+            y_pred = np.clip(y_pred.cpu(), stats["min"].cpu().numpy(), stats["max"].cpu().numpy())
             if conf.lognorm:
                 image_sign = np.sign(y_pred)
                 y_pred = image_sign * (np.exp(np.abs(y_pred)) - 1.0)
                 del image_sign
-            y_pred.reshape(-1, y_pred.shape[-1])
-            vmax = stats["max"].numpy()
-            vmin = stats["min"].numpy()
-            plt.imsave(filepath, y_pred, cmap="grey", vmax=vmax, vmin=vmin)
+            y_pred = y_pred.reshape(-1, y_pred.shape[-1])
+            y_pred = y_pred.numpy()
+            print(y_pred.shape)
+            vmax = np.max(y_pred)
+            vmin = np.min(y_pred)
+            plt.imsave(filepath, y_pred, cmap="gray", vmax=vmax, vmin=vmin)
             
             del y_pred, vmax, vmin, filepath, stats, filename
     
