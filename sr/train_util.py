@@ -148,7 +148,7 @@ def check_load_model(save_model_path, model, learning_rate=0.0005):
     training_parameters = {}
 
     # learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, factor=0.99, verbose=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, factor=0.999, verbose=True)
 
     if not current_model_list:
         current_model = ""
