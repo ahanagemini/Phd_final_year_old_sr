@@ -56,6 +56,9 @@ def upsampler(conf):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda:0" if use_cuda else "cpu")
     idir = Path(conf.input)
+    if not os.path.isdir(Path(conf.output)):
+        os.makedirs(Path(conf.output))
+
     test_set = create_dataset(idir, conf.lognorm)
     test_generator = torch.utils.data.DataLoader(test_set, **parameters)
     model = model_selection(conf.architecture, conf.aspp, conf.dilation, conf.act)
