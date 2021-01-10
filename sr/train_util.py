@@ -16,6 +16,56 @@ from axial_bicubic import AxialNet
 from PIL import Image, ImageFont, ImageDraw
 from skimage import metrics
 
+def power_of_2_next(x):
+    p = 1
+    if(x and not(x & (x-1))):
+        return x
+    while(p < x):
+        p<<=1
+    return p
+
+def forward_chop(x, model, scale=4, shave=10, min_size=6400):
+    n_GPUs = 1
+    b, c, h, w = x.size()
+    h_half, w_half = h // 2, w // 2
+    h_size, w_size = h_half + shave, w_half + shave
+    h_size += h_size % scale
+    w_size += w_size % scale
+    lr_list = [
+        x[:, :, 0:h_size, 0:w_size],
+        x[:, :, 0:h_size, (w - w_size):w],
+        x[:, :, (h - h_size):h, 0:w_size],
+        x[:, :, (h - h_size):h, (w - w_size):w]]
+
+    if w_size * h_size < min_size:
+        sr_list = []
+        for i in range(0, 4, n_GPUs):
+            lr_batch = lr_list[i]
+            sr_batch = model(lr_batch)
+            sr_list.extend(sr_batch.chunk(n_GPUs, dim=0))
+    else:
+        sr_list = [
+            forward_chop(patch, model=model, scale=4, shave=shave, min_size=min_size) \
+            for patch in lr_list
+        ]
+
+    h, w = scale * h, scale * w
+    h_half, w_half = scale * h_half, scale * w_half
+    h_size, w_size = scale * h_size, scale * w_size
+    shave *= scale
+
+    output = x.new(b, c, h, w)
+    output[:, :, 0:h_half, 0:w_half] \
+        = sr_list[0][:, :, 0:h_half, 0:w_half]
+    output[:, :, 0:h_half, w_half:w] \
+        = sr_list[1][:, :, 0:h_half, (w_size - w + w_half):w_size]
+    output[:, :, h_half:h, 0:w_half] \
+        = sr_list[2][:, :, (h_size - h + h_half):h_size, 0:w_half]
+    output[:, :, h_half:h, w_half:w] \
+        = sr_list[3][:, :, (h_size - h + h_half):h_size, (w_size - w + w_half):w_size]
+
+    return output
+
 def matrix_cutter(img, width=64, height=64):
     """
 
@@ -131,7 +181,7 @@ def model_selection(architecture, aspp, dilation, act):
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif architecture == "edsr_16_64":
-        model = EDSR(n_resblocks=64, n_feats=64, aspp=aspp, dilation=dilation, act=act)
+        model = EDSR(n_resblocks=32, n_feats=64, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_8_256":
         model = EDSR(n_resblocks=8, n_feats=256, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_16_256":

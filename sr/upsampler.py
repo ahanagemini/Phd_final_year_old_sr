@@ -3,7 +3,7 @@ import torch
 from torch.backends import cudnn
 
 from test_dataset import Upsampler_Dataset
-from train_util import model_selection, chop_forward
+from train_util import model_selection, chop_forward, forward_chop
 import argparse
 import os
 import torch
@@ -78,7 +78,7 @@ def upsampler(conf):
             filename = str(i) + ".png"
             filepath = Path(conf.output) / filename
             sample["lr"] = prepare(sample["lr"], conf)
-            y_pred = chop_forward(sample["lr"].to(device), model, device)
+            y_pred = forward_chop(sample["lr"].to(device), model=model, scale=4)
             print(f" output image size is {y_pred.size()}")
             y_pred = (y_pred * std) + mean
             y_pred = np.clip(y_pred.cpu(), stats["min"].cpu().numpy(), stats["max"].cpu().numpy())
