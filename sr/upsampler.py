@@ -91,7 +91,7 @@ def upsampler(conf):
             print(y_pred.shape)
             vmax = np.max(y_pred)
             vmin = np.min(y_pred)
-            plt.imsave(filepath, y_pred, cmap="gray", vmax=vmax, vmin=vmin)
+            plt.imsave(str(filepath), y_pred, cmap="gray", vmax=vmax, vmin=vmin)
             
             del y_pred, vmax, vmin, filepath, stats, filename
     
