@@ -123,7 +123,7 @@ class Pad:
     
     def pad(self, x):
         height, width = x.shape
-        if height>width:
+        if height > width:
             # start padding width
             diff = height - width
             if diff%2==0:
@@ -132,8 +132,9 @@ class Pad:
             else:
                 left, right = diff // 2 + 1, diff // 2
                 x = np.pad(x, [(0, 0), (diff//2 + 1, diff//2)])
-            return x, left, right
-        elif width>height:
+            return x, "width", left, right
+
+        elif width > height:
             diff = width - height
             if diff%2==0:
                 top, bottom = diff//2, diff//2
@@ -141,9 +142,10 @@ class Pad:
             else:
                 top, bottom = diff//2+1, diff//2
                 x = np.pad(x, [(diff // 2 + 1, diff // 2), (0, 0)])
-            return x, top, bottom
+            return x, "height", top, bottom
+
         else:
-            return x, 0, 0
+            return x, "none", 0, 0
     
     def __call__(self, sample):
         """
@@ -156,6 +158,6 @@ class Pad:
         -------
 
         """
-        sample["lr"] = self.pad(sample["lr"])
+        sample["lr"], sample["type"], sample["pad_1"], sample["pad_2"] = self.pad(sample["lr"])
         print(sample["lr"].shape)
         return sample

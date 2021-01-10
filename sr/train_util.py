@@ -16,14 +16,6 @@ from axial_bicubic import AxialNet
 from PIL import Image, ImageFont, ImageDraw
 from skimage import metrics
 
-def power_of_2_next(x):
-    p = 1
-    if(x and not(x & (x-1))):
-        return x
-    while(p < x):
-        p<<=1
-    return p
-
 def forward_chop(x, model, scale=4, shave=10, min_size=6400):
     n_GPUs = 1
     b, c, h, w = x.size()

@@ -79,7 +79,6 @@ def upsampler(conf):
             filepath = Path(conf.output) / filename
             sample["lr"] = prepare(sample["lr"], conf)
             y_pred = forward_chop(sample["lr"].to(device), model=model, scale=4)
-            print(f" output image size is {y_pred.size()}")
             y_pred = (y_pred * std) + mean
             y_pred = np.clip(y_pred.cpu(), stats["min"].cpu().numpy(), stats["max"].cpu().numpy())
             if conf.lognorm:
@@ -88,6 +87,12 @@ def upsampler(conf):
                 del image_sign
             y_pred = y_pred.reshape(-1, y_pred.shape[-1])
             y_pred = y_pred.numpy()
+
+            if sample["type"][0] == "height":
+                y_pred = y_pred[sample["pad_1"]*4:-sample["pad_2"]*4, :]
+            elif sample["type"][0] == "width":
+                y_pred = y_pred[:, sample["pad_1"]*4:-sample["pad_2"]*4]
+
             print(y_pred.shape)
             vmax = np.max(y_pred)
             vmin = np.min(y_pred)
