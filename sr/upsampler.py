@@ -78,7 +78,7 @@ def upsampler(conf):
             filename = str(i) + ".png"
             filepath = Path(conf.output) / filename
             sample["lr"] = prepare(sample["lr"], conf)
-            y_pred = forward_chop(sample["lr"].to(device), model=model, scale=4)
+            y_pred = forward_chop(sample["lr"].to(device), model=model, scale=4, shave=10)
             y_pred = (y_pred * std) + mean
             y_pred = np.clip(y_pred.cpu(), stats["min"].cpu().numpy(), stats["max"].cpu().numpy())
             if conf.lognorm:
