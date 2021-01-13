@@ -10,8 +10,10 @@ import numpy as np
 from stat_plotter import PlotStat
 from cutter import loader
 
+
 class Upsampler_Dataset(Dataset):
     """This dataloader will read the images for upsampling"""
+
     def __init__(self, root_dir, lognorm=False):
         """
 
@@ -109,44 +111,45 @@ class ToFloatTensor:
         sample["lr"] = torch.from_numpy(sample["lr"].copy()).float()
 
         return sample
-    
+
+
 class Pad:
     """This class will pad the image to equal size. Will only work for 2d images"""
 
     def power_of_2_next(self, x):
         p = 1
-        if (x and not (x & (x - 1))):
+        if x and not (x & (x - 1)):
             return x
-        while (p < x):
+        while p < x:
             p <<= 1
         return p
-    
+
     def pad(self, x):
         height, width = x.shape
         if height > width:
             # start padding width
             diff = height - width
-            if diff%2==0:
-                left, right = diff//2, diff//2
-                x = np.pad(x, [(0, 0), (diff//2, diff//2)])
+            if diff % 2 == 0:
+                left, right = diff // 2, diff // 2
+                x = np.pad(x, [(0, 0), (diff // 2, diff // 2)])
             else:
                 left, right = diff // 2 + 1, diff // 2
-                x = np.pad(x, [(0, 0), (diff//2 + 1, diff//2)])
+                x = np.pad(x, [(0, 0), (diff // 2 + 1, diff // 2)])
             return x, "width", left, right
 
         elif width > height:
             diff = width - height
-            if diff%2==0:
-                top, bottom = diff//2, diff//2
-                x = np.pad(x, [(diff//2, diff//2), (0, 0)])
+            if diff % 2 == 0:
+                top, bottom = diff // 2, diff // 2
+                x = np.pad(x, [(diff // 2, diff // 2), (0, 0)])
             else:
-                top, bottom = diff//2+1, diff//2
+                top, bottom = diff // 2 + 1, diff // 2
                 x = np.pad(x, [(diff // 2 + 1, diff // 2), (0, 0)])
             return x, "height", top, bottom
 
         else:
             return x, "none", 0, 0
-    
+
     def __call__(self, sample):
         """
         
@@ -158,6 +161,8 @@ class Pad:
         -------
 
         """
-        sample["lr"], sample["type"], sample["pad_1"], sample["pad_2"] = self.pad(sample["lr"])
+        sample["lr"], sample["type"], sample["pad_1"], sample["pad_2"] = self.pad(
+            sample["lr"]
+        )
         print(sample["lr"].shape)
         return sample
