@@ -87,7 +87,7 @@ def upsampler(conf):
 
             # The actual upsample happens here
             y_pred = forward_chop(
-                sample["lr"].to(device), model=model, scale=4, shave=10
+                sample["lr"].to(device), model=model, scale=4, shave=32, min_size=16384
             )
             y_pred = (y_pred * std) + mean
             y_pred = np.clip(
