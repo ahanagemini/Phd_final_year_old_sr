@@ -1,82 +1,140 @@
 import os
 import sys
-import json
-import shutil
+import argparse
 from pathlib import Path
+import torch
 import numpy as np
-from  zeroshotpreprocessing import assert_stats, stat_calculator
-from cutter import loader, matrix_cutter
-import scipy.ndimage
+import matplotlib.pyplot as plt
 from tqdm import tqdm
-from configs import Config
-from tester import evaluate
+from test_dataset import Interpol_Test_Dataset
+from train_util import model_selection, forward_chop
+from PIL import Image, ImageDraw, ImageFont
+from skimage import metrics
 
-def process(conf):
-    output_directory = Path(conf.cutting_output_dir_path)
 
-    # deletting if cutting out existed already to avoid overlaps
-    if os.path.isdir(output_directory):
-        print("deleting existing path")
-        shutil.rmtree(output_directory)
-    input_directory = Path(conf.input_dir_path)
-    parent_folders = os.scandir(input_directory)
+def writetext(imgfile, l1, psnr, ssim):
+    img = Image.open(imgfile)
+    draw = ImageDraw.Draw(img)
+    font_path = os.path.abspath(os.path.expanduser("./font/dancing.ttf"))
+    font = ImageFont.truetype(font_path, 10)
+    draw.text((0, 0), "L1=" + str(l1), font=font, fill=(255, 0, 0))
+    draw.text((0, 16), "PSNR=" + str(psnr), font=font, fill=(255, 0, 0))
+    draw.text((0, 32), "SSIM=" + str(ssim), font=font, fill=(255, 0, 0))
+    img.save(imgfile)
+def prepare(tensor, conf):
+    """
 
-    print("started image pair creation")
-    for parent in parent_folders:
-        parent = Path(parent)
-        ldir_train = output_directory / "test" / "LR" / parent.name
-        hdir_train = output_directory / "test" / "HR" / parent.name
+    Parameters
+    ----------
+    tensor
+    conf
 
-        stats = assert_stats(parent)
+    Returns
+    -------
 
-        if not os.path.isdir(ldir_train):
-            print("creating lr directory")
-            os.makedirs(str(ldir_train))
-        if not os.path.isdir(hdir_train):
-            print("creating hr directory")
-            os.makedirs(str(hdir_train))
+    """
+    if conf.precision == 'half': tensor = tensor.half()
+    return tensor
 
-        #save stat file
-        with open(str(ldir_train / "stats.json"), "w") as sfile:
-            json.dump(stats, sfile)
+def create_dataset(path, lognorm=False, interpol="bicubic"):
+    """
 
-        with open(str(hdir_train / "stats.json"), "w") as sfile:
-            json.dump(stats, sfile)
-        input_files = list(parent.rglob("*.npz"))
-        for i, image_path in enumerate(tqdm(input_files)):
-            image_name = image_path.name
-            lr_image_matrix = loader(image_path)
-            hr_image_matrix = scipy.ndimage.zoom(lr_image_matrix, 4)
-            np.savez_compressed(ldir_train / image_name, lr_image_matrix)
-            np.savez_compressed(hdir_train / image_name, hr_image_matrix)
+    Parameters
+    ----------
+    path: path to data directory
+    lognorm: Is log normalization used?
+    interpol: type of interpolation(bicubic, bilinear, scipy, pil_resize)
 
-        print("image pair creation complete starting testing")
-        test_path = output_directory / "test"
-        best_model_save = Path(conf.model_save)
-        best_model_save = best_model_save / conf.architecture
-        best_model = sorted(list(best_model_save.rglob("*best_model.pt")))[-1]
-        print(best_model)
+    Returns
+    -------
+    Loaded dataset
 
-        if not os.path.isdir(conf.output_dir_path):
-            os.makedirs(conf.output_dir_path)
-        args = {
-            "--input": test_path,
-            "--output": conf.output_dir_path,
-            "--architecture": conf.architecture,
-            "--model": best_model,
-            "--act": conf.act,
-            "--lognorm": conf.lognorm,
-            "--active": conf.active,
-            "--save_slice": conf.save_slice,
-            "--aspp": conf.aspp,
-            "--dilation": conf.dilation,
-            "kernel": True,
-            "hr": True,
-        }
-        evaluate(args)
+    """
+    return Interpol_Test_Dataset(path, lognorm, interpolation_type=interpol)
 
-if __name__ == '__main__':
-    if len(sys.argv) == 1 or "--input_dir_path" not in str(sys.argv) or "--output" not in str(sys.argv):
-        sys.argv.append('-h')
-    conf = Config().parse()
-    process(conf)
+class ModelTester:
+    """This class will contain methods that will load the model and images from input directory, downsample the images
+    teice using the given interpolations and then upsample two times the images and then calculate the metrics like l1
+    ssim and psnr between the ground truth and the sr image and will save the image with the following values"""
+    def upsampler(self, conf):
+        parameters = {"batch_size": 1, "shuffle": False, "num_workers": 6}
+        use_cuda = torch.cuda.is_available()
+        device = torch.device("cuda:0" if use_cuda else "cpu")
+        idir = Path(conf.input)
+        if not os.path.isdir(Path(conf.output)):
+            os.makedirs(Path(conf.output))
+
+        test_set = create_dataset(idir, conf.lognorm)
+        test_generator = torch.utils.data.DataLoader(test_set, **parameters)
+        model = model_selection(conf.architecture, conf.aspp, conf.dilation, conf.act)
+        model = model.to(device)
+        checkpoint = torch.load(conf.model)
+        model.load_state_dict(checkpoint['model'])
+        model.eval()
+        if conf.precision == "half":
+            model.half()
+        with torch.no_grad():
+            for i, sample in enumerate(tqdm(test_generator)):
+                stats = sample["stats"]
+                mean = stats["mean"]
+                std = stats["std"]
+                mean = mean.to(device)
+                std = std.to(device)
+                y_pred = forward_chop(forward_chop(sample["lr"].to(device), model=model, shave=32, min_size=16384),
+                                      model=model, shave=32, min_size=16384)
+                y_pred = (y_pred * std) + mean
+                if conf.lognorm:
+                    image_sign = np.sign(y_pred)
+                    y_pred = image_sign * (np.exp(np.abs(y_pred)) - 1.0)
+                    del image_sign
+                y = sample["lr_un"].numpy()
+                y_pred = y_pred.reshape(-1, y_pred.shape[-1])
+                y_pred = y_pred.cpu().numpy()
+                height, width = y_pred.shape
+                y_pred = y_pred[sample["top"]*4: height-sample["bottom"]*4, sample["left"]*4:width-sample["right"]*4]
+                data_range = stats["max"].numpy()
+                # calculating l1 loss, ssim loss and psnr loss
+                l1_loss = np.mean(np.abs(y - y_pred))
+                ssim_loss = metrics.structural_similarity(y, y_pred, data_range=data_range)
+                psnr_loss = metrics.peak_signal_noise_ratio(y, y_pred, data_range=data_range)
+
+                filename = str(i) + ".png"
+                vertical_stack = np.vstack((y, y_pred))
+                vmax = np.max(y)
+                vmin = np.min(y)
+                filepath = conf.output_dir + fr"/{filename}"
+                plt.imsave(filepath, vertical_stack, vmax=vmax, vmin=vmin, cmap="gray")
+                writetext(filepath, l1_loss, psnr_loss, ssim_loss)
+
+
+
+
+
+class Configurator:
+    """ This is the config class for tester"""
+
+    def __init__(self):
+        self.parser = argparse.ArgumentParser()
+        self.parser.add_argument('--input', default=os.path.dirname(os.path.abspath(__file__)) + r"/input_dir",
+                                 help="use this command to set input directory")
+        self.parser.add_argument('--output', default=os.path.dirname(os.path.abspath(__file__)) + r"/output_dir",
+                                 help="use this command to set output directory")
+        self.parser.add_argument('--model', default=os.path.dirname(os.path.abspath(__file__)) + r"/model_dir",
+                                 help="use this command to set model directory")
+        self.parser.add_argument('--architecture', default="edsr_16_64",
+                                 help="use this command to set architecture")
+        self.parser.add_argument('--act', default="leakyrelu",
+                                 help="use this command to set activation")
+        self.parser.add_argument('--aspp', default=False,
+                                 help="use this to set aspp for edsr")
+        self.parser.add_argument('--dilation', default=False,
+                                 help="use this to set dilation for edsr")
+        self.parser.add_argument('--lognorm', default=False,
+                                 help="use this command to set lognorm")
+        self.parser.add_argument('--precision', default='half',
+                                 help="use this to set the command to change the precision")
+
+    def parse(self, args=None):
+        """Parse the configuration"""
+        self.conf = self.parser.parse_args(args=args)
+        return self.conf

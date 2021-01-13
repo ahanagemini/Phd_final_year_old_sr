@@ -27,31 +27,18 @@ Options:
 
 from pathlib import Path
 import os
-import sys
 import shutil
 from time import time
 import datetime
-import scipy.ndimage
-
 import torch
-import torch.optim as optim
 import torch.nn
-
 from torchsummary import summary
-
 from docopt import docopt
-
 import numpy as np
-import tifffile
-import matplotlib.pyplot as plt
-from tqdm import tqdm
-from models import UNET
-from models import EDSR
 from dataset import PairedDataset
-from axial_bicubic import AxialNet
 from losses import SSIM, L1loss, PSNR, Column_Difference, Row_Difference
 from logger import Logger
-from train_util import model_selection, debug_pics,  check_load_model, model_save, train_model, valid_model
+from train_util import model_selection, check_load_model, model_save, train_model, valid_model
 
 BATCH_SIZE = {
     "unet": 4,
