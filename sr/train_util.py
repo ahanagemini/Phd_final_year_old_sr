@@ -16,6 +16,115 @@ from axial_bicubic import AxialNet
 from PIL import Image, ImageFont, ImageDraw
 from skimage import metrics
 
+def forward_chop(x, model, scale=4, shave=10, min_size=6400):
+    n_GPUs = 1
+    b, c, h, w = x.size()
+    h_half, w_half = h // 2, w // 2
+    h_size, w_size = h_half + shave, w_half + shave
+    h_size += h_size % scale
+    w_size += w_size % scale
+    lr_list = [
+        x[:, :, 0:h_size, 0:w_size],
+        x[:, :, 0:h_size, (w - w_size):w],
+        x[:, :, (h - h_size):h, 0:w_size],
+        x[:, :, (h - h_size):h, (w - w_size):w]]
+
+    if w_size * h_size < min_size:
+        sr_list = []
+        for i in range(0, 4, n_GPUs):
+            lr_batch = lr_list[i]
+            sr_batch = model(lr_batch)
+            sr_list.extend(sr_batch.chunk(n_GPUs, dim=0))
+    else:
+        sr_list = [
+            forward_chop(patch, model=model, scale=4, shave=shave, min_size=min_size) \
+            for patch in lr_list
+        ]
+
+    h, w = scale * h, scale * w
+    h_half, w_half = scale * h_half, scale * w_half
+    h_size, w_size = scale * h_size, scale * w_size
+    shave *= scale
+
+    output = x.new(b, c, h, w)
+    output[:, :, 0:h_half, 0:w_half] \
+        = sr_list[0][:, :, 0:h_half, 0:w_half]
+    output[:, :, 0:h_half, w_half:w] \
+        = sr_list[1][:, :, 0:h_half, (w_size - w + w_half):w_size]
+    output[:, :, h_half:h, 0:w_half] \
+        = sr_list[2][:, :, (h_size - h + h_half):h_size, 0:w_half]
+    output[:, :, h_half:h, w_half:w] \
+        = sr_list[3][:, :, (h_size - h + h_half):h_size, (w_size - w + w_half):w_size]
+
+    return output
+
+def matrix_cutter(img, width=64, height=64):
+    """
+
+
+    Parameters
+    ----------
+    image : TYPE
+        DESCRIPTION.
+    height : TYPE, optional
+        DESCRIPTION. The default is 256.
+    width : TYPE, optional
+        DESCRIPTION. The default is 256.
+
+    Returns
+    -------
+    None.
+
+    """
+    images = []
+    img_batch, img_channels, img_height, img_width = img.size()
+
+    # check if images have 256 width and 256 height if it does skip cutting
+    if img_height <= height and img_width <= width:
+        return [(0, 0, img)]
+
+    for i, ih in enumerate(range(0, img_height, height)):
+        for j, iw in enumerate(range(0, img_width, width)):
+            posx = iw
+            posy = ih
+            if posx + width > img_width:
+                posx = img_width - width
+            if posy + height > img_height:
+                posy = img_height - height
+
+            cutimg = img[:, :, posy : posy + height, posx : posx + width]
+            cutimg_batch, cutimg_channels, cutimg_height, cutimg_width = cutimg.size()
+            assert cutimg_height == height and cutimg_width == width
+            images.append((i, j, cutimg))
+    return images
+
+def matrix_stitcher(img, mat_dict, device, scale=4, height=256, width=256):
+    img_batch, img_channel, img_height, img_width = img.size()
+    del img
+    img_height, img_width = img_height*scale, img_width*scale
+
+    img = torch.zeros((img_batch, img_channel, img_height, img_width), device=device)
+    for i, ih in enumerate(range(0, img_height, height)):
+        for j, iw in enumerate(range(0, img_width, width)):
+            posx = iw
+            posy = ih
+            if posx + width > img_width:
+                posx = img_width - width
+            if posy + height > img_height:
+                posy = img_height - height
+            img[:, :, posy:posy + height, posx:posx + height] = mat_dict[str(i)+str(j)]
+
+    return img
+
+
+def chop_forward(x, model, device):
+    images = matrix_cutter(x)
+    up_images = {}
+    for i, j, mat in images:
+        up_images[str(i)+str(j)] = model(mat)
+    out_image = matrix_stitcher(x, up_images, device)
+    return out_image
+
 
 def writetext(imgfile, e_sr=None, e_lr=None):
     img = Image.open(imgfile)
@@ -149,7 +258,7 @@ def check_load_model(save_model_path, model, learning_rate=0.0005):
     training_parameters = {}
 
     # learning rate scheduler
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3, factor=0.5, verbose=True)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=10, factor=0.999, verbose=True)
 
     if not current_model_list:
         current_model = ""
@@ -167,6 +276,7 @@ def check_load_model(save_model_path, model, learning_rate=0.0005):
         load_model(current_model, training_parameters)
     for param_group in training_parameters["optimizer"].param_groups:
         param_group['lr'] = learning_rate
+    training_parameters["scheduler"].factor = 0.999
     return training_parameters
 
 

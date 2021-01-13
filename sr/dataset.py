@@ -23,7 +23,7 @@ class PairedDataset(Dataset):
         """
         Args:
             root_dir (string): Directory with all the images.
-            lognorm: True if we ar eusing log normalization
+            lognorm: True if we are using log normalization
             test: True only for test dataset
             transform (callable, optional): Optional transform to be applied
                 on a sample.
