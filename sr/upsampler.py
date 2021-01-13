@@ -100,12 +100,10 @@ def upsampler(conf):
             y_pred = y_pred.reshape(-1, y_pred.shape[-1])
             y_pred = y_pred.numpy()
 
-            if sample["type"][0] == "height":
-                y_pred = y_pred[sample["pad_1"] * 4 : -sample["pad_2"] * 4, :]
-            elif sample["type"][0] == "width":
-                y_pred = y_pred[:, sample["pad_1"] * 4 : -sample["pad_2"] * 4]
+            height, width = y_pred.shape
+            y_pred = y_pred[sample["top"] * 4: height - sample["bottom"] * 4,
+                     sample["left"] * 4:width - sample["right"] * 4]
 
-            print(y_pred.shape)
             vmax = np.max(y_pred)
             vmin = np.min(y_pred)
             plt.imsave(str(filepath), y_pred, cmap="gray", vmax=vmax, vmin=vmin)
