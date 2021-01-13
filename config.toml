@@ -1,0 +1,11 @@
+[default]
+filters = 64
+layers = 64
+lr = 0.0001
+epoches = 350
+cutblur = false
+batchSize = 8
+gradientLossMultipler = 0.1
+
+[reduceLROnPlateau]
+factor=0.999
