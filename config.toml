@@ -6,6 +6,8 @@ epoches = 350
 cutblur = false
 batchSize = 8
 gradientLossMultipler = 0.1
+# full or half for models
+precision = "full"
 
 [reduceLROnPlateau]
 factor=0.999
