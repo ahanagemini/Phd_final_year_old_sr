@@ -210,3 +210,4 @@ class Interpolate:
             sample["lr"] = interpol_type.t_interpolate(interpol_type.t_interpolate(sample["lr"], mode=self.interpolation_type,
                                                                             scale_factor=0.25),
                                                 mode=self.interpolation_type, scale_factor=0.25)
+        return sample

@@ -64,7 +64,7 @@ class ModelTester:
         if not os.path.isdir(Path(conf.output)):
             os.makedirs(Path(conf.output))
 
-        test_set = create_dataset(idir, conf.lognorm)
+        test_set = create_dataset(idir, conf.lognorm, conf.interpol)
         test_generator = torch.utils.data.DataLoader(test_set, **parameters)
         model = model_selection(conf.architecture, conf.aspp, conf.dilation, conf.act)
         model = model.to(device)
@@ -80,7 +80,9 @@ class ModelTester:
                 std = stats["std"]
                 mean = mean.to(device)
                 std = std.to(device)
-                y_pred = forward_chop(forward_chop(sample["lr"].to(device), model=model, shave=32, min_size=16384),
+                sample["lr"] = prepare(sample["lr"], conf)
+                sample["lr_un"] = prepare(sample["lr_un"], conf)
+                y_pred = forward_chop(forward_chop(sample["lr"].to(device), model=model, shave=16, min_size=16384),
                                       model=model, shave=32, min_size=16384)
                 y_pred = (y_pred * std) + mean
                 if conf.lognorm:
@@ -88,22 +90,26 @@ class ModelTester:
                     y_pred = image_sign * (np.exp(np.abs(y_pred)) - 1.0)
                     del image_sign
                 y = sample["lr_un"].numpy()
+                y = y[0, :, :]
+                vmax = np.max(y)
+                vmin = np.min(y)
+                height_y, width_y = y.shape
                 y_pred = y_pred.reshape(-1, y_pred.shape[-1])
                 y_pred = y_pred.cpu().numpy()
                 height, width = y_pred.shape
                 y_pred = y_pred[sample["top"]*4: height-sample["bottom"]*4, sample["left"]*4:width-sample["right"]*4]
+                filename = str(i)
+                filepath = conf.output + fr"/{filename}_test.png"
+                plt.imsave(filepath, y_pred, vmax=vmax, vmin=vmin, cmap="gray")
+                y_pred = y_pred[:height_y, :width_y]
                 data_range = stats["max"].numpy()
                 # calculating l1 loss, ssim loss and psnr loss
                 l1_loss = np.mean(np.abs(y - y_pred))
                 ssim_loss = metrics.structural_similarity(y, y_pred, data_range=data_range)
                 psnr_loss = metrics.peak_signal_noise_ratio(y, y_pred, data_range=data_range)
-
-                filename = str(i) + ".png"
-                vertical_stack = np.vstack((y, y_pred))
-                vmax = np.max(y)
-                vmin = np.min(y)
-                filepath = conf.output_dir + fr"/{filename}"
-                plt.imsave(filepath, vertical_stack, vmax=vmax, vmin=vmin, cmap="gray")
+                horizontal_stack = np.hstack((y_pred, y))
+                filepath = conf.output + fr"/{filename}.png"
+                plt.imsave(filepath, horizontal_stack, vmax=vmax, vmin=vmin, cmap="gray")
                 writetext(filepath, l1_loss, psnr_loss, ssim_loss)
 
 
@@ -133,8 +139,17 @@ class Configurator:
                                  help="use this command to set lognorm")
         self.parser.add_argument('--precision', default='half',
                                  help="use this to set the command to change the precision")
+        self.parser.add_argument("--interpol", default="bicubic",
+                                 help="Use this command to set the interpolation (bicubic, bilinear, scipy, pil_resize")
 
     def parse(self, args=None):
         """Parse the configuration"""
         self.conf = self.parser.parse_args(args=args)
         return self.conf
+
+if __name__ == "__main__":
+    conf = Configurator().parse()
+    if not os.path.isdir(Path(conf.output)):
+        os.makedirs(Path(conf.output))
+    modeltester = ModelTester()
+    modeltester.upsampler(conf)

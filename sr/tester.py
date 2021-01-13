@@ -21,31 +21,16 @@ Options:
   -h --help -h
 """
 import os
-from pathlib import Path
-import shutil
 import torch
-
-import tifffile
 from dataset import PairedDataset
-from docopt import docopt
-
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from skimage import metrics
-from models import UNET
-from axial_bicubic import AxialNet
-from models import EDSR
-from tqdm import tqdm
 from train_util import model_selection, test_model
-import scipy.ndimage
 import argparse
 
 from PIL import Image, ImageFont, ImageDraw
 
 
 
-def create_dataset(path, lognorm=False, test=True, hr=True):
+def create_dataset(path, lognorm=False, test=True, validate=False, hr=True):
     """
 
     Parameters
@@ -60,7 +45,7 @@ def create_dataset(path, lognorm=False, test=True, hr=True):
     """
 
     if set(os.listdir(path)) == set(["LR", "HR"]):
-        return PairedDataset(path, lognorm=lognorm, test=test)
+        return PairedDataset(path, lognorm=lognorm, test=test, validate=validate)
     else:
         raise NotADirectoryError("LR and HR are missing")
 
@@ -82,7 +67,7 @@ def evaluate(args):
     device = torch.device("cuda:0" if use_cuda else "cpu")
     torch.backends.cudnn.benchmark = True
 
-    test_set = create_dataset(args["--input"], lognorm=args["--lognorm"], test=True, validate=False, hr=args["hr"])
+    test_set = create_dataset(args["--input"], lognorm=args["--lognorm"], test=True, hr=args["hr"])
     test_generator = torch.utils.data.DataLoader(test_set, **parameters)
     dilation = args["--dilation"]
     aspp = args["--aspp"]
