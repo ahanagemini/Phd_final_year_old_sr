@@ -36,7 +36,7 @@ from torchsummary import summary
 from docopt import docopt
 import numpy as np
 from dataset import PairedDataset
-from losses import SSIM, L1loss, PSNR, Column_Difference, Row_Difference
+from losses import Row_Difference
 from logger import Logger
 from train_util import model_selection, check_load_model, model_save, train_model, valid_model
 
@@ -110,7 +110,7 @@ def training(
     aspp: True if EDSR is going to use aspp
     dilation True if EDSR is going to use dilation
     act: activation function to be used
-    model_save: location where model will be saved
+    model_save_path: location where model will be saved
     Returns
     -------
 

@@ -7,7 +7,7 @@ cuttingdir := "$(root_dir)/output_dir/cutting_out"
 resumedir := "$(root_dir)/output_dir/edsr_16_64/edsr_16_64"
 loggerdir := "$(root_dir)/output_dir/logger"
 epochs := 350
-architecture := "edsr_16_64"
+architecture := "vgg"
 
 clean:
 	echo "clean started"
@@ -21,7 +21,7 @@ run:
 	$(PYTHON) sr/downloader.py --download="slices" --output_directory=$(inputdir)
 	echo "download ended"
 
-	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=$(epochs) --log_dir=$(loggerdir) --architecture=$(architecture)
+	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=$(epochs) --log_dir=$(loggerdir) --architecture=$(architecture) --vgg=True
 	echo "training ended"
 
 
@@ -31,4 +31,7 @@ resume:
 		
 setup:
 	$(PYTHON) -m pip install -r requirements.txt
+
+test:
+
 	

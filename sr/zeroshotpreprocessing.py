@@ -25,7 +25,6 @@ Options:
 import os
 import sys
 import json
-import random
 import shutil
 import numpy as np
 import scipy.ndimage
@@ -41,9 +40,19 @@ from tester import evaluate
 from tqdm import tqdm
 from stat_plotter import PlotStat
 from different_loss_plotter import LossPlotter
+from vgg_trainer import vgg_process
+from vgg_tester import vgg_testing
 
 sample_dict = {"--X2": 0.5, "--X4": 0.25, "--X8": 0.125}
 
+def vgg_hr_random_cropper(image_matrix, hr_opath, fname):
+    height_mat, width_mat = image_matrix.shape
+    start_height = np.random.randint(0, height_mat - 64)
+    end_height = start_height + 64
+    start_width = np.random.randint(0, width_mat - 64)
+    end_width = start_width + 64
+    hr_mat = image_matrix[start_height: end_height, start_width: end_width]
+    np.savez_compressed(hr_opath / fname, hr_mat)
 
 def writetext(imgfile):
     img = Image.open(imgfile)
@@ -356,7 +365,12 @@ def pil_saving_images(sample_list, conf):
                 + "_"
                 + format(j, "05d")
             )
-            np.savez_compressed(hr_opath / fname, mat)
+            if conf.vgg:
+                # randomly cropping 64 by 64 hr for vgg training
+                vgg_hr_random_cropper(mat.copy(), hr_opath, fname)
+            else:
+                np.savez_compressed(hr_opath / fname, mat)
+
             if conf.kernel_gan:
                 mat = np.reshape(mat, (mat.shape[0], mat.shape[1], 1))
 
@@ -583,23 +597,24 @@ def perform_bilinear_and_stats_zoom(scipy_directories, conf):
                     + "_"
                     + format(j, "05d")
                 )
+                if conf.vgg:
+                    # randomly cropping 64 by 64 hr for vgg training
+                    vgg_hr_random_cropper(mat.copy(), hr_opath, fname)
+                else:
+                    np.savez_compressed(hr_opath / fname, mat)
                 if i < int(0.2*scipy_len):
-                    np.savez_compressed(hr_opath / fname, np.array(mat))
                     mat = resizer.pil_image(mat, scale_factor=0.25)
                     mat = image_clipper(mat, stats)
-                    np.savez_compressed(lr_opath / fname, np.array(mat))
+                    np.savez_compressed(lr_opath / fname, mat)
                 elif i > int(0.2 * scipy_len) and i < int(0.4 * scipy_len):
-                    np.savez_compressed(hr_opath / fname, np.array(mat))
                     mat = resizer.scipy_zoom(mat, scale_factor=0.25)
                     mat = image_clipper(mat, stats)
-                    np.savez_compressed(lr_opath / fname, np.array(mat))
+                    np.savez_compressed(lr_opath / fname, mat)
                 elif i > int(0.4 * scipy_len) and i < int(0.6 * scipy_len):
-                    np.savez_compressed(hr_opath / fname, mat)
                     mat = resizer.t_interpolate(mat, mode="bilinear", scale_factor=0.25)
                     mat = image_clipper(mat, stats)
                     np.savez_compressed(lr_opath / fname, mat)
                 else:
-                    np.savez_compressed(hr_opath / fname, mat)
                     mat = resizer.t_interpolate(mat, mode="bicubic", scale_factor=0.25)
                     mat = image_clipper(mat, stats)
                     np.savez_compressed(lr_opath / fname, mat)
@@ -650,69 +665,102 @@ def image_stat_processing(conf):
     test_path = output_directory / "test"
     predict_path = output_directory / "predict"
 
-    # EDSR Training
-    print("started EDSR Training")
-    process(
-        train_path,
-        valid_path,
-        conf.log_dir,
-        conf.architecture,
-        conf.num_epochs,
-        conf.lognorm,
-        conf.debug_pics,
-        conf.aspp,
-        conf.dilation,
-        conf.act,
-        conf.model_save
-    )
-    print("training is complete")
+    if conf.vgg:
+        print("started vgg training")
+        vgg_process(
+            train_path,
+            valid_path,
+            conf.log_dir,
+            conf.architecture,
+            conf.num_epochs,
+            conf.lognorm,
+            conf.aspp,
+            conf.dilation,
+            conf.act,
+            conf.model_save
+        )
 
-    # EDSR Loading model
-    print("started testing")
-    best_model_save = Path(conf.model_save)
-    print(f"path of trained model is {best_model_save}")
-    best_model = sorted(list(best_model_save.rglob("*best_model*")))[-1]
+        best_model_save = Path(conf.model_save)
+        best_model = sorted(list(best_model_save.rglob("*best_model*")))[-1]
+        conf.model_save = best_model
+        print("# started vgg testing")
+        conf.input = test_path
+        vgg_testing(conf)
+        print("# ending vgg testing")
 
-    final_test_path = Path(conf.output_dir_path) / "Result_Test"
-    if not os.path.isdir(final_test_path):
-        os.makedirs(final_test_path)
-    args = {
-        "--input": test_path,
-        "--output": final_test_path,
-        "--architecture": conf.architecture,
-        "--model": best_model,
-        "--act": conf.act,
-        "--lognorm": conf.lognorm,
-        "--active": conf.active,
-        "--save_slice": conf.save_slice,
-        "--aspp": conf.aspp,
-        "--dilation": conf.dilation,
-        "kernel": True,
-        "hr": True,
-    }
-    evaluate(args)
-    print("finished testing exiting")
+        print('# started vgg predict testing')
+        conf.input = predict_path
+        vgg_testing(conf)
+        print('# ending vgg testing')
 
-    print("started predict testing")
-    final_predict_path = Path(conf.output_dir_path) / "Result_Predict"
-    if not os.path.isdir(final_predict_path):
-        os.makedirs(final_predict_path)
-    args = {
-        "--input": predict_path,
-        "--output": final_predict_path,
-        "--architecture": conf.architecture,
-        "--model": best_model,
-        "--act": conf.act,
-        "--lognorm": conf.lognorm,
-        "--active": conf.active,
-        "--save_slice": conf.save_slice,
-        "--aspp": conf.aspp,
-        "--dilation": conf.dilation,
-        "kernel": True,
-        "hr": True,
-    }
-    evaluate(args)
-    print("finished testing exiting")
+
+
+    else:
+        # EDSR Training
+        print("started EDSR Training")
+        process(
+            train_path,
+            valid_path,
+            conf.log_dir,
+            conf.architecture,
+            conf.num_epochs,
+            conf.lognorm,
+            conf.debug_pics,
+            conf.aspp,
+            conf.dilation,
+            conf.act,
+            conf.model_save
+        )
+        print("training is complete")
+
+        # EDSR Loading model
+        print("started testing")
+        best_model_save = Path(conf.model_save)
+        print(f"path of trained model is {best_model_save}")
+        best_model = sorted(list(best_model_save.rglob("*best_model*")))[-1]
+
+        final_test_path = Path(conf.output_dir_path) / "Result_Test"
+        if not os.path.isdir(final_test_path):
+            os.makedirs(final_test_path)
+        args = {
+            "--input": test_path,
+            "--output": final_test_path,
+            "--architecture": conf.architecture,
+            "--model": best_model,
+            "--act": conf.act,
+            "--lognorm": conf.lognorm,
+            "--active": conf.active,
+            "--save_slice": conf.save_slice,
+            "--aspp": conf.aspp,
+            "--dilation": conf.dilation,
+            "kernel": True,
+            "hr": True,
+        }
+        evaluate(args)
+        print("finished testing exiting")
+
+        print("started predict testing")
+        final_predict_path = Path(conf.output_dir_path) / "Result_Predict"
+        if not os.path.isdir(final_predict_path):
+            os.makedirs(final_predict_path)
+        args = {
+            "--input": predict_path,
+            "--output": final_predict_path,
+            "--architecture": conf.architecture,
+            "--model": best_model,
+            "--act": conf.act,
+            "--lognorm": conf.lognorm,
+            "--active": conf.active,
+            "--save_slice": conf.save_slice,
+            "--aspp": conf.aspp,
+            "--dilation": conf.dilation,
+            "kernel": True,
+            "hr": True,
+        }
+        evaluate(args)
+        print("finished testing exiting")
+
+
 
 
 if __name__ == "__main__":

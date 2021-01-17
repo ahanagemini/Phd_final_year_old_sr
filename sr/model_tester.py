@@ -81,9 +81,9 @@ class ModelTester:
                 mean = mean.to(device)
                 std = std.to(device)
                 sample["lr"] = prepare(sample["lr"], conf)
+                print(f"this is the sample input size {sample['lr'].size()}")
                 sample["lr_un"] = prepare(sample["lr_un"], conf)
-                y_pred = forward_chop(forward_chop(sample["lr"].to(device), model=model, shave=16, min_size=16384),
-                                      model=model, shave=32, min_size=16384)
+                y_pred = forward_chop(sample["lr"].to(device), model=model, shave=32, min_size=16384)
                 y_pred = (y_pred * std) + mean
                 if conf.lognorm:
                     image_sign = np.sign(y_pred)

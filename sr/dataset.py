@@ -8,7 +8,6 @@ import os
 import torch
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose
-import scipy.ndimage
 import numpy as np
 from stat_plotter import PlotStat
 from cutter import loader

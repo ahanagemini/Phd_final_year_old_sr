@@ -132,6 +132,8 @@ class Config:
         )
 
         # Trainer.py Parameters
+        self.parser.add_argument("--vgg", default=False,
+                                 help="use this command to set whether to train vgg")
         self.parser.add_argument(
             "--train",
             default=os.path.dirname(__file__) + r"/results/train",
