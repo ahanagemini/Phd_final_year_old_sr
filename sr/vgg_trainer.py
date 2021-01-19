@@ -13,7 +13,7 @@ from torchsummary import summary
 import numpy as np
 from vgg_dataset import VGGTrainDataset
 from logger import Logger
-from train_util import model_selection, check_load_model, model_save, vgg_train, vgg_valid
+from train_util import model_selection, check_load_model, model_save, vgg_train, vgg_valid, check_load_pretrained_model
 
 BATCH_SIZE = {
     "vgg" :16
@@ -88,7 +88,7 @@ def vgg_trainer(training_generator,
     # parameters
     lr = LR[architecture]
     model.to(device)
-    summary(model, (1, 64, 64), batch_size=1, device="cuda")
+    summary(model, (1, 256, 256), batch_size=1, device="cuda")
     max_epochs = num_epochs
 
     '''
@@ -101,7 +101,7 @@ def vgg_trainer(training_generator,
 
     # loading the model
     training_parameters = check_load_model(save_model_path, model, lr)
-    training_parameters["criterion"] = torch.nn.BCELoss()
+    training_parameters["criterion"] = torch.nn.L1Loss()
     training_parameters["device"] = device
     training_parameters["max_epochs"] = max_epochs
     training_parameters["learning_rate"] = lr

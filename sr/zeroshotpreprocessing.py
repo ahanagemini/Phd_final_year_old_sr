@@ -28,6 +28,7 @@ import json
 import shutil
 import numpy as np
 import scipy.ndimage
+import torch
 from pathlib import Path
 from cutter import loader, matrix_cutter
 import matplotlib.pyplot as plt
@@ -40,10 +41,43 @@ from tester import evaluate
 from tqdm import tqdm
 from stat_plotter import PlotStat
 from different_loss_plotter import LossPlotter
+from train_util import model_selection, check_load_pretrained_model
 from vgg_trainer import vgg_process
 from vgg_tester import vgg_testing
 
 sample_dict = {"--X2": 0.5, "--X4": 0.25, "--X8": 0.125}
+
+def pretrained_model_upsample(mat, conf):
+    """
+    This function takes a pretrained model and uses it to upsample
+    Parameters
+    ----------
+    mat
+    conf
+
+    Returns
+    -------
+
+    """
+    use_cuda = torch.cuda.is_available()
+    device = torch.device("cuda:0" if use_cuda else "cpu")
+    training_parameters = {}
+    height, width = mat.shape
+    model = model_selection(conf.pretrained_architecture, conf.aspp, conf.dilation, conf.act)
+    training_parameters["pretrained_model"] = model
+    training_parameters["pretrained_model_path"] = Path(conf.pretrained_model_path) / "best"
+    training_parameters = check_load_pretrained_model(training_parameters)
+    model = training_parameters["pretrained_model"]
+    mat = np.reshape(mat, (1, 1, height, width))
+    mat = torch.from_numpy(mat)
+    mat = mat.to(device)
+    model = model.to(device)
+    model.eval()
+    with torch.no_grad():
+        mat = model(mat)
+        mat = mat.cpu().numpy()
+        mat = mat[0, 0, :, :]
+    return mat
 
 def vgg_hr_random_cropper(image_matrix, hr_opath, fname):
     height_mat, width_mat = image_matrix.shape
@@ -365,21 +399,17 @@ def pil_saving_images(sample_list, conf):
                 + "_"
                 + format(j, "05d")
             )
-            if conf.vgg:
-                # randomly cropping 64 by 64 hr for vgg training
-                vgg_hr_random_cropper(mat.copy(), hr_opath, fname)
-            else:
-                np.savez_compressed(hr_opath / fname, mat)
-
+            np.savez_compressed(hr_opath / fname, mat)
             if conf.kernel_gan:
                 mat = np.reshape(mat, (mat.shape[0], mat.shape[1], 1))
-
                 mat = imresize(
                     im=mat, scale_factor=conf.scale_factor, kernel=conf.kernel
                 )
                 mat = mat[:, :, 0]
             else:
                 mat = resizer.pil_image(mat, conf.scale_factor)
+            if conf.vgg:
+                mat = pretrained_model_upsample(mat, conf)
             np.savez_compressed(lr_opath / fname, mat)
 
     print("process of cutting and saving images has ended")
@@ -597,26 +627,26 @@ def perform_bilinear_and_stats_zoom(scipy_directories, conf):
                     + "_"
                     + format(j, "05d")
                 )
-                if conf.vgg:
-                    # randomly cropping 64 by 64 hr for vgg training
-                    vgg_hr_random_cropper(mat.copy(), hr_opath, fname)
-                else:
-                    np.savez_compressed(hr_opath / fname, mat)
+                np.savez_compressed(hr_opath / fname, mat)
                 if i < int(0.2*scipy_len):
                     mat = resizer.pil_image(mat, scale_factor=0.25)
                     mat = image_clipper(mat, stats)
+                    mat = pretrained_model_upsample(mat, conf)
                     np.savez_compressed(lr_opath / fname, mat)
                 elif i > int(0.2 * scipy_len) and i < int(0.4 * scipy_len):
                     mat = resizer.scipy_zoom(mat, scale_factor=0.25)
                     mat = image_clipper(mat, stats)
+                    mat = pretrained_model_upsample(mat, conf)
                     np.savez_compressed(lr_opath / fname, mat)
                 elif i > int(0.4 * scipy_len) and i < int(0.6 * scipy_len):
                     mat = resizer.t_interpolate(mat, mode="bilinear", scale_factor=0.25)
                     mat = image_clipper(mat, stats)
+                    mat = pretrained_model_upsample(mat, conf)
                     np.savez_compressed(lr_opath / fname, mat)
                 else:
                     mat = resizer.t_interpolate(mat, mode="bicubic", scale_factor=0.25)
                     mat = image_clipper(mat, stats)
+                    mat = pretrained_model_upsample(mat, conf)
                     np.savez_compressed(lr_opath / fname, mat)
 
     print("scipy zoom process has finished")
@@ -679,21 +709,7 @@ def image_stat_processing(conf):
             conf.act,
             conf.model_save
         )
-
-        best_model_save = Path(conf.model_save)
-        best_model = sorted(list(best_model_save.rglob("*best_model*")))[-1]
-        conf.model_save = best_model
-        print("# started vgg testing")
-        conf.input = test_path
-        vgg_testing(conf)
-        print("# ending vgg testing")
-
-        print('# started vgg predict testing')
-        conf.input = predict_path
-        vgg_testing(conf)
-        print('# ending vgg testing')
-
-
+        print("vgg training has ended")
 
     else:
         # EDSR Training

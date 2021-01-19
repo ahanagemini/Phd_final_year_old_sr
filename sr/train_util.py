@@ -181,7 +181,7 @@ def model_selection(architecture, aspp, dilation, act):
     elif architecture == "edsr_32_256":
         model = EDSR(n_resblocks=32, n_feats=256)
     elif architecture == "vgg":
-        model = Discriminator_VGG_128(1, 64)
+        model = Discriminator_VGG_128(1, 64, 256)
     return model
 
 
@@ -281,6 +281,18 @@ def check_load_model(save_model_path, model, learning_rate=0.0005):
     training_parameters["scheduler"].factor = 0.999
     return training_parameters
 
+def check_load_pretrained_model(training_parameters):
+    current_save_model_path = training_parameters["pretrained_model_path"]
+    current_model_list = list(current_save_model_path.rglob("*.pt"))
+    current_model_list = sorted(current_model_list)
+    if not current_model_list:
+        current_model = ""
+    else:
+        current_model = current_model_list[-1]
+    if os.path.isfile(current_model):
+        checkpoint = torch.load(current_model)
+        training_parameters["pretrained_model"].load_state_dict(checkpoint["model"])
+    return training_parameters
 
 def model_save(save_params, train_model_path):
     """
@@ -395,7 +407,6 @@ def valid_model(validation_generator, training_parameters):
 
             x_valid = data["lr"]
             y_valid = data["hr"]
-
             x_valid, y_valid = x_valid.to(device), y_valid.to(device)
             y_pred = model(x_valid)
             loss_l1_valid = criterion(y_pred, y_valid)
@@ -558,30 +569,28 @@ def vgg_train(training_generator, training_parameters):
     l1_loss = 0.0
     model.train(True)
     for batch_idx, data in enumerate(tqdm(training_generator)):
-        x_train = data["image"]
-        y_train = data["label"]
-        y_train = torch.reshape(y_train, (len(y_train), 1)).float()
-
+        x_train_lr = data["lr"]
+        x_train_hr = data["hr"]
         stat = data["stats"]
         mean, sigma = stat["mean"], stat["std"]
-        x_train, y_train, mean, sigma = (
-            x_train.to(device),
-            y_train.to(device),
+        x_train_lr, x_train_hr, mean, sigma = (
+            x_train_lr.to(device),
+            x_train_hr.to(device),
             mean.to(device),
             sigma.to(device),
         )
         training_parameters['optimizer'].zero_grad()
         with torch.autograd.set_detect_anomaly(True):
             with torch.set_grad_enabled(True):
-                y_pred = model(x_train)
-                loss_l1 = criterion(y_pred, y_train)
+                y_pred_lr = model(x_train_lr)
+                y_pred_hr = model(x_train_hr)
+                loss_l1 = (criterion(y_pred_hr, torch.ones_like(y_pred_hr)) +
+                           criterion(y_pred_lr, torch.zeros_like(y_pred_lr)))/2
                 l1_loss = l1_loss + (
                         (1 / (batch_idx + 1)) * (loss_l1.data - l1_loss))
-
                 l1_loss_list.append(loss_l1.item())
                 loss_l1.backward()
                 training_parameters['optimizer'].step()
-
 
     return l1_loss, l1_loss_list
 
@@ -604,13 +613,21 @@ def vgg_valid(validation_generator, training_parameters):
     model.train(False)
     with torch.no_grad():
         for batch_idx, data in enumerate(tqdm(validation_generator)):
-
-            x_valid = data["image"]
-            y_valid = data["label"]
-            y_valid = torch.reshape(y_valid, (len(y_valid), 1)).float()
-            x_valid, y_valid = x_valid.to(device), y_valid.to(device)
-            y_pred = model(x_valid)
-            loss_l1_valid = criterion(y_pred, y_valid)
+            x_train_lr = data["lr"]
+            x_train_hr = data["hr"]
+            stat = data["stats"]
+            mean, sigma = stat["mean"], stat["std"]
+            x_train_lr, x_train_hr, mean, sigma = (
+                x_train_lr.to(device),
+                x_train_hr.to(device),
+                mean.to(device),
+                sigma.to(device),
+            )
+            y_pred_lr = model(x_train_lr)
+            print(y_pred_lr.size())
+            y_pred_hr = model(x_train_hr)
+            loss_l1_valid = (criterion(y_pred_hr, torch.ones_like(y_pred_hr)) +
+                       criterion(y_pred_lr, torch.zeros_like(y_pred_lr))) / 2
             l1_loss_valid_list.append(loss_l1_valid.item())
             valid_l1_loss = valid_l1_loss + (
                     (1 / (batch_idx + 1)) * (loss_l1_valid.data - valid_l1_loss))

@@ -240,6 +240,15 @@ class Config:
             help="ZSSRs configuration is for real images",
         )
 
+        self.parser.add_argument(
+            "--pretrained_model_path",
+            default=os.path.dirname(os.path.abspath(__file__)) + r"/pre_trained",
+            help="Use this command to set pretrained_model_path"
+        )
+        self.parser.add_argument("--pretrained_architecture",
+                                 default="edsr_16_64",
+                                 help="Use this command to set the pretrained architecture")
+
     def parse(self, args=None):
         """Parse the configuration"""
         self.conf = self.parser.parse_args(args=args)
