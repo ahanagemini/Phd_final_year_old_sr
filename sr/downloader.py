@@ -80,6 +80,7 @@ def data_download(dataname, odir):
         "Retinal_OCT": r"https://www.dropbox.com/s/e9p0dt001mrej99/earth2.tar?dl=0",
         "Medical_3D": r"https://www.dropbox.com/s/ri3cpsunqed32my/Medical_data.tar.gz?dl=0",
         "slices": r"https://www.dropbox.com/s/aibbeqwbswpe894/slices.tar.gz?dl=0",
+        "edsr_64": r"https://www.dropbox.com/s/6d0hmrtixay7w8r/edsr_64_64.tar.xz?dl=0"
     }
     down_path = Path(os.getcwd() + r"/Download")
     #if os.path.isdir(down_path):

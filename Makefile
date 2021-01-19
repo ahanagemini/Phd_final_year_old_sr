@@ -6,6 +6,7 @@ outputdir := "$(root_dir)/output_dir"
 cuttingdir := "$(root_dir)/output_dir/cutting_out"
 resumedir := "$(root_dir)/output_dir/edsr_16_64/edsr_16_64"
 loggerdir := "$(root_dir)/output_dir/logger"
+pretrained_model := "$(root_dir)/input_dir/edsr_64"
 epochs := 350
 architecture := "vgg"
 
@@ -19,9 +20,10 @@ run:
 	echo "download started"
 	$(PYTHON) sr/downloader.py --download="earth1" --output_directory=$(inputdir)
 	$(PYTHON) sr/downloader.py --download="slices" --output_directory=$(inputdir)
+	$(PYTHON) sr/downloader.py --download="edsr_64" --output_directory=$(inputdir)
 	echo "download ended"
 
-	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=$(epochs) --log_dir=$(loggerdir) --architecture=$(architecture) --vgg=True
+	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=$(epochs) --log_dir=$(loggerdir) --architecture=$(architecture) --pretrained_model_path=$(pretrained_model) --vgg=True
 	echo "training ended"
 
 

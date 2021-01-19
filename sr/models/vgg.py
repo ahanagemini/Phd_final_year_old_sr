@@ -31,8 +31,8 @@ class Discriminator_VGG_128(nn.Module):
         self.conv4_1 = nn.Conv2d(nf * 16, nf * 16, 4, 2, 1, bias=False)
         self.bn4_1 = nn.BatchNorm2d(nf * 16, affine=True)
 
-        self.linear1 = nn.Linear(1024 * shape//32 * shape//32, 1000)
-        self.linear2 = nn.Linear(1000, 100)
+        self.linear1 = nn.Linear(1024 * shape//32 * shape//32, 1024)
+        self.linear2 = nn.Linear(1024, 512)
 
         # activation function
         self.lrelu = nn.LeakyReLU(negative_slope=0.2, inplace=True)

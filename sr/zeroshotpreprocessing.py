@@ -65,7 +65,7 @@ def pretrained_model_upsample(mat, conf):
     height, width = mat.shape
     model = model_selection(conf.pretrained_architecture, conf.aspp, conf.dilation, conf.act)
     training_parameters["pretrained_model"] = model
-    training_parameters["pretrained_model_path"] = Path(conf.pretrained_model_path) / "best"
+    training_parameters["pretrained_model_path"] = Path(conf.pretrained_model_path)
     training_parameters = check_load_pretrained_model(training_parameters)
     model = training_parameters["pretrained_model"]
     mat = np.reshape(mat, (1, 1, height, width))

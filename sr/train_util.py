@@ -173,7 +173,7 @@ def model_selection(architecture, aspp, dilation, act):
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif architecture == "edsr_16_64":
-        model = EDSR(n_resblocks=32, n_feats=64, aspp=aspp, dilation=dilation, act=act)
+        model = EDSR(n_resblocks=64, n_feats=64, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_8_256":
         model = EDSR(n_resblocks=8, n_feats=256, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_16_256":
@@ -624,7 +624,6 @@ def vgg_valid(validation_generator, training_parameters):
                 sigma.to(device),
             )
             y_pred_lr = model(x_train_lr)
-            print(y_pred_lr.size())
             y_pred_hr = model(x_train_hr)
             loss_l1_valid = (criterion(y_pred_hr, torch.ones_like(y_pred_hr)) +
                        criterion(y_pred_lr, torch.zeros_like(y_pred_lr))) / 2
