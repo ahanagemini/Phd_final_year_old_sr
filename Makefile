@@ -31,7 +31,7 @@ run:
 
 
 resume:
-	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=$(epochs) --log_dir=$(loggerdir) --architecture=$(architecture) --resume=$(resumedir)
+	$(PYTHON) sr/zeroshotpreprocessing.py --input_dir_path=$(inputdir) --output_dir_path=$(outputdir) --cutting_output_dir_path=$(cuttingdir) --model_save=$(outputdir) --num_epochs=$(epochs) --log_dir=$(loggerdir) --architecture=$(architecture) --resume=$(resumedir) --pretrained_model=$(pretrained_model) --vgg=True
 	
 		
 setup:
