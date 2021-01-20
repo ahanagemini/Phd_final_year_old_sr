@@ -1,15 +1,16 @@
 PYTHON = python3
 
+epochs := 350
+architecture := "vgg"
 root_dir := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 inputdir := "$(root_dir)/input_dir"
 outputdir := "$(root_dir)/output_dir"
 cuttingdir := "$(root_dir)/output_dir/cutting_out"
-resumedir := "$(root_dir)/output_dir/edsr_16_64/edsr_16_64"
+resumedir := "$(root_dir)/output_dir/$(architecture)/$(architecture)"
 loggerdir := "$(root_dir)/output_dir/logger"
 download_dir := "$(root_dir)/Download"
 pretrained_model := "$(root_dir)/input_dir/edsr_64"
-epochs := 350
-architecture := "vgg"
+
 
 clean:
 	echo "clean started"
