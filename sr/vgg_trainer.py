@@ -19,7 +19,7 @@ BATCH_SIZE = {
     "vgg" :16
 }
 LR = {
-    "vgg":0.001
+    "vgg":0.0001
 }
 
 
