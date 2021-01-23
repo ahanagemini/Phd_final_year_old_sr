@@ -24,8 +24,11 @@ class VGGTrainDataset(Dataset):
             image_name = image_file_name.name
             image_parent_name = os.path.splitext(image_file_name.parent.name)[0]
             lr_image = image_file_name
+            lr_image_label = 0.0
             hr_image = self.hr_dir / image_parent_name / image_name
-            self.lr_hr_tuple.append((lr_image, hr_image))
+            hr_image_label = 1.0
+            self.lr_hr_tuple.append((lr_image, lr_image_label))
+            self.lr_hr_tuple.append((hr_image, hr_image_label))
 
         np.random.shuffle(self.lr_hr_tuple)
         self.lognorm = lognorm
@@ -33,8 +36,8 @@ class VGGTrainDataset(Dataset):
         self.validate = validate
         keys = ("mean", "std", "min", "max")
         for ftuple in self.lr_hr_tuple:
-            lr_image, hr_image = ftuple
-            hstat = json.load(open(str(hr_image.parent / "stats.json")))
+            image, label = ftuple
+            hstat = json.load(open(str(image.parent / "stats.json")))
             hstat = {x: hstat[x] for x in keys}
             self.stats_list.append(hstat)
 
@@ -42,20 +45,22 @@ class VGGTrainDataset(Dataset):
         return len(self.lr_hr_tuple)
 
     def __getitem__(self, idx):
-        lrimg_name, hrimg_name = self.lr_hr_tuple[idx]
-        lrimg_name = Path(lrimg_name)
-        hrimg_name = Path(hrimg_name)
-        filename = os.path.basename(hrimg_name)
+        image_path, image_label = self.lr_hr_tuple[idx]
+        image_name = Path(image_path)
+        filename = os.path.basename(image_name)
         filename = filename.split(".")[0]
         stats_hr = self.stats_list[idx]
-        hr_image = loader(hrimg_name)
-        lr_image = loader(lrimg_name)
-
-        lr_image = Normalize()(lr_image, stats_hr)
-        hr_image = Normalize()(hr_image, stats_hr)
-        sample = {"lr": lr_image, "hr": hr_image, "stats": stats_hr, "filename": filename}
-
-        transforms = Compose([Reshape(), ToFloatTensor()])
+        image = loader(image_path)
+        image = Normalize()(image, stats_hr)
+        sample = {"image": image, "label": image_label, "stats": stats_hr, "file": filename}
+        transforms = Compose([Differential(0.4),
+                              Rotate(),
+                              Transpose(),
+                              HorizontalFlip(),
+                              VerticalFlip(),
+                              Pertube(0.5, 0.5),
+                              Reshape(),
+                              ToFloatTensor()])
         for i, trans in enumerate([transforms]):
             sample = trans(sample)
 
@@ -94,11 +99,8 @@ class Reshape:
         """
 
         # setting hr width and height
-        image_height_lr, image_width_lr = sample["lr"].shape
-        image_height_hr, image_width_hr = sample["hr"].shape
-
-        sample["lr"] = np.reshape(sample["lr"], (1, image_height_lr, image_width_lr))
-        sample["hr"] = np.reshape(sample["hr"], (1, image_height_hr, image_width_hr))
+        image_height_lr, image_width_lr = sample["image"].shape
+        sample["image"] = np.reshape(sample["image"], (1, image_height_lr, image_width_lr))
         return sample
 
 class ToFloatTensor:
@@ -114,6 +116,137 @@ class ToFloatTensor:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
-        sample["lr"] = torch.from_numpy(sample["lr"]).float()
-        sample["hr"] = torch.from_numpy(sample["hr"]).float()
+        sample["image"] = torch.from_numpy(sample["image"].copy()).float()
+        return sample
+
+class Differential:
+    """This will calculate the difference gradient matrix of the image"""
+    def __init__(self, prob):
+        """
+
+        Parameters
+        ----------
+        prob: The probability of this filter running between 0 and 1
+        """
+        self.prob = prob
+
+    def __call__(self, sample):
+        """
+
+        Parameters
+        ----------
+        sample: Contains lr, hr images
+        Returns
+        -------
+
+        """
+        if random.random() < self.prob:
+            lr_height, lr_width = sample["image"].shape
+            sample["image"] = np.abs(np.diff(np.pad(sample["image"], 1))[1: 1+lr_width, 0:lr_height])
+        return sample
+
+class Rotate:
+    """Rotate class rotates image array"""
+
+    def __call__(self, sample):
+        """
+
+        Parameters
+        ----------
+        sample: dictionary containing lr, hr and stats
+
+        Returns
+        -------
+        sample: dictionary containing transformed lr and transformed hr
+        """
+        for i in range(random.randint(0, 3)):
+            sample["image"] = np.rot90(sample["image"])
+        return sample
+
+class Transpose:
+    """Transpose class calculates the transpose of the matrix"""
+
+    def __call__(self, sample):
+        """
+
+        Parameters
+        ----------
+        sample: dictionary containing lr, hr and stats
+
+        Returns
+        -------
+        sample: dictionary containing transformed lr and transformed hr
+        """
+        if random.random() > 0.5:
+            sample["image"] = np.transpose(sample["image"])
+        return sample
+
+
+class VerticalFlip:
+    """VerticalFlip class to probailistically return vertical flip of the matrix"""
+
+    def __call__(self, sample):
+        """
+
+        Parameters
+        ----------
+        sample: dictionary containing lr, hr and stats
+
+        Returns
+        -------
+        sample: dictionary containing transformed lr and transformed hr
+        """
+        if random.random() > 0.5:
+            sample["image"] = np.flipud(sample["image"])
+        return sample
+
+
+class HorizontalFlip:
+    """HorizontalFlip class to probailistically return horizontal flip of the matrix"""
+
+    def __call__(self, sample):
+        """
+
+        Parameters
+        ----------
+        sample: dictionary containing lr, hr and stats
+
+        Returns
+        -------
+        sample: dictionary containing transformed lr and transformed hr
+        """
+        if random.random() > 0.5:
+            sample["image"] = np.fliplr(sample["image"])
+        return sample
+
+
+class Pertube:
+    """ Pertube class transforms image array by adding very small values to the array """
+
+    def __init__(self, prob=0.5, random_prob=0.5):
+        """
+
+        Parameters
+        ----------
+        prob: probabilty of no. of images to be processed using this filter
+        random_prob: the probability of generating zeros in an array
+        """
+        self.prob = prob
+        self.random_prob = random_prob
+
+    def __call__(self, sample):
+        """
+        Parameters
+        ----------
+        sample: dictionary containing lr, hr and stats
+
+        Returns
+        -------
+        sample: dictionary containing transformed lr and transformed hr
+        """
+
+        if random.random() < self.prob:
+            lr_width, lr_height = sample["image"].shape
+            sample["image"] = np.random.choice([0, 1], size=(lr_width, lr_height),
+                                                      p=[self.random_prob, 1-self.random_prob]) * sample["image"]
         return sample

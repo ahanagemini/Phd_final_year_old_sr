@@ -77,6 +77,10 @@ def pretrained_model_upsample(mat, conf):
         mat = model(mat)
         mat = mat.cpu().numpy()
         mat = mat[0, 0, :, :]
+
+    file_directory = r"/home/venkat/Documents/PiyushKumarProject/Upsampled_images"
+    if not os.path.isdir(file_directory):
+        os.makedirs(file_directory)
     return mat
 
 def vgg_hr_random_cropper(image_matrix, hr_opath, fname):
@@ -408,6 +412,7 @@ def pil_saving_images(sample_list, conf):
                 mat = mat[:, :, 0]
             else:
                 mat = resizer.pil_image(mat, conf.scale_factor)
+
             if conf.vgg:
                 mat = pretrained_model_upsample(mat, conf)
             np.savez_compressed(lr_opath / fname, mat)

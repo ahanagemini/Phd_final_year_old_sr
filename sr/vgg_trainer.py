@@ -13,10 +13,10 @@ from torchsummary import summary
 import numpy as np
 from vgg_dataset import VGGTrainDataset
 from logger import Logger
-from train_util import model_selection, check_load_model, model_save, vgg_train, vgg_valid, check_load_pretrained_model
+from train_util import model_selection, check_load_model, model_save, vgg_train, vgg_valid, check_load_pretrained_model, debug_pics
 
 BATCH_SIZE = {
-    "vgg" :16
+    "vgg" :4
 }
 LR = {
     "vgg":0.0001
@@ -101,7 +101,7 @@ def vgg_trainer(training_generator,
 
     # loading the model
     training_parameters = check_load_model(save_model_path, model, lr)
-    training_parameters["criterion"] = torch.nn.L1Loss()
+    training_parameters["criterion"] = torch.nn.CrossEntropyLoss()
     training_parameters["device"] = device
     training_parameters["max_epochs"] = max_epochs
     training_parameters["learning_rate"] = lr
