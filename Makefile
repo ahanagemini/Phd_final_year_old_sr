@@ -9,7 +9,7 @@ cuttingdir := "$(root_dir)/output_dir/cutting_out"
 resumedir := "$(root_dir)/output_dir/$(architecture)/$(architecture)"
 loggerdir := "$(root_dir)/output_dir/logger"
 download_dir := "$(root_dir)/Download"
-pretrained_model := "$(root_dir)/input_dir/edsr_64"
+pretrained_model := "$(root_dir)/input_dir/edsr_64_64"
 
 
 clean:

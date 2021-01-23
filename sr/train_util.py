@@ -173,7 +173,7 @@ def model_selection(architecture, aspp, dilation, act):
     elif architecture == "axial":
         model = AxialNet(num_channels=1, resblocks=2, skip=1)
     elif architecture == "edsr_16_64":
-        model = EDSR(n_resblocks=32, n_feats=64, aspp=aspp, dilation=dilation, act=act)
+        model = EDSR(n_resblocks=64, n_feats=64, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_8_256":
         model = EDSR(n_resblocks=8, n_feats=256, aspp=aspp, dilation=dilation, act=act)
     elif architecture == "edsr_16_256":
