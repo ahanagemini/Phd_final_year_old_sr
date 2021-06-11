@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """Usage:   trainer.py --train=train_path --valid=valid_path --log_dir=log_dir --num_epochs=epochs
-                       --architecture=arch --act=act [--lognorm] [--debug_input_pics] [--aspp] [--dilation]
+                       --architecture=arch --loss_list=loss1:loss2:loss3:loss4  --act=act [--lognorm] [--debug_input_pics] [--aspp] [--dilation]
             trainer.py --help | -help | -h
 
 Train the requested model.
@@ -11,7 +11,8 @@ Arguments:
   log_dir       directory for storing training logs
   num_epochs    number of epochs
   architecture  the architecture to train unet or axial
-  act activations can be relu or leakyrelu FOR EDSR ONLY
+  loss_list     combination of losses to use. : separated list
+  act activations can be relu, elu, or leakyrelu, prelu, FOR EDSR ONLY
   --lognorm     if we are using log normalization
   --debug_input_pics  If we want to save input pics for debugging
   --aspp        use ASPP in EDSR
@@ -43,11 +44,11 @@ from autoencoder import AE
 from dataset import SrDataset, PairedDataset
 from dataset import AEDataset
 from axial_bicubic import AxialNet
-from losses import SSIM, L1loss, PSNR
+from losses import SSIM, PerceptualLoss
 from logger import Logger
 
 BATCH_SIZE = {"unet": 16, "axial": 16, "edsr_16_64": 8, "edsr_8_256": 16,
-              "edsr_16_256": 8, "edsr_32_256": 16, "AE": 16}
+              "edsr_16_256": 8, "edsr_32_256": 8, "AE": 16}
 LR = {"unet": 0.00005, "axial": 0.0005, "edsr_16_64": 0.0005, "AE": 0.0001, 
       "edsr_8_256": 0.0002, "edsr_16_256": 0.0001, "edsr_32_256": 0.0001}
 
@@ -94,7 +95,7 @@ def model_save(train_model, train_model_path):
 
 
 def training(training_generator, validation_generator, device, log_dir,
-             architecture, num_epochs, debug_pics, aspp, dilation, act):
+             architecture, losses, num_epochs, debug_pics, aspp, dilation, act):
     """
 
     Parameters
@@ -104,6 +105,7 @@ def training(training_generator, validation_generator, device, log_dir,
     device: Cuda Device
     log_dir: The log directory for storing logs
     architecture: The architecture to be used unet or axial
+    losses: list of losses
     num_epochs:   The number of epochs
     debug_pics: True if we want to save pictures in input_pics
     aspp: True if EDSR is going to use aspp
@@ -137,13 +139,30 @@ def training(training_generator, validation_generator, device, log_dir,
     model.to(device)
     summary(model, (1, 256, 256), batch_size=1, device="cuda")
     max_epochs = num_epochs
-    criterion = torch.nn.L1Loss()
+    criterion = dict()
+    percep_criterion =False
+    loss_weights = dict()
+    for loss in losses:
+        if loss == "L1":
+            criterion["L1"] = torch.nn.L1Loss()
+            loss_weights["L1"] = 1.0
+        elif loss == "MSE":
+            criterion["MSE"] = torch.nn.MSELoss(reduction='mean')
+            loss_weights["MSE"] = 0.1
+        elif loss == "SSIM":
+            criterion["SSIM"] = SSIM()
+            loss_weights["SSIM"] = 30.0
+        elif loss == "perceptual":
+            print("Perceptual loss starts getting used later")
+            percep_criterion = True
+            loss_weights["perceptual"] = 1.0
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     # learning rate scheduler
     if architecture == "edsr_16_64":
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=3)
     best_valid_loss = float("inf")
+    best_epoch = 0
     logger = Logger(str(log_dir))
     step = 0
     totiter = len(training_generator)
@@ -157,7 +176,11 @@ def training(training_generator, validation_generator, device, log_dir,
     for epoch in range(max_epochs):
         start_time = time()
         train_loss = valid_loss = 0.0
+        loss_values = dict()
+        val_loss_values = dict()
         model.train()
+        if percep_criterion and epoch == (max_epochs * 2) // 3:
+            criterion["perceptual"] = PerceptualLoss()
         loss_train_list = []
         step += 1
         # Main training loop for this epoch
@@ -196,7 +219,14 @@ def training(training_generator, validation_generator, device, log_dir,
                         encoded, y_pred = model(x_train)
                     else:
                         y_pred = model(x_train)
-                    loss_train = criterion(y_pred, y_train)
+                    loss_train = 0.0
+                    for key in criterion.keys():
+                        if batch_idx == 0:
+                            loss_values[key] = 0.0
+                        this_loss = criterion[key](y_pred, y_train)
+                        loss_values[key] = loss_values[key] + (
+                            (1 / (batch_idx + 1)) * (this_loss.data - loss_values[key]))
+                        loss_train += (loss_weights[key] * this_loss)
                     train_loss = train_loss + (
                         (1 / (batch_idx + 1)) * (loss_train.data - train_loss)
                     )
@@ -227,7 +257,16 @@ def training(training_generator, validation_generator, device, log_dir,
                     encoded, y_pred = model(x_valid)
                 else:
                     y_pred = model(x_valid)
-                loss_valid = criterion(y_pred, y_valid)
+                #loss_valid = criterion(y_pred, y_valid)
+                loss_valid = 0.0
+                for key in criterion.keys():
+                    if batch_idx == 0:
+                        val_loss_values[key] = 0.0
+                    this_loss = criterion[key](y_pred, y_valid)
+                    val_loss_values[key] = val_loss_values[key] + (
+                        (1 / (batch_idx + 1)) * (this_loss.data - val_loss_values[key]))
+                    loss_valid += (loss_weights[key] * this_loss)
+
                 loss_valid_list.append(loss_valid.item())
                 valid_loss = valid_loss + (
                     (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
@@ -244,7 +283,7 @@ def training(training_generator, validation_generator, device, log_dir,
         del x_valid, y_valid, loss_valid_list
         memory = torch.cuda.max_memory_allocated() / 1024.0 / 1024.0
         print(
-            "\nEpoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f} in {:.1f} seconds. [lr:{:.8f}][max mem:{:.0f}MB]".format(
+                "\nEpoch: {} \tTraining Loss: {:.6f} \tValidation Loss: {:.6f} in {:.1f} seconds. [lr:{:.8f}][max mem:{:.0f}MB]".format(
                 epoch,
                 train_loss,
                 valid_loss,
@@ -253,18 +292,22 @@ def training(training_generator, validation_generator, device, log_dir,
                 memory,
             )
         )
+        print("Best epoch: " + str(best_epoch) + " Best Val loss: " + str(best_valid_loss))
+        print("Training losses: ", loss_values)
+        print("Validation losses: ", val_loss_values)
         # Save best validation epoch model
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
+            best_epoch = epoch
             model_save(
                 model, f"{save_model_path}/{architecture}/{timestamp}_best_model.pt",
             )
 
-        if step % 10 == 0:
-            model_save(
-                model,
-                f"{save_model_path}/{architecture}/{timestamp}_model_{step}.pt",
-            )
+        # if step % 10 == 0:
+        #    model_save(
+        #        model,
+        #        f"{save_model_path}/{architecture}/{timestamp}_model_{step}.pt",
+        #    )
         model_save(model, f"{save_model_path}/{architecture}/{timestamp}_model.pt")
         torch.cuda.empty_cache()
 
@@ -284,6 +327,8 @@ def process(arguments):
     valid_path = Path(arguments["--valid"])
     log_dir = Path(arguments["--log_dir"])
     architecture = arguments["--architecture"]
+    loss_list = arguments["--loss_list"]
+    losses = loss_list.split(':')
     num_epochs = int(arguments["--num_epochs"]) 
     lognorm = arguments["--lognorm"]
     debug_pics = arguments["--debug_input_pics"]
@@ -312,7 +357,7 @@ def process(arguments):
     validation_set = create_dataset(valid_path, architecture, lognorm=lognorm)
     validation_generator = torch.utils.data.DataLoader(validation_set, **parameters_val)
     training(training_generator, validation_generator, device, log_dir,
-             architecture, num_epochs, debug_pics, aspp, dilation, act)
+             architecture, losses, num_epochs, debug_pics, aspp, dilation, act)
 
 
 if __name__ == "__main__":
