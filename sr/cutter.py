@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """Usage: cutter.py --input-directory=IDIR --output-directory=ODIR --percentage=100 --patch_size=256 \
-                    --train_size=0.9 --val_size=0.05 [--no_test_patch]
+                    --train_size=0.9 --val_size=0.05 [--no_test_patch] [--info_crop] [--rescale]
           cutter.py --help | -help | -h
 
 --input-directory=IDIR  Some directory [default: ./data]
@@ -11,6 +11,8 @@
 --train_size=0.9  the percentage of files in the train set
 --val_size=0.05 the percentage of files in the validation set
 --no_test_patch  No breaking the test set image sinto patches
+--info_crop  Use the maximal info crop of 128*128 at the center
+--rescale  Whether to rescale to 0-255
 
 cutter expects the input directory of images to be of the following structure.
 Input_directory->patient_folder->patient_image.
@@ -58,7 +60,7 @@ def loader(ifile):
     fileExt = "." + ".".join(fname.split(".")[1:])
     if fileExt in ImagePaths:
         image = Image.open(ifile)
-        image = np.array(image.convert(mode="L"))
+        image = np.array(image.convert(mode="F"))
     if fileExt in TiffPaths:
         # 16 bit tifffiles are not read correctly by Pillow
         image = tifffile.imread(str(ifile))
@@ -131,8 +133,7 @@ def computestats(imatrix):
 
 
 def matrix_dictionary_update(
-    key_matrix_map, matrix_key_map, file_names_map, imatrix, key, ofile, file_name
-):
+    key_matrix_map, matrix_key_map, file_names_map, imatrix, key, ofile, file_name):
     if imatrix.ndim == 2:
         key_matrix_map.append((imatrix, key))
         matrix_key_map[key] = ofile
@@ -153,6 +154,7 @@ def matrix_dictionary_update(
             for i in range(imatrix.shape[2]):
                 slice_i = imatrix[:,:,i]
                 key_matrix_map.append((slice_i, key))
+
                 matrix_key_map[key] = ofile
                 file_names_map[key] = f"{file_name}_{i}"
                 key = key + 1
@@ -160,7 +162,7 @@ def matrix_dictionary_update(
     return file_names_map, key_matrix_map, matrix_key_map, key
 
 
-def process(L, stats_paths, train_size, val_size, patch_size, no_test_patch):
+def process(L, stats_paths, train_size, val_size, patch_size, no_test_patch, info_crop, rescale):
     """
 
     :param L: contains the input_file path and output_file path
@@ -169,6 +171,8 @@ def process(L, stats_paths, train_size, val_size, patch_size, no_test_patch):
     :param val_size: validation set size
     :param patch_size: this will cut the images to desired size
     :param no_test_patch: this ensures test set dtaa is not patched
+    :param info_crop: Whether we crop central 128*128 pixels with maximal info
+    :param rescale: Whether to rescale to 0 - 255
     :return:
     """
     matrices = []
@@ -193,7 +197,14 @@ def process(L, stats_paths, train_size, val_size, patch_size, no_test_patch):
         #if imatrix.shape[0] < patch_size or imatrix.shape[1] < patch_size:
         #    print("Skipping because file is constant or size is too small.")
         #    continue
-
+        
+        if rescale and np.max(imatrix) - np.min(imatrix) > 0:
+            imatrix = 255.0 * imatrix / (np.max(imatrix) - np.min(imatrix))
+            print(np.max(imatrix))
+        if info_crop:
+            start = imatrix.shape[0] // 2 - 64
+            end = imatrix.shape[0] // 2 + 64
+            imatrix = imatrix[start:end, start:end,:]
         matrix_vector = np.asarray(imatrix).reshape(-1)
         if i < train_len:
             square_vector = np.square(matrix_vector, dtype=np.float)
@@ -371,6 +382,8 @@ def main():
     train_size = float(arguments["--train_size"])
     val_size = float(arguments["--val_size"])
     no_test_patch = arguments["--no_test_patch"]
+    info_crop = arguments["--info_crop"]
+    rescale = arguments["--rescale"]
     assert not odir.is_dir(), "Please provide a non-existent output directory!"
     folder_map, train_size = scan_idir(idir, odir, percentage,
                                        train_size, val_size)
@@ -378,7 +391,7 @@ def main():
     for folder in folder_map.keys():
         print(folder)
         L, stats_paths = folder_map[folder]
-        process(L, stats_paths, train_size, val_size, patch_size, no_test_patch)
+        process(L, stats_paths, train_size, val_size, patch_size, no_test_patch, info_crop, rescale)
 
 
 if __name__ == "__main__":
