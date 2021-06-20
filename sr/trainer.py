@@ -155,7 +155,7 @@ def training(training_generator, validation_generator, device, log_dir,
         elif loss == "perceptual":
             print("Perceptual loss starts getting used later")
             percep_criterion = True
-            loss_weights["perceptual"] = 1.0
+            loss_weights["perceptual"] = 0.1
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
     # learning rate scheduler
@@ -259,14 +259,17 @@ def training(training_generator, validation_generator, device, log_dir,
                     y_pred = model(x_valid)
                 #loss_valid = criterion(y_pred, y_valid)
                 loss_valid = 0.0
+                weight_sum = 0.0
                 for key in criterion.keys():
                     if batch_idx == 0:
                         val_loss_values[key] = 0.0
                     this_loss = criterion[key](y_pred, y_valid)
                     val_loss_values[key] = val_loss_values[key] + (
                         (1 / (batch_idx + 1)) * (this_loss.data - val_loss_values[key]))
+                    weight_sum += loss_weights[key]
                     loss_valid += (loss_weights[key] * this_loss)
 
+                loss_valid = loss_valid / weight_sum
                 loss_valid_list.append(loss_valid.item())
                 valid_loss = valid_loss + (
                     (1 / (batch_idx + 1)) * (loss_valid.data - valid_loss)
