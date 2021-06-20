@@ -10,7 +10,7 @@ Arguments:
   output        a directory for saving the output images
   model         a .pt file to use for the model
   architecture  architecture to use: unet or axial
-  act           activation used in EDSR 'relu' or 'leakyrelu'
+  act           activation used in EDSR 'relu' or 'leakyrelu' or 'elu' or prelu
   --lognorm     If we want to use log normalization
   --active      Whether to save per-image metrics for active learning selection
   --save_slice  If we want to save the slice as a png image
@@ -167,14 +167,18 @@ def evaluate(args):
                 y_pred = model(x_test)
 
             # Inverse of the nomalizations used. Applied on SR data
-            stat_test["std"] = stat_test["std"].numpy()
-            stat_test["mean"] = stat_test["mean"].numpy()
-            y_pred = y_pred.cpu().numpy()
-            y_pred = (y_pred * stat_test["std"]) + stat_test["mean"]
-            y_pred =  np.clip(y_pred, stat_test["min"].numpy(), stat_test["max"].numpy())
-            if lognorm:
-                image_sign = np.sign(y_pred)
-                y_pred = image_sign * (np.exp(np.abs(y_pred)) - 1.0)
+            # stat_test["std"] = stat_test["std"].numpy()
+            # stat_test["mean"] = stat_test["mean"].numpy()
+            # y_pred = y_pred.cpu().numpy()
+            # y_pred = (y_pred * stat_test["std"]) + stat_test["mean"]
+            # y_pred =  np.clip(y_pred, stat_test["min"].numpy(), stat_test["max"].numpy())
+            # if lognorm:
+            #     image_sign = np.sign(y_pred)
+            #     y_pred = image_sign * (np.exp(np.abs(y_pred)) - 1.0)
+            y_test = y_test * 16
+            y_pred = y_pred.cpu().numpy() 
+            y_pred = y_pred * 16
+            y_pred =  np.clip(y_pred, 0, 4095)
 
             # Compute the loss if HR is given
             if args["hr"]:
@@ -190,7 +194,7 @@ def evaluate(args):
             if not active_learning:
                 if args["hr"]:
                     error = np.abs(y_pred - y_test).reshape(-1, y_pred.shape[-1])
-                    error = error * (stat_test["max"].numpy() / np.max(error))
+                    error = error * (stat_test["max"].numpy() / max(1, np.max(error)))
                     lr_error = np.hstack([error, x_test.reshape(-1, y_pred.shape[-1])])
                     save_plots = np.vstack([sr_hr, lr_error])
                 else:
@@ -219,13 +223,15 @@ def evaluate(args):
                 x_test = x_test.reshape(x_test.shape[3], -1)
                 y_test = y_test.reshape(y_test.shape[3], -1)
                 y_pred = y_pred.reshape(y_pred.shape[3], -1)
-                data_range = stat_test["max"].numpy()
+                data_range = 4095
+                # data_range = stat_test["max"].numpy()[0]
                 # For AE architecture, the lr and hr are same, so not comparing
-                if architecture != "AE":
+                if architecture != "AE" and np.mean(np.abs(y_test - x_test)) != 0:
                     lr_psnr = metrics.peak_signal_noise_ratio(y_test, x_test,
                                                               data_range=data_range)
-                sr_psnr = metrics.peak_signal_noise_ratio(y_test, y_pred,
-                                                          data_range=data_range)
+                if np.mean(np.abs(y_test - y_pred)) != 0:
+                    sr_psnr = metrics.peak_signal_noise_ratio(y_test, y_pred,
+                                                              data_range=data_range)
                 # For AE architecture, the lr and hr are same, so not comparing
                 if architecture != "AE":
                     lr_ssim = metrics.structural_similarity(y_test, x_test,
@@ -234,13 +240,13 @@ def evaluate(args):
                 sr_ssim = metrics.structural_similarity(y_test, y_pred,
                                                         gaussian_weights=True,
                                                         data_range=data_range)
-                test_psnr = test_psnr + sr_psnr[0]
+                test_psnr = test_psnr + sr_psnr
                 test_ssim = test_ssim + sr_ssim
-                lr_tot_psnr = lr_tot_psnr + lr_psnr[0]
+                lr_tot_psnr = lr_tot_psnr + lr_psnr
                 lr_tot_ssim = lr_tot_ssim + lr_ssim
                 lr_l1_tot = lr_l1_tot + lr_l1
-                srerror = (sr_l1, sr_psnr[0], sr_ssim)
-                lrerror = (lr_l1, lr_psnr[0], lr_ssim)
+                srerror = (sr_l1, sr_psnr, sr_ssim)
+                lrerror = (lr_l1, lr_psnr, lr_ssim)
                 # For AE architecture, images are too small for writing on
                 if not active_learning and not architecture == "AE":
                     writetext(os.path.abspath(filename), srerror, lrerror)
@@ -248,8 +254,8 @@ def evaluate(args):
                     messed_images = messed_images + 1
                 # Fro non AE architecture, save hte utility values of image
                 if active_learning and not architecture == "AE":
-                    active_list.append([data["file"][0], sr_l1, sr_psnr[0],
-                                        sr_ssim, lr_l1, lr_psnr[0], lr_ssim])
+                    active_list.append([data["file"][0], sr_l1, sr_psnr,
+                                        sr_ssim, lr_l1, lr_psnr, lr_ssim])
                 # For AE architecture save the latent variable values for image
                 if active_learning and architecture == "AE":
                     data_list = []
