@@ -10,6 +10,7 @@ import os
 import torch
 from torch.utils.data import Dataset
 from torchvision.transforms import Compose
+import torch.nn.functional as F
 import scipy.ndimage
 import numpy as np
 from cutter import loader
@@ -61,39 +62,43 @@ class PairedDataset(Dataset):
 
         lr_image =  loader(lrimg_name)
         lr_unorm = lr_image.copy()
-        if self.lognorm:
-            stats_lr = {}
-            image_sign = np.sign(lr_image)
-            lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
-            stats_lr["mean"] = np.mean(lr_image)
-            stats_lr["std"] = np.std(lr_image)
-            if not self.test:
-                stats_hr = {}
-                image_sign = np.sign(hr_image)
-                hr_image = image_sign * np.log(np.abs(hr_image) + 1.0)
-                stats_hr["mean"] = np.mean(hr_image)
-                stats_hr["std"] = np.std(hr_image)
-        if stats_lr["std"] <= 0.001:
-            stats_lr["std"] = 1
-        if stats_hr["std"] <= 0.001:
-            stats_hr["std"] = 1
+        # if self.lognorm:
+        #     stats_lr = {}
+        #     image_sign = np.sign(lr_image)
+        #     lr_image = image_sign * np.log(np.abs(lr_image) + 1.0)
+        #     stats_lr["mean"] = np.mean(lr_image)
+        #     stats_lr["std"] = np.std(lr_image)
+        #     if not self.test:
+        #         stats_hr = {}
+        #         image_sign = np.sign(hr_image)
+        #         hr_image = image_sign * np.log(np.abs(hr_image) + 1.0)
+        #         stats_hr["mean"] = np.mean(hr_image)
+        #         stats_hr["std"] = np.std(hr_image)
+        # if stats_lr["std"] <= 0.001:
+        #     stats_lr["std"] = 1
+        # if stats_hr["std"] <= 0.001:
+        #     stats_hr["std"] = 1
 
-        if not self.test:
-            hr_image = Normalize()(hr_image, stats_hr)
-        lr_image = Normalize()(lr_image, stats_lr)
+        # if not self.test:
+        #    hr_image = Normalize()(hr_image, stats_hr)
+        # lr_image = Normalize()(lr_image, stats_lr)
+        hr_image = hr_image / 16.0
+        lr_image = lr_image / 16.0
         sample = {"lr": lr_image, "lr_un": lr_unorm, "hr": hr_image, "stats": stats_hr, "file": filename}
         if not self.test:
             transforms = Compose(
                 [Rotate(), Transpose(), HorizontalFlip(), VerticalFlip(),
-                    Pertube(1.00e-6), Reshape(), ToFloatTensor()]
+                    Reshape(), ToFloatTensor()]
             )
             for i, trans in enumerate([transforms]):
                 sample = trans(sample)
         if self.test:
             transforms = Compose(
-                [Pertube(1.00e-6), Reshape(), ToFloatTensor()]
+                [Reshape(), ToFloatTensor()]
             )
             sample = transforms(sample)
+        # transforms = Compose([Reshape(), ToFloatTensor()])
+        # sample = transforms(sample)
         return sample
 
 class AEDataset(Dataset):
@@ -193,6 +198,13 @@ class SrDataset(Dataset):
         stats = self.statlist[idx]
         if self.hr:
             hr_image = loader(img_name)
+            # hr_image = hr_image[56:184, 56:184]
+            # stats["max"] = max(1, np.max(hr_image))
+            # hr_image = (hr_image / stats["max"]) * 255
+            # stats["max"] = 255
+            # stats["mean"] = np.mean(hr_image)
+            # stats["std"] = np.std(hr_image)
+            #print(stats["max"])
         if not self.test:
             if self.lognorm:
                 image_sign = np.sign(hr_image)
@@ -206,7 +218,28 @@ class SrDataset(Dataset):
             hr_image = Normalize()(hr_image, stats)
         
         if self.hr:
-            lr_image = scipy.ndimage.zoom(scipy.ndimage.zoom(hr_image, 0.25), 4.0)
+            # lr_image = scipy.ndimage.zoom(scipy.ndimage.zoom(hr_image, 0.25), 4.0)
+            # CHANGES FOR USING DIFFERENT SCALING ALGO
+            # hr_image = hr_image.reshape((hr_image.shape[0], hr_image.shape[1], 1))
+            hr_mod = hr_image.reshape((1, 1, hr_image.shape[1], hr_image.shape[0]))
+            hr_mod = torch.tensor(hr_mod, dtype=torch.float32)
+            lr = F.interpolate(
+                hr_mod,
+                scale_factor=0.25,
+                mode='bicubic',
+                align_corners=True,
+                recompute_scale_factor=False,
+            )
+            lr_image = F.interpolate(
+                lr,
+                scale_factor=4,
+                mode='bicubic',
+                align_corners=True,
+                recompute_scale_factor=False,
+            )
+            lr_image = lr_image.reshape(lr_image.shape[3], lr_image.shape[2])
+            lr_image = lr_image.numpy()
+            # END OF THOSE CHANGES FOR SCALING
         else:
             lr_image =  loader(img_name)
             hr_image = np.zeros_like(lr_image)
@@ -294,9 +327,10 @@ class ToFloatTensor:
         -------
         sample: dictionary containing transformed lr and transformed hr
         """
+        sample["hr"] = np.ascontiguousarray(sample["hr"])
+        sample["lr"] = np.ascontiguousarray(sample["lr"])
         sample["hr"] = torch.tensor(sample["hr"], dtype=torch.float32)
         sample["lr"] = torch.tensor(sample["lr"], dtype=torch.float32)
-
         return sample
 
 
