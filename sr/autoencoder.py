@@ -18,11 +18,11 @@ class AE(nn.Module):
         self.enc2 = nn.Conv2d(64, 32, kernel_size=3, padding=1)
         self.enc3 = nn.Conv2d(32, 16, kernel_size=3, padding=1)
         self.enc4 = nn.Conv2d(16, 8, kernel_size=3, padding=1)
-        self.enc5 = nn.Conv2d(8, 8, kernel_size=3, padding=1)
+        # self.enc5 = nn.Conv2d(8, 8, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(2, 2)
 
         # decoder layers
-        self.dec0 = nn.ConvTranspose2d(8, 8, kernel_size=2, stride=2)
+        # self.dec0 = nn.ConvTranspose2d(8, 8, kernel_size=2, stride=1, padding=1)
         self.dec1 = nn.ConvTranspose2d(8, 8, kernel_size=2, stride=2)
         self.dec2 = nn.ConvTranspose2d(8, 16, kernel_size=2, stride=2)
         self.dec3 = nn.ConvTranspose2d(16, 32, kernel_size=2, stride=2)
@@ -39,12 +39,12 @@ class AE(nn.Module):
         x = self.pool(x)
         x = F.relu(self.enc4(x))
         enc = self.pool(x) 
-        #x = F.relu(self.enc5(x))
+        #enc = F.relu(self.enc5(x))
         #enc = self.pool(x)
         # the latent space representation
 
         # decode
-        #res = F.relu(self.dec0(enc))
+        # res = F.relu(self.dec0(enc))
         res = F.relu(self.dec1(enc))
         res = F.relu(self.dec2(res))
         res = F.relu(self.dec3(res))
